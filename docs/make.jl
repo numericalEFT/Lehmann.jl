@@ -15,6 +15,12 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Manual" => Any[
+        ],
+        "Library" => Any[
+                map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+                # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+        ]
     ],
 )
 
