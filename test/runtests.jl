@@ -1,6 +1,9 @@
 using Lehmann
 using Test
 
-@testset "Lehmann.jl" begin
+include("spectral.jl")
+include("dlr.jl")
+
+# @testset "Lehmann.jl" begin
     # Write your tests here.
-end
+# end

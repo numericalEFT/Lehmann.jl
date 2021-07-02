@@ -1,5 +1,10 @@
 module Lehmann
+using StaticArrays
 
-# Write your package code here.
+include("spectral.jl")
+export Spectral
+
+include("dlr/dlr.jl")
+export DLR
 
 end
