@@ -1,5 +1,5 @@
 using Lehmann
-using FastGaussQuadrature
+using FastGaussQuadrature, Printf
 
 function kernelMatrix(ktype, x, ω, β) # both x and \omege are vectors
     if ktype == 0
@@ -109,7 +109,7 @@ end
 
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
-β = 10.0
+β = 100.0
 Euv = 1.0
 eps = 1.0e-8
 type = :fermi
@@ -136,5 +136,5 @@ GwnDfitted = dlr2matfreqD(coeff, dlr, ngrid)
 println("derivative in ωn fit error: ", rtol(GwnD, GwnDfitted))
 
 for (wi, w) in enumerate(ngrid)
-    println("$w  $(GwnD[wi])  $(GwnDfitted[wi])   $(GwnDfitted[wi] - GwnD[wi])")
+    @printf("%3i   %10.6f + %10.6fim   %10.6f + %10.6fim   %12.6f\n", w, real(GwnD[wi]), imag(GwnD[wi]), real(GwnDfitted[wi]), imag(GwnDfitted[wi]), abs(GwnDfitted[wi] - GwnD[wi]))
 end
