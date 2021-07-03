@@ -25,5 +25,5 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/kunyuan/Lehmann.jl",
+    repo="github.com/kunyuan/Lehmann.jl.git",
 )
