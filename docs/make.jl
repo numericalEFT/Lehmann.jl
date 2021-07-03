@@ -26,4 +26,5 @@ makedocs(;
 
 deploydocs(;
     repo="github.com/kunyuan/Lehmann.jl.git",
+    devbranch="main"
 )
