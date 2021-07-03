@@ -109,12 +109,12 @@ end
 
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
-β = 100.0
+β = 10.0
 Euv = 1.0
 eps = 1.0e-8
 type = :fermi
 
-dlr = DLR.DLRGrid(type, Euv, β, eps) # construct dlr basis
+dlr = DLR.DLRGrid(type, 1Euv, β, eps) # construct dlr basis
 
 Gt0 = SemiCircle(type, dlr.τ, β, Euv, 0)[1] # Gτ in dlr τ grid
 
