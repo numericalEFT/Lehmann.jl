@@ -7,22 +7,22 @@ using Quadmath
 const Float = BigFloat
 # const Float = Float128
 
-# """
-# \int_1^∞ e^{-ω_1 τ}*e^{-ω_2*τ} dτ = 1/(ω_1+ω_2)
-# """
+"""
+\\int_0^1 e^{-ω_1 τ}*e^{-ω_2*τ} dτ = (1-exp(-(ω_1+ω_2))/(ω_1+ω_2)
+"""
 function proj(ω1::Float, ω2::Float)
     ω = ω1 + ω2
     if ω < 1e-6
-        # return (1 - exp(-(ω1 + ω2))) / (ω1 + ω2)
         return 1 - ω / 2 + ω^2 / 6 - ω^3 / 24 + ω^4 / 120 - ω^5 / 720
     else
-        # return (1 - exp(-ω)) / ω
         return (1 - exp(-ω)) / ω
     end
 end
 
+"""
+ derivative for proj(ω, ω)
+"""
 function dproj(ω::Float)
-    # derivative for proj(ω, ω)
     if ω < 1e-4
         return -1 + 4ω / 3 - ω^2 + 8 * ω^3 / 15 - 2 * ω^4 / 9 + 8 * ω^5 / 105
     else
@@ -30,31 +30,26 @@ function dproj(ω::Float)
     end
 end
 
+"""
+ derivative for proj(ω1, ω2)
+"""
 function dproj1(ω1::Float, ω2::Float)
     ω = ω1 + ω2
     if ω < 1e-4
         return -1 / 2 + ω / 3 - ω^2 / 8 + ω^3 / 30 - ω^4 / 144 + ω^5 / 840
     else
         return -(1 - exp(-ω)) / ω^2 + exp(-ω) / ω
-    end
+end
 end
 
 function proj(freq, q, ω::Float)
-    sum = Float(0)
-    for (idx, ωi) in enumerate(freq)
-        sum += q[idx] * proj(ωi, ω)
-    end
-    return sum
+    @assert length(freq) == length(q)
+    return sum([q[i] * proj(freq[i], ω) for i in 1:length(freq)])
 end
 
 function proj(freq, q1::Vector{Float}, q2::Vector{Float})
-    # println(q1)
-    # println(q2)
-    sum = Float(0.0)
-    for (idx, ωi) in enumerate(freq)
-        sum += q2[idx] * proj(freq, q1, freq[idx])
-    end
-    return sum
+    @assert length(freq) == length(q1) == length(q2)
+    return sum([q2[i] * proj(freq, q1, freq[i]) for i in 1:length(freq)])
 end
 
 Norm(ω) = sqrt(abs(proj(ω, ω)))
@@ -62,12 +57,8 @@ Norm(ω) = sqrt(abs(proj(ω, ω)))
 function Norm(freq, Q, ω::Float)
 #   qi=sum_j c_ij e^{-ω_j*τ}
 #   norm2 = <e^{-ω*τ}, e^{-ω*τ}>- \sum_i c_ij*c_ik*<e^{-ω*τ}, e^{-ω_j*τ}>*<e^{-ω*τ}, e^{-ω_k*τ}>
-    norm2 = proj(ω, ω)
-    for (qi, q) in enumerate(Q)
-        norm2 -= (proj(freq, q, ω))^2
-    end
-    norm = sqrt(abs(norm2))
-    return norm
+    norm2 = proj(ω, ω) - sum([(proj(freq, q, ω))^2 for q in Q])
+    return sqrt(abs(norm2)) # norm2 may become slightly negative if ω concides with the existing frequencies
 end
 
 """
@@ -76,15 +67,11 @@ First derivative of norm2 for the vector: e^{-ωτ}-sum_i <q_i, e^{-ωτ}>
 function DNorm2(freq, Q, ω::Float)
     # d Norm(freq, Q, ω)/dω
     dnorm2 = dproj(ω)
-    # println("omega:", ω, ", ", proj(ω, ω))
     for j in 1:length(Q)
         for k in 1:length(Q)
-            amp = Float(0)
-            for i in 1:length(Q)
-                amp += Q[i][j] * Q[i][k]
-            end
+            amp = sum([q[j] * q[k] for q in Q])
             dnorm2 -= amp * (dproj1(ω, freq[j]) * proj(ω, freq[k]) + proj(ω, freq[j]) * dproj1(ω, freq[k]))
-        end
+    end
     end
     return dnorm2 / (2 * Norm(freq, Q, ω))
 end
@@ -100,9 +87,9 @@ function projectedKernel(freq, Q, ω::Float)
         for i in 1:length(Q)
             for j in 1:length(Q)
                 amp[k] += Q[i][j] * Q[i][k] * proj(ω, freq[j])
-            end
+        end
     end
-end
+    end
     return amp
 end
 
@@ -113,8 +100,7 @@ Return the vector q (the projection of the new frequency basis to that of the ex
 function orthognalize(freq, Q, ω::Float)
     idx = length(Q) + 1
     qnew = zeros(Float, length(freq))
-
-    # qnew[idx] = 1.0
+    
     for (qi, q) in enumerate(Q)
         qnew .-= proj(freq, q, ω) .* q
     end
@@ -122,7 +108,6 @@ function orthognalize(freq, Q, ω::Float)
     norm = Norm(freq, Q, ω)
     qnew /= norm
     
-    println(qnew)
     return qnew, 1 / norm
 end
 
@@ -165,7 +150,7 @@ end
 function addFreq!(freq, Q, ω)
     idxList = findall(x -> x > ω, freq)
     # if ω is larger than any existing freqencies, then idx is an empty list
-    idx = length(idxList) == 0 ? length(freq) + 1 : idxList[1] # where to insert the new frequency
+    idx = length(idxList) == 0 ? length(freq) + 1 : idxList[1] # the index to insert the new frequency
 
     q, q00 = orthognalize(freq, Q, ω)
     insert!(freq, idx, ω)
@@ -271,7 +256,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     scheme1(1.0e-3, Float(10))
 
     # ω = LinRange(Float(0), Float(0.5), 1000)
-    # y = [Norm(freq, Q, w) for w in ω]
+# y = [Norm(freq, Q, w) for w in ω]
     # p = plot(ω, y, xlims=(0.0, 0.5))
     # display(p)
     # readline()
