@@ -1,11 +1,15 @@
-using LinearAlgebra
-# using Gaston
+using LinearAlgebra, Printf
+using Roots
+using Quadmath
+# using Plots
 
-const Float = Float64
+# const Float = Float64
+const Float = BigFloat
+# const Float = Float128
 const Vec = Vector{Tuple{Float,Float}}
-const rank = 16
 const atol = 1.0e-10
-const Λ = Float(1000)
+# const Λ0 = Float(1)
+# const Λ = Float(100)
 
 # """
 # \int_1^∞ e^{-ω_1 τ}*e^{-ω_2*τ} dτ = 1/(ω_1+ω_2)
@@ -42,11 +46,7 @@ end
 function proj(freq, q, ω::Float)
     sum = Float(0)
     for (idx, ωi) in enumerate(freq)
-        # println("idx: $idx, ωi: $ωi")
-        # if ωi >= 1 - eps(Float(0))
         sum += q[idx] * proj(ωi, ω)
-            # println("more: $idx, ", q[idx], ", ", ωi, ", ", proj(ωi, ω))
-        # end
     end
     return sum
 end
@@ -56,10 +56,7 @@ function proj(freq, q1::Vector{Float}, q2::Vector{Float})
     # println(q2)
     sum = Float(0.0)
     for (idx, ωi) in enumerate(freq)
-        # if ωi >= 1 - eps(Float(0))
         sum += q2[idx] * proj(freq, q1, freq[idx])
-            # println(q2[idx], ", ", freq[idx], ", ", proj(freq, q1, freq[idx]))
-        # end
     end
     return sum
 end
@@ -70,104 +67,245 @@ function Norm(freq, Q, ω::Float)
 #   qi=sum_j c_ij e^{-ω_j*τ}
 #   norm2 = 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
     norm2 = proj(ω, ω)
+    # if ω > 999.0
+    #     println(norm2)
+    # end
     for (qi, q) in enumerate(Q)
         norm2 -= (proj(freq, q, ω))^2
+        # if ω > 999.0
+        #     println(norm2, " from ", proj(freq, q, ω))
+        # end
     end
-    # @assert norm2 > 0
+    # if norm2 < 0.0
+    #     println("warning: negative norm2 = $norm2 \n freq=$freq \n Q=$Q")
+    # end
+    # @assert norm2 > 0 "$norm2 <=0"
     norm = sqrt(abs(norm2))
     return norm
 end
 
 """
-First derivative of norm for the vector: e^{-ωτ}-sum_i <q_i, e^{-ωτ}>
+First derivative of norm2 for the vector: e^{-ωτ}-sum_i <q_i, e^{-ωτ}>
 """
 function DNorm2(freq, Q, ω::Float)
 #   qi=sum_j c_ij e^{-ω_j*τ}
 #   dnorm2 = -1/2ω^2 + \sum_{jk} (\sum_i c_ij*c_ik)*(2ω+ω_j+ω_k)/(ω+ω_j)^2/(ω+ω_k)^2
     dnorm2 = dproj(ω)
-    # println(dnorm2)
-# println("omega:", ω, ", ", proj(ω, ω))
+    # println("omega:", ω, ", ", proj(ω, ω))
     for j in 1:length(Q)
         for k in 1:length(Q)
             amp = Float(0)
             for i in 1:length(Q)
                 amp += Q[i][j] * Q[i][k]
             end
-        # dnorm2 += amp * (2 * ω + freq[j] + freq[k]) / (ω + freq[j])^2 / (ω + freq[k])^2
             dnorm2 -= amp * (dproj1(ω, freq[j]) * proj(ω, freq[k]) + proj(ω, freq[j]) * dproj1(ω, freq[k]))
-            # println(amp, ", ", dproj1(ω, freq[j]), ",  ", proj(ω, freq[k]), ", ", dproj1(ω, freq[k]), ",  ", proj(ω, freq[j]), " -> ", dnorm2)
         end
     end
     return dnorm2 / (2 * Norm(freq, Q, ω))
 end
 
-# function NormExpr(freq, Q)
-#     coeff = [1.0, ]
-
-# end
-
-    function projectedKernel(freq, Q, ω::Float)
+function projectedKernel(freq, Q, ω::Float)
     # K(τ, ω) ≈ \sum_i <e^{-ωτ}, qi> qi = \sum_k (\sum_ij c_ij*c_ik/(ω+ω_j) e^{-ω_k*τ})
-        amp = zeros(Float, length(Q))
-        for k in 1:length(Q)
-            amp[k] = Float(0)
-            for i in 1:length(Q)
-                for j in 1:length(Q)
-                # amp[k] += Q[i][j] * Q[i][k] / (ω + freq[j])
-                    amp[k] += Q[i][j] * Q[i][k] * proj(ω, freq[j])
-                end
+    amp = zeros(Float, length(Q))
+    for k in 1:length(Q)
+        amp[k] = Float(0)
+        for i in 1:length(Q)
+            for j in 1:length(Q)
+                amp[k] += Q[i][j] * Q[i][k] * proj(ω, freq[j])
             end
-        end
-        return amp
+    end
+end
+    return amp
+end
+
+function orthognalize(freq, Q, ω::Float)
+    idx = length(Q) + 1
+    qnew = zeros(Float, length(freq))
+    # println("compare ", length(freq), " vs ", length(Q[1]))
+
+    # qnew[idx] = 1.0
+    for (qi, q) in enumerate(Q)
+        qnew .-= proj(freq, q, ω) .* q
     end
 
-    function orthognalize(freq, Q, ω::Float)
-        idx = length(Q) + 1
-        qnew = zeros(Float, rank)
-    # println(idx)
-        qnew[idx] = 1.0
-    # println(qnew)
-        for (qi, q) in enumerate(Q)
-            qnew .-= proj(freq, q, ω) .* q
-        end
+    norm = Norm(freq, Q, ω)
+    qnew /= norm
 
-        norm = Norm(freq, Q, ω)
-        qnew /= norm
+    return qnew, 1 / norm
+end
 
-        return qnew
-    end
-
-    function testOrthgonal(freq, Q)
+function testOrthgonal(freq, Q)
     # maxerr = 0.0
     # pos = [1, 1]
-        err = zeros(Float, (length(Q), length(Q)))
-        for (i, qi) in enumerate(Q)
-            for (j, qj) in enumerate(Q)
-                err[i, j] = proj(freq, qi, qj)
+    err = zeros(Float, (length(Q), length(Q)))
+    for (i, qi) in enumerate(Q)
+        for (j, qj) in enumerate(Q)
+            err[i, j] = proj(freq, qi, qj)
+        end
+    end
+    maxerr = maximum(abs.(err - I))
+    println("Max Err: ", maxerr)
+    @assert maxerr < atol
+end
+
+function residualF(freq, Q, Λ)
+#   qi=sum_j c_ij e^{-ω_j*τ}
+#   int_1^\Lambda dω 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+#    ln(ω)/2- int_1^\Lambda dω \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+    F0 = log(Λ) / 2
+    F = F0
+    # println("omega:", ω, ", ", proj(ω, ω))
+    for j in 1:length(Q)
+        for k in 1:length(Q)
+            amp = Float(0)
+            for i in 1:length(Q)
+                amp += Q[i][j] * Q[i][k]
+            end
+            if j == k
+                F -= amp * (1 / (freq[j] + 1) - 1 / (freq[j] + Λ))  
+            else
+                F -= amp / (freq[k] - freq[j]) * log((freq[j] + Λ) * (freq[k] + 1) / (freq[j] + 1) / (freq[k] + Λ))
             end
         end
-        maxerr = maximum(abs.(err - I))
-        println("Max Err: ", maxerr)
-        @assert maxerr < atol
     end
+    return sqrt(F / F0)
+end
 
 
-    if abspath(PROGRAM_FILE) == @__FILE__    
-        freq = zeros(Float, rank)
-        freq[1] = 1.0
-        Q = [zeros(Float, rank), ]
-        Q[1][1] = 1.0 / Norm(freq[1])
-        println(Q[1])
-        println(Norm(freq, Q, 2.0))
+function addFreq!(freq, Q, ω)
+    idx = findall(x -> x > ω, freq)
+    if length(idx) == 0
+        idx = length(freq) + 1
+    else
+        idx = idx[1]
+    end
+    q, q00 = orthognalize(freq, Q, ω)
+    insert!(freq, idx, ω)
+    insert!(Q, idx, q)
+    # println("freq length = $(length(freq))")
+    for qi in 1:length(Q)
+        insert!(Q[qi], idx, Float(0))
+        # println("Q[i] length = $(length(Q[qi]))")
+    end
+    Q[idx][idx] = q00
+    return idx
+end
 
-        println("Derivative: ", DNorm2(freq, Q, 1.0))
-        println("Derivative: ", DNorm2(freq, Q, 2.0))
-        println("Derivative: ", DNorm2(freq, Q, 10.0))
-        println("Derivative: ", DNorm2(freq, Q, 100.0))
+function findFreqMax(freq, Q, idx, Λ)
+    if idx == length(freq)
+        # the last segement, bounded by Λ
+        if DNorm2(freq, Q, Λ) > 0.0
+            return Λ
+        end
 
-        freq[2] = 2.0
-        push!(Q, orthognalize(freq, Q, 2.0))
-        testOrthgonal(freq, Q)
+        if idx == 1
+            # ∈ (0, Λ)
+            ω = find_zero(x -> DNorm2(freq, Q, x), (Float(1e-6), Float(10)), Bisection(), rtol=1e-5)
+        else
+            maxω = 10 * freq[end] > Λ ? Λ : 100 * freq[end]
+            ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-3), maxω), Bisection(), rtol=1e-5)
+        end
+        return ω
+    else
+        # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (2 + 1e-1)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (0.5 - 1e-1)))
+        if idx == 1
+            d1, d2 = Float(1e-6), freq[idx + 1] * (1 - 1e-1)
+        else
+            d1, d2 = freq[idx] * (1 + 1e-6), freq[idx + 1] * (1 - 1e-6)
+        end
+        if sign(DNorm2(freq, Q, d1)) == sign(DNorm2(freq, Q, d2))
+            # println(d1, ", ", d2)
+            println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
+
+            # ω = LinRange(3.0, 5.0, 100)
+            # y = [Norm(freq, Q, w) for w in ω]
+            # p = plot(ω, y)
+            # ω = LinRange(Float(0), Float(0.5), 1000)
+            # y = [Norm(freq, Q, w) for w in ω]
+            # p = plot(ω, y, xlims=(0.0, 0.5))
+            # display(p)
+            # readline()
+
+            ω = sqrt(freq[idx] * freq[idx + 1])
+        else
+            ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
+        end
+        return ω
+end
+end
+
+function findFreqMedian(freq, Q, idx, Λ)
+    if idx == length(freq)
+        return sqrt(freq[idx] * Λ)
+    else
+        return sqrt(freq[idx] * freq[idx + 1])
+end
+end
+
+function scheme1(eps, Λ)
+    freq = Vector{Float}([Float(0), ])
+    Q = [[1 / Norm(freq[1]), ], ]
+    residual = 1.0
+    candidates = [findFreqMax(freq, Q, 1, Λ), ]
+    while residual > eps
+        maxR = Float(0)
+        idx, ifreq, newω = 1, 1, 1
+        for i in 1:length(freq)
+            # ω = findFreqMax(freq, Q, i)
+            ω = candidates[i]
+            normw = Norm(freq, Q, ω)
+            if normw > maxR
+                maxR = normw
+                # idx = k + 1
+                ifreq = i
+        newω = ω 
+            end
+        end
+        residual = maxR
+        # residual = 
+        if residual > eps
+            idx = addFreq!(freq, Q, newω)
+            # println("add $(length(freq))")
+            if idx < length(freq)
+                @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], freq[idx + 1])
+                # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
+            else
+                @printf("%3i : ω=%16.8f ∈ (%16.8f, Λ)\n", length(freq), newω, freq[idx - 1])
+                # println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
+            end
+            # println("residual=$residual")
+            # @assert newidx == idx "idx: $idx != newidx: $newidx"
+            # testOrthgonal(freq, Q)
+
+            deleteat!(candidates, ifreq)
+            @assert idx > 1 "idx=$idx"
+            push!(candidates, findFreqMax(freq, Q, idx - 1, Λ))
+            push!(candidates, findFreqMax(freq, Q, idx, Λ))
+        end
+    end
+    testOrthgonal(freq, Q)
+    # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
+    @printf("residual = %.10e\n", residual)
+return freq, Q
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__    
+    scheme1(1.0e-10, Float(100000000))
+    # freq = zeros(Float, rank)
+    # freq[1] = 1.0
+    # Q = [zeros(Float, rank), ]
+    # Q[1][1] = 1.0 / Norm(freq[1])
+    # println(Q[1])
+    # println(Norm(freq, Q, 2.0))
+
+    # println("Derivative: ", DNorm2(freq, Q, 1.0))
+    # println("Derivative: ", DNorm2(freq, Q, 2.0))
+    # println("Derivative: ", DNorm2(freq, Q, 10.0))
+    # println("Derivative: ", DNorm2(freq, Q, 100.0))
+
+    # freq[2] = 2.0
+    # push!(Q, orthognalize(freq, Q, 2.0))
+    # testOrthgonal(freq, Q)
 
     # ω = LinRange(0.0, 20.0, 100)
     # y = [Norm(freq, Q, w) for w in ω]
@@ -179,4 +317,4 @@ end
 
 
 
-    end
+end
