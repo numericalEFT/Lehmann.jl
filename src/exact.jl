@@ -6,10 +6,6 @@ using Quadmath
 # const Float = Float64
 const Float = BigFloat
 # const Float = Float128
-const Vec = Vector{Tuple{Float,Float}}
-const atol = 1.0e-10
-# const Λ0 = Float(1)
-# const Λ = Float(100)
 
 # """
 # \int_1^∞ e^{-ω_1 τ}*e^{-ω_2*τ} dτ = 1/(ω_1+ω_2)
@@ -65,21 +61,11 @@ Norm(ω) = sqrt(abs(proj(ω, ω)))
 
 function Norm(freq, Q, ω::Float)
 #   qi=sum_j c_ij e^{-ω_j*τ}
-#   norm2 = 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+#   norm2 = <e^{-ω*τ}, e^{-ω*τ}>- \sum_i c_ij*c_ik*<e^{-ω*τ}, e^{-ω_j*τ}>*<e^{-ω*τ}, e^{-ω_k*τ}>
     norm2 = proj(ω, ω)
-    # if ω > 999.0
-    #     println(norm2)
-    # end
     for (qi, q) in enumerate(Q)
         norm2 -= (proj(freq, q, ω))^2
-        # if ω > 999.0
-        #     println(norm2, " from ", proj(freq, q, ω))
-        # end
     end
-    # if norm2 < 0.0
-    #     println("warning: negative norm2 = $norm2 \n freq=$freq \n Q=$Q")
-    # end
-    # @assert norm2 > 0 "$norm2 <=0"
     norm = sqrt(abs(norm2))
     return norm
 end
@@ -88,8 +74,7 @@ end
 First derivative of norm2 for the vector: e^{-ωτ}-sum_i <q_i, e^{-ωτ}>
 """
 function DNorm2(freq, Q, ω::Float)
-#   qi=sum_j c_ij e^{-ω_j*τ}
-#   dnorm2 = -1/2ω^2 + \sum_{jk} (\sum_i c_ij*c_ik)*(2ω+ω_j+ω_k)/(ω+ω_j)^2/(ω+ω_k)^2
+    # d Norm(freq, Q, ω)/dω
     dnorm2 = dproj(ω)
     # println("omega:", ω, ", ", proj(ω, ω))
     for j in 1:length(Q)
@@ -104,8 +89,11 @@ function DNorm2(freq, Q, ω::Float)
     return dnorm2 / (2 * Norm(freq, Q, ω))
 end
 
+"""
+Project the kernel to the DLR basis
+"""
 function projectedKernel(freq, Q, ω::Float)
-    # K(τ, ω) ≈ \sum_i <e^{-ωτ}, qi> qi = \sum_k (\sum_ij c_ij*c_ik/(ω+ω_j) e^{-ω_k*τ})
+    # K(τ, ω) ≈ \sum_i <e^{-ωτ}, qi> qi = \sum_k (\sum_ij c_ij*c_ik <e^{-ωτ, e^{-ωj*τ}}> e^{-ω_k*τ})
     amp = zeros(Float, length(Q))
     for k in 1:length(Q)
         amp[k] = Float(0)
@@ -118,25 +106,27 @@ end
     return amp
 end
 
+"""
+Calculate the orthnormal vector of the new frequency ω. 
+Return the vector q (the projection of the new frequency basis to that of the existing frequencies) and the normalization factor for the new frequency basis.
+"""
 function orthognalize(freq, Q, ω::Float)
     idx = length(Q) + 1
     qnew = zeros(Float, length(freq))
-    # println("compare ", length(freq), " vs ", length(Q[1]))
 
     # qnew[idx] = 1.0
     for (qi, q) in enumerate(Q)
         qnew .-= proj(freq, q, ω) .* q
     end
-
+    
     norm = Norm(freq, Q, ω)
     qnew /= norm
-
+    
+    println(qnew)
     return qnew, 1 / norm
 end
 
 function testOrthgonal(freq, Q)
-    # maxerr = 0.0
-    # pos = [1, 1]
     err = zeros(Float, (length(Q), length(Q)))
     for (i, qi) in enumerate(Q)
         for (j, qj) in enumerate(Q)
@@ -144,8 +134,8 @@ function testOrthgonal(freq, Q)
         end
     end
     maxerr = maximum(abs.(err - I))
-    println("Max Err: ", maxerr)
-    @assert maxerr < atol
+    println("Max Orthognalization Error: ", maxerr)
+    # @assert maxerr < atol
 end
 
 function residualF(freq, Q, Λ)
@@ -173,21 +163,17 @@ end
 
 
 function addFreq!(freq, Q, ω)
-    idx = findall(x -> x > ω, freq)
-    if length(idx) == 0
-        idx = length(freq) + 1
-    else
-        idx = idx[1]
-    end
+    idxList = findall(x -> x > ω, freq)
+    # if ω is larger than any existing freqencies, then idx is an empty list
+    idx = length(idxList) == 0 ? length(freq) + 1 : idxList[1] # where to insert the new frequency
+
     q, q00 = orthognalize(freq, Q, ω)
     insert!(freq, idx, ω)
     insert!(Q, idx, q)
-    # println("freq length = $(length(freq))")
-    for qi in 1:length(Q)
-        insert!(Q[qi], idx, Float(0))
-        # println("Q[i] length = $(length(Q[qi]))")
+    for q in Q
+        insert!(q, idx, Float(0))  # append zero to the new frequency index in the existing q vectors
     end
-    Q[idx][idx] = q00
+    Q[idx][idx] = q00  # add the diagonal element for the current freq
     return idx
 end
 
@@ -217,15 +203,6 @@ function findFreqMax(freq, Q, idx, Λ)
             # println(d1, ", ", d2)
             println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
 
-            # ω = LinRange(3.0, 5.0, 100)
-            # y = [Norm(freq, Q, w) for w in ω]
-            # p = plot(ω, y)
-            # ω = LinRange(Float(0), Float(0.5), 1000)
-            # y = [Norm(freq, Q, w) for w in ω]
-            # p = plot(ω, y, xlims=(0.0, 0.5))
-            # display(p)
-            # readline()
-
             ω = sqrt(freq[idx] * freq[idx + 1])
         else
             ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
@@ -237,7 +214,7 @@ end
 function findFreqMedian(freq, Q, idx, Λ)
     if idx == length(freq)
         return sqrt(freq[idx] * Λ)
-    else
+else
         return sqrt(freq[idx] * freq[idx + 1])
 end
 end
@@ -247,6 +224,7 @@ function scheme1(eps, Λ)
     Q = [[1 / Norm(freq[1]), ], ]
     residual = 1.0
     candidates = [findFreqMax(freq, Q, 1, Λ), ]
+
     while residual > eps
         maxR = Float(0)
         idx, ifreq, newω = 1, 1, 1
@@ -276,7 +254,7 @@ function scheme1(eps, Λ)
             # println("residual=$residual")
             # @assert newidx == idx "idx: $idx != newidx: $newidx"
             # testOrthgonal(freq, Q)
-
+            
             deleteat!(candidates, ifreq)
             @assert idx > 1 "idx=$idx"
             push!(candidates, findFreqMax(freq, Q, idx - 1, Λ))
@@ -290,31 +268,11 @@ return freq, Q
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
-    scheme1(1.0e-10, Float(100000000))
-    # freq = zeros(Float, rank)
-    # freq[1] = 1.0
-    # Q = [zeros(Float, rank), ]
-    # Q[1][1] = 1.0 / Norm(freq[1])
-    # println(Q[1])
-    # println(Norm(freq, Q, 2.0))
+    scheme1(1.0e-3, Float(10))
 
-    # println("Derivative: ", DNorm2(freq, Q, 1.0))
-    # println("Derivative: ", DNorm2(freq, Q, 2.0))
-    # println("Derivative: ", DNorm2(freq, Q, 10.0))
-    # println("Derivative: ", DNorm2(freq, Q, 100.0))
-
-    # freq[2] = 2.0
-    # push!(Q, orthognalize(freq, Q, 2.0))
-    # testOrthgonal(freq, Q)
-
-    # ω = LinRange(0.0, 20.0, 100)
+    # ω = LinRange(Float(0), Float(0.5), 1000)
     # y = [Norm(freq, Q, w) for w in ω]
-    # p = plot(ω, y)
+    # p = plot(ω, y, xlims=(0.0, 0.5))
     # display(p)
     # readline()
-    # println("Derivative: ", DNorm2(freq, Q, 2.0))
-    # println("Derivative: ", DNorm2(freq, Q, 10.0))
-
-
-
 end
