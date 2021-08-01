@@ -135,28 +135,28 @@ function testOrthgonal(freq, Q)
 # @assert maxerr < atol
 end
 
-function residualF(freq, Q, Λ)
-#   qi=sum_j c_ij e^{-ω_j*τ}
-#   int_1^\Lambda dω 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
-#    ln(ω)/2- int_1^\Lambda dω \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
-    F0 = log(Λ) / 2
-    F = F0
-    # println("omega:", ω, ", ", proj(ω, ω))
-        for j in 1:length(Q)
-        for k in 1:length(Q)
-            amp = Float(0)
-            for i in 1:length(Q)
-                amp += Q[i][j] * Q[i][k]
-            end
-            if j == k
-                F -= amp * (1 / (freq[j] + 1) - 1 / (freq[j] + Λ))  
-            else
-                F -= amp / (freq[k] - freq[j]) * log((freq[j] + Λ) * (freq[k] + 1) / (freq[j] + 1) / (freq[k] + Λ))
-            end
-        end
-    end
-    return sqrt(F / F0)
-end
+# function residualF(freq, Q, Λ)
+# #   qi=sum_j c_ij e^{-ω_j*τ}
+# #   int_1^\Lambda dω 1/2ω- \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+# #    ln(ω)/2- int_1^\Lambda dω \sum_i c_ij*c_ik/(ω+ω_j)/(ω+ω_k)
+#     F0 = log(Λ) / 2
+#     F = F0
+#     # println("omega:", ω, ", ", proj(ω, ω))
+#         for j in 1:length(Q)
+#         for k in 1:length(Q)
+#             amp = Float(0)
+#             for i in 1:length(Q)
+#                 amp += Q[i][j] * Q[i][k]
+#             end
+#             if j == k
+#                 F -= amp * (1 / (freq[j] + 1) - 1 / (freq[j] + Λ))  
+#             else
+#                 F -= amp / (freq[k] - freq[j]) * log((freq[j] + Λ) * (freq[k] + 1) / (freq[j] + 1) / (freq[k] + Λ))
+#             end
+#         end
+#     end
+#     return sqrt(F / F0)
+# end
 
 """
 add new frequency ω into the existing basis
@@ -165,10 +165,11 @@ function addFreq!(freq, Q, ω)
     idxList = findall(x -> x > ω, freq)
     # if ω is larger than any existing freqencies, then idx is an empty list
     idx = length(idxList) == 0 ? length(freq) + 1 : idxList[1] # the index to insert the new frequency
+    # idx = length(freq) + 1 # always add the new freq to the end
 
-    q, q00 = orthognalize(freq, Q, ω)
+    qnew, q00 = orthognalize(freq, Q, ω)
     insert!(freq, idx, ω)
-    insert!(Q, idx, q)
+        insert!(Q, idx, qnew)
     for q in Q
         insert!(q, idx, Float(0))  # append zero to the new frequency index in the existing q vectors
     end
@@ -176,98 +177,162 @@ function addFreq!(freq, Q, ω)
     return idx
 end
 
-function findFreqMax(freq, Q, idx, Λ)
-    if idx == length(freq)
-        # the last segement, bounded by Λ
-        if DNorm2(freq, Q, Λ) > 0.0
-            return Λ
-        end
-
-        if idx == 1
-            # ∈ (0, Λ)
-            ω = find_zero(x -> DNorm2(freq, Q, x), (Float(1e-6), Float(10)), Bisection(), rtol=1e-5)
-        else
-            maxω = 10 * freq[end] > Λ ? Λ : 100 * freq[end]
-            ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-3), maxω), Bisection(), rtol=1e-5)
-        end
-        return ω
+function findFreqMax(freq, Q, ωmin, ωmax)
+    if DNorm2(freq, Q, ωmin) * DNorm2(freq, Q, ωmax) < Float(0)
+        return find_zero(x -> DNorm2(freq, Q, x), (ωmin, ωmax), Bisection(), rtol=1e-5)
     else
-        # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (2 + 1e-1)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (0.5 - 1e-1)))
-        if idx == 1
-            d1, d2 = Float(1e-6), freq[idx + 1] * (1 - 1e-1)
-        else
-            d1, d2 = freq[idx] * (1 + 1e-6), freq[idx + 1] * (1 - 1e-6)
-        end
-        if sign(DNorm2(freq, Q, d1)) == sign(DNorm2(freq, Q, d2))
-            # println(d1, ", ", d2)
-            println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
+        println("warning: $ωmin -> $ωmax derivatives have the same sign $(DNorm2(freq, Q, ωmin)) -> $(DNorm2(freq, Q, ωmax)) !")
+        println(DNorm2(freq, Q, ωmin))
+        println(DNorm2(freq, Q, ωmax))
+        exit(0)
+        return sqrt(ωmin * ωmax) # simply return the median of the two frequencies
+    end
+    end
 
-            ω = sqrt(freq[idx] * freq[idx + 1])
-    else
-            ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
-        end
-        return ω
-end
-end
+# plus(ω) = ω + eps(ω) * 1000
+    # minus(ω) = ω - eps(ω) * 1000
+    plus(ω) = ω + Float(1e-3)
+    minus(ω) = ω - Float(1e-3)
 
-function findFreqMedian(freq, Q, idx, Λ)
-if idx == length(freq)
-        return sqrt(freq[idx] * Λ)
-else
-        return sqrt(freq[idx] * freq[idx + 1])
-end
-end
-
-function scheme1(eps, Λ)
-    freq = Vector{Float}([Float(0), ])
+    function findBasis(eps, Λ)
+    freq = [Float(0), ]
+    error = [Float(1), ]
     Q = [[1 / Norm(freq[1]), ], ]
-    residual = 1.0
-    candidates = [findFreqMax(freq, Q, 1, Λ), ]
+    candidates = [findFreqMax(freq, Q, plus(freq[1]), minus(Λ)), ] # ω with the maximum residual in each segement
+    residual = [Norm(freq, Q, candidates[1]), ]
+    maxResidual, ωi = residual[1], 1
 
-    while residual > eps
-        maxR = Float(0)
-            idx, ifreq, newω = 1, 1, 1
-        for i in 1:length(freq)
-            # ω = findFreqMax(freq, Q, i)
-            ω = candidates[i]
-            normw = Norm(freq, Q, ω)
-            if normw > maxR
-                maxR = normw
-                # idx = k + 1
-                ifreq = i
-        newω = ω 
-            end
+        while maxResidual > eps
+        # println("next : ", candidates[ωi], " -> ", maxResidual)
+
+        newω = candidates[ωi]
+
+        idx = addFreq!(freq, Q, newω)
+
+        if idx < length(freq)
+            @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], freq[idx + 1])
+            # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
+        else
+            @printf("%3i : ω=%16.8f ∈ (%16.8f, Λ)\n", length(freq), newω, freq[idx - 1])
+            # println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
         end
-        residual = maxR
-        # residual = 
-        if residual > eps
-            idx = addFreq!(freq, Q, newω)
-            # println("add $(length(freq))")
-            if idx < length(freq)
-                @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], freq[idx + 1])
-                # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
-            else
-                @printf("%3i : ω=%16.8f ∈ (%16.8f, Λ)\n", length(freq), newω, freq[idx - 1])
-                # println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
-            end
-            # println("residual=$residual")
-            # @assert newidx == idx "idx: $idx != newidx: $newidx"
-            # testOrthgonal(freq, Q)
-            
-            deleteat!(candidates, ifreq)
-            @assert idx > 1 "idx=$idx"
-            push!(candidates, findFreqMax(freq, Q, idx - 1, Λ))
-            push!(candidates, findFreqMax(freq, Q, idx, Λ))
-        end
+        
+        # if idx == length(freq)
+        #     # ωMax = (freq[idx] * 10 > Λ) ? Λ : freq[idx] * 10
+        #     ωMax = freq[idx] * 10
+        # else
+        #     ωMax = freq[idx + 1]
+        # end
+        r1 = findFreqMax(freq, Q, plus(freq[idx - 1]), minus(freq[idx]))
+        ωMax = (idx == length(freq)) ? freq[idx] * 10 : freq[idx + 1]
+        r2 = findFreqMax(freq, Q, plus(freq[idx]), minus(ωMax))
+        r2 = (r2 > Λ) ? Λ : r2
+
+        candidates[idx - 1] = r1
+        insert!(candidates, idx, r2)
+        residual[idx - 1] = Norm(freq, Q, r1)
+        insert!(residual, idx, Norm(freq, Q, r2))
+    
+        maxResidual, ωi = findmax(residual)
     end
     testOrthgonal(freq, Q)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
-    @printf("residual = %.10e\n", residual)
+    @printf("residual = %.10e\n", maxResidual)
 return freq, Q
 end
 
+# function findFreqMax(freq, Q, idx, Λ)
+#     if idx == length(freq)
+#         # the last segement, bounded by Λ
+#         if DNorm2(freq, Q, Λ) > 0.0
+#             return Λ
+#         end
+
+#         if idx == 1
+#             # ∈ (0, Λ)
+#             ω = find_zero(x -> DNorm2(freq, Q, x), (Float(1e-6), Float(10)), Bisection(), rtol=1e-5)
+#         else
+#             maxω = 10 * freq[end] > Λ ? Λ : 100 * freq[end]
+#             ω = find_zero(x -> DNorm2(freq, Q, x), (freq[end] * (1 + 1e-3), maxω), Bisection(), rtol=1e-5)
+#         end
+#         return ω
+#     else
+#         # println("DNorm2: ", DNorm2(freq, Q, freq[idx] * (2 + 1e-1)), " -> ", DNorm2(freq, Q, freq[idx + 1] * (0.5 - 1e-1)))
+#         if idx == 1
+#             d1, d2 = Float(1e-6), freq[idx + 1] * (1 - 1e-1)
+#         else
+#             d1, d2 = freq[idx] * (1 + 1e-6), freq[idx + 1] * (1 - 1e-6)
+#         end
+#         if sign(DNorm2(freq, Q, d1)) == sign(DNorm2(freq, Q, d2))
+#             # println(d1, ", ", d2)
+#             println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
+
+#             ω = sqrt(freq[idx] * freq[idx + 1])
+#     else
+#             ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
+#         end
+#         return ω
+# end
+# end
+
+# function findFreqMedian(freq, Q, idx, Λ)
+# if idx == length(freq)
+    #         return sqrt(freq[idx] * Λ)
+# else
+#         return sqrt(freq[idx] * freq[idx + 1])
+# end
+# end
+
+# function scheme1(eps, Λ)
+#     freq = Vector{Float}([Float(0), ])
+#     Q = [[1 / Norm(freq[1]), ], ]
+#     residual = 1.0
+#     candidates = [findFreqMax(freq, Q, 1, Λ), ]
+
+#     while residual > eps
+#         maxR = Float(0)
+#             idx, ifreq, newω = 1, 1, 1
+#         for i in 1:length(freq)
+#             # ω = findFreqMax(freq, Q, i)
+#             ω = candidates[i]
+#             normw = Norm(freq, Q, ω)
+#             if normw > maxR
+#                 maxR = normw
+#                 # idx = k + 1
+#                 ifreq = i
+#         newω = ω 
+#             end
+#         end
+#         residual = maxR
+#         # residual = 
+#         if residual > eps
+#             idx = addFreq!(freq, Q, newω)
+#             # println("add $(length(freq))")
+#             if idx < length(freq)
+#                 @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], freq[idx + 1])
+#                 # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
+#             else
+#                 @printf("%3i : ω=%16.8f ∈ (%16.8f, Λ)\n", length(freq), newω, freq[idx - 1])
+#                 # println("$(length(freq)) basis: ω=$(Float64(newω)) for the last freq $(Float64(freq[idx - 1]))")
+#             end
+#             # println("residual=$residual")
+#             # @assert newidx == idx "idx: $idx != newidx: $newidx"
+#             # testOrthgonal(freq, Q)
+            
+#             deleteat!(candidates, ifreq)
+#             @assert idx > 1 "idx=$idx"
+#             push!(candidates, findFreqMax(freq, Q, idx - 1, Λ))
+#             push!(candidates, findFreqMax(freq, Q, idx, Λ))
+#         end
+#     end
+#     testOrthgonal(freq, Q)
+#     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
+#     @printf("residual = %.10e\n", residual)
+# return freq, Q
+# end
+
 if abspath(PROGRAM_FILE) == @__FILE__    
-    scheme1(1.0e-3, Float(10))
+    findBasis(1.0e-3, Float(10))
 
     # ω = LinRange(Float(0), Float(0.5), 1000)
 # y = [Norm(freq, Q, w) for w in ω]
