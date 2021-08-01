@@ -42,11 +42,20 @@ function dproj1(ω1::Float, ω2::Float)
 end
 end
 
+"""
+q=sum_j c_j e^{-ω_j*τ}
+return <q, e^{-ωτ}>
+"""
 function proj(freq, q, ω::Float)
     @assert length(freq) == length(q)
     return sum([q[i] * proj(freq[i], ω) for i in 1:length(freq)])
 end
 
+"""
+q1=sum_j c_j e^{-ω_j*τ}
+q2=sum_k d_k e^{-ω_k*τ}
+return <q1, q2> = sum_k d_k <q1, e^{-ω_k*τ}>
+"""
 function proj(freq, q1::Vector{Float}, q2::Vector{Float})
     @assert length(freq) == length(q1) == length(q2)
     return sum([q2[i] * proj(freq, q1, freq[i]) for i in 1:length(freq)])
@@ -54,9 +63,12 @@ end
 
 Norm(ω) = sqrt(abs(proj(ω, ω)))
 
+"""
+   qi=sum_j c_ij e^{-ω_j*τ}
+   norm2 = <e^{-ω*τ}, e^{-ω*τ}>- \\sum_i c_ij*c_ik*<e^{-ω*τ}, e^{-ω_j*τ}>*<e^{-ω*τ}, e^{-ω_k*τ}>
+   return sqrt(norm2)
+"""
 function Norm(freq, Q, ω::Float)
-#   qi=sum_j c_ij e^{-ω_j*τ}
-#   norm2 = <e^{-ω*τ}, e^{-ω*τ}>- \sum_i c_ij*c_ik*<e^{-ω*τ}, e^{-ω_j*τ}>*<e^{-ω*τ}, e^{-ω_k*τ}>
     norm2 = proj(ω, ω) - sum([(proj(freq, q, ω))^2 for q in Q])
     return sqrt(abs(norm2)) # norm2 may become slightly negative if ω concides with the existing frequencies
 end
@@ -89,7 +101,7 @@ function projectedKernel(freq, Q, ω::Float)
                 amp[k] += Q[i][j] * Q[i][k] * proj(ω, freq[j])
         end
     end
-    end
+end
     return amp
 end
 
@@ -106,7 +118,7 @@ function orthognalize(freq, Q, ω::Float)
     end
     
     norm = Norm(freq, Q, ω)
-    qnew /= norm
+qnew /= norm
     
     return qnew, 1 / norm
 end
@@ -120,7 +132,7 @@ function testOrthgonal(freq, Q)
     end
     maxerr = maximum(abs.(err - I))
     println("Max Orthognalization Error: ", maxerr)
-    # @assert maxerr < atol
+# @assert maxerr < atol
 end
 
 function residualF(freq, Q, Λ)
@@ -130,7 +142,7 @@ function residualF(freq, Q, Λ)
     F0 = log(Λ) / 2
     F = F0
     # println("omega:", ω, ", ", proj(ω, ω))
-    for j in 1:length(Q)
+        for j in 1:length(Q)
         for k in 1:length(Q)
             amp = Float(0)
             for i in 1:length(Q)
@@ -146,7 +158,9 @@ function residualF(freq, Q, Λ)
     return sqrt(F / F0)
 end
 
-
+"""
+add new frequency ω into the existing basis
+"""
 function addFreq!(freq, Q, ω)
     idxList = findall(x -> x > ω, freq)
     # if ω is larger than any existing freqencies, then idx is an empty list
@@ -189,7 +203,7 @@ function findFreqMax(freq, Q, idx, Λ)
             println("warning: $(freq[idx]) -> $(freq[idx + 1]) derivatives have the same sign $(DNorm2(freq, Q, d1)) -> $(DNorm2(freq, Q, d1)) !")
 
             ω = sqrt(freq[idx] * freq[idx + 1])
-        else
+    else
             ω = find_zero(x -> DNorm2(freq, Q, x), (d1, d2), Bisection(), rtol=1e-6)
         end
         return ω
@@ -197,7 +211,7 @@ end
 end
 
 function findFreqMedian(freq, Q, idx, Λ)
-    if idx == length(freq)
+if idx == length(freq)
         return sqrt(freq[idx] * Λ)
 else
         return sqrt(freq[idx] * freq[idx + 1])
@@ -212,7 +226,7 @@ function scheme1(eps, Λ)
 
     while residual > eps
         maxR = Float(0)
-        idx, ifreq, newω = 1, 1, 1
+            idx, ifreq, newω = 1, 1, 1
         for i in 1:length(freq)
             # ω = findFreqMax(freq, Q, i)
             ω = candidates[i]
