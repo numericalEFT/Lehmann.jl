@@ -1,3 +1,4 @@
+using LinearAlgebra:Matrix
 using LinearAlgebra, Printf
 using Roots
 using Quadmath
@@ -6,6 +7,11 @@ using Plots
 # const Float = Float64
 # const Float = BigFloat
 const Float = Float128
+
+# struct Basis
+#     grid::Vector{Float}
+#     Q::Matrix{Float,Float}
+# end
 
 """
 \\int_0^1 e^{-ω_1 τ}*e^{-ω_2*τ} dτ = (1-exp(-(ω_1+ω_2))/(ω_1+ω_2)
@@ -183,11 +189,16 @@ function addFreq!(freq, Q, ω)
 #     ωmin += dω
 #     ωmax -= dω
 #     if DNorm2(freq, Q, ωmin) * DNorm2(freq, Q, ωmax) < Float(0)
-#         return find_zero(x -> DNorm2(freq, Q, x), (ωmin, ωmax), Bisection(), rtol=1e-5)
+#         return find_zero(x -> DNorm2(freq, Q, x), (ωmin, ωmax), Bisection(), rtol=1e-3)
 #     else
 #         println("warning: $ωmin -> $ωmax derivatives have the same sign $(DNorm2(freq, Q, ωmin)) -> $(DNorm2(freq, Q, ωmax)) !")
 #         println(DNorm2(freq, Q, ωmin))
 #         println(DNorm2(freq, Q, ωmax))
+#         # ω = LinRange(Float(ωmin), Float(ωmax), 1000)
+#         # y = [DNorm2(freq, Q, w) for w in ω]
+#         # p = plot(ω, y, xlims=(ωmin, ωmax))
+#         # display(p)
+#         # readline()
 #         # exit(0)
 #         return sqrt(ωmin * ωmax) # simply return the median of the two frequencies
 #     end
