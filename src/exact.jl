@@ -4,9 +4,9 @@ using Roots
 using Quadmath
 using Plots
 
-# const Float = Float64
+const Float = Float64
 # const Float = BigFloat
-const Float = Float128
+# const Float = Float128
 
 mutable struct Basis
     Λ::Float
@@ -56,6 +56,16 @@ function addBasis(basis, g0::Float)
     basis.Q[idx + 1:end, 1:idx - 1] = _Q[idx:end, 1:idx - 1]
     basis.Q[idx + 1:end, idx + 1:end] = _Q[idx + 1:end, idx + 1:end]
     basis.Q[idx, :] = qnew
+    println(basis.grid)
+    println(basis.Q)
+
+    testOrthgonal(basis)
+    ω = LinRange(Float(0), Float(10), 1000)
+    y = [residual(basis, w) for w in ω]
+    p = plot(ω, y, xlims=(0.0, 10))
+    display(p)
+    readline()
+
 
     basis.residual = zeros(Float, basis.N)
     basis.candidate = zeros(Float, basis.N)
@@ -65,7 +75,12 @@ function addBasis(basis, g0::Float)
         basis.candidate[i] = g
         basis.residual[i] = residual(basis, g)
     end
-    g = findCandidate(basis, basis.grid[end], basis.grid[end] * 10)
+    
+    if g0 < eps(Float(0))
+        g = findCandidate(basis, Float(0), Float(10))
+    else
+        g = findCandidate(basis, basis.grid[end], basis.grid[end] * 10)
+    end
     if g > basis.Λ
         basis.candidate[end] = basis.Λ
         basis.residual[end] = 0
@@ -73,12 +88,13 @@ function addBasis(basis, g0::Float)
         basis.candidate[end] = g
         basis.residual[end] = residual(basis, g)
     end
+
     return idx, basis
 end
 
 function QR(Λ, rtol)
     basis = Basis(Λ, rtol)
-    addBasis(basis, Float(1))
+    addBasis(basis, Float(0))
     maxResidual, ωi = findmax(basis.residual)
 
     while maxResidual > rtol
@@ -127,19 +143,19 @@ function residual(basis, g::Float)
     end
     
 function findCandidate(basis, gmin::Float, gmax::Float)
-        N = 16
-    dg = abs(gmax - gmin) / 16
+    N = 16
+    dg = abs(gmax - gmin) / N
     r0 = residual(basis, gmin)
     g = gmin + dg
     r = residual(basis, g)
     if r <= r0
        println("warning: $r at $g < $r0 at $gmin  !")
 
-       ω = LinRange(Float(gmin), Float(gmax), 1000)
-       y = [residual(basis, w) for w in ω]
-       p = plot(ω, y, xlims=(0.0, 10))
-       display(p)
-       readline()
+    #    ω = LinRange(Float(0), Float(gmax), 1000)
+    #    y = [residual(basis, w) for w in ω]
+    #    p = plot(ω, y, xlims=(0.0, 10))
+    #    display(p)
+    #    readline()
 
        exit(0)
     end
@@ -149,6 +165,22 @@ function findCandidate(basis, gmin::Float, gmax::Float)
         r = residual(basis, g)
     end
     return g - dg
+end
+
+
+function testOrthgonal(basis)
+    println("testing orthognalization...")
+    II = zeros(Float, (basis.N, basis.N))
+    K = zeros(Float, (basis.N, basis.N))
+    for i in 1:basis.N
+        for j in 1:basis.N
+            K[i,j] = proj(basis.grid[i], basis.grid[j])
+        end
+    end
+    II = basis.Q*K*basis.Q'
+    maxerr = maximum(abs.(II - I))
+    println("Max Orthognalization Error: ", maxerr)
+# @assert maxerr < atol
 end
     
 
