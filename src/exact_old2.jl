@@ -469,8 +469,8 @@ add new frequency ω into the existing basis
 # end
     
 function findFreqMax(freq, Q, ωmin, ωmax)
-    N = 16
-    dω = abs(ωmax - ωmin) / 16
+    N = 100
+    dω = abs(ωmax - ωmin) / 100
     r0 = Norm(freq, Q, ωmin)
     ω = ωmin + dω
     r = Norm(freq, Q, ω)
@@ -547,10 +547,10 @@ return freq, Q
     end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
-    # freq, Q = findBasis(1.0e-3, Float(100))
-    basis = QR(100000000, 1e-10)
+    freq, Q = findBasis(1.0e-10, Float(100000000))
+    # basis = QR(100000000, 1e-10)
     # basis = QR(100, 1e-3)
-    testOrthgonal(basis)
+    # testOrthgonal(basis)
 
     # freq = [Float(0), ]
     # Q = [[1 / Norm(freq[1]), ], ]
@@ -568,9 +568,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # println(basis.Q)
     # testOrthgonal(basis)
 
-    ω = LinRange(Float(0), Float(100), 1000)
-    y = [residual(basis, w) for w in ω]
-    p = plot(ω, y, xlims=(0.0, 100))
-    display(p)
-    readline()
+    # ω = LinRange(Float(0), Float(100), 1000)
+    # y = [Norm(freq, Q, w) for w in ω]
+    # p = plot(ω, y, xlims=(0.0, 100))
+    # display(p)
+    # readline()
 end

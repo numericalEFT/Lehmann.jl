@@ -1,0 +1,284 @@
+        - using LinearAlgebra:Matrix, zero, similar
+        - using LinearAlgebra, Printf
+        - using Roots
+        - using Quadmath
+        - using Plots
+        - using ProfileView
+        - 
+        - # const Float = Float64
+        - # const Float = BigFloat
+        - const Float = Float128
+        - 
+        - mutable struct Basis
+        -     Λ::Float
+        -     rtol::Float
+        - 
+        -     N::Int
+        -     grid::Vector{Float}
+        -     Q::Matrix{Float} # u_j = K_{g_i}*Q_{ij}
+        -     residual::Vector{Float}
+        -     candidate::Vector{Float}
+        -     proj::Matrix{Float} # the overlap of basis functions <K(g_i), K(g_j)>
+        -     QQ::Matrix{Float} # Q'*Q=\sum_i qi'*qi
+        -     tmp::Vector{Float}
+        -     function Basis(Λ, rtol)
+      160         _Q = Matrix{Float}(undef, (0, 0))
+     1184         return new(Λ, rtol, 0, [], _Q, [], [], similar(_Q), similar(_Q), [])
+        -     end
+        - end
+        - 
+        - function addBasis(basis, g0::Float)
+        0     basis.N += 1
+        0     if basis.N == 1
+        -         idx = 1
+      192         basis.grid = [g0, ]
+        0         basis.Q = zeros(Float, (basis.N, basis.N))
+        0         basis.Q[1,1] = 1 / Norm(g0)
+        0         basis.proj=projKernel(basis)
+        -     else
+     6160         idxList = findall(x -> x > g0, basis.grid)
+        -         # if ω is larger than any existing freqencies, then idx is an empty list
+        0         idx = length(idxList) == 0 ? basis.N : idxList[1] # the index to insert the new frequency
+        - 
+     4464         insert!(basis.grid, idx, g0)
+        0         basis.proj=projKernel(basis)
+  1879968         _Q = copy(basis.Q)
+        0         basis.Q = zeros(Float, (basis.N, basis.N))
+        0         basis.Q[1:idx - 1, 1:idx - 1] = _Q[1:idx - 1, 1:idx - 1]
+        0         basis.Q[1:idx - 1, idx + 1:end] = _Q[1:idx - 1, idx:end]
+        0         basis.Q[idx + 1:end, 1:idx - 1] = _Q[idx:end, 1:idx - 1]
+        0         basis.Q[idx + 1:end, idx + 1:end] = _Q[idx:end, idx:end]
+        -         # println(maximum(abs.(GramSchmidt(basis, idx, g0) .- mGramSchmidt(basis, idx, g0))))
+        0         basis.Q[idx, :] = mGramSchmidt(basis, idx, g0)
+        -     end
+  1961920     basis.QQ=basis.Q'*basis.Q
+    49312     basis.tmp = similar(basis.grid)
+        - 
+        0     basis.residual = zeros(Float, basis.N)
+        0     basis.candidate = zeros(Float, basis.N)
+        -         
+        0     for i in 1:basis.N - 1
+        0         g = findCandidate(basis, basis.grid[i], basis.grid[i + 1])
+        0         basis.candidate[i] = g
+        0         basis.residual[i] = residual(basis, g)
+        -     end
+        -     
+        -     # take care of the last bin
+        0     if g0 < eps(Float(0))
+        0         g = findCandidate(basis, Float(0), Float(10))
+        -     else
+        0         g = findCandidate(basis, basis.grid[end], basis.grid[end] * 10)
+        -     end
+        0         if g > basis.Λ
+        0         basis.candidate[end] = basis.Λ
+        0         basis.residual[end] = 0
+        -     else
+        0         basis.candidate[end] = g
+        0         basis.residual[end] = residual(basis, g)
+        -     end
+        - 
+        0     return idx, basis
+        - end
+        - 
+        - function QR(Λ, rtol)
+        0     basis = Basis(Λ, rtol)
+        0     addBasis(basis, Float(0))
+        0     maxResidual, ωi = findmax(basis.residual)
+        - 
+        0     while maxResidual > rtol
+        - 
+        0         newω = basis.candidate[ωi]
+        -         # println(newω)
+        0         idx, basis = addBasis(basis, newω)
+        - 
+    13280         @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", basis.N, newω, basis.grid[idx - 1], (idx == basis.N) ? Λ : basis.grid[idx + 1])
+        -         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
+        -         
+        -     #     for i in 1:length(candidates)
+        -     #         @printf("%16.8f  ->  %16.8f\n", candidates[i], residual[i])
+        -     # end
+        - 
+        -         # ω = LinRange(Float(0), Float(100), 1000)
+        -         # y = [residual(basis, w) for w in ω]
+        -         # p = plot(ω, y, xlims=(0.0, 100))
+        -         # display(p)
+        -         # readline()
+        -     
+        0         maxResidual, ωi = findmax(basis.residual)
+        -     end
+        0     testOrthgonal(basis)
+        -     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
+       32     @printf("residual = %.10e\n", maxResidual)
+        0     return basis
+        - end
+        - 
+        - """
+        - calculate the new basis projected to the existing orthonormal basis
+        - return [<new basis, Q[:, i]>  for i ∈ 1:N ]
+        - """
+        - function proj(basis, g::Float)
+        -     proj_j = [proj(gj, g) for gj in basis.grid]
+        -     return basis.Q * proj_j
+        - end
+        -     
+        - """
+        - q=sum_j c_j K_j
+        - return <q, K_g>
+        - """
+        - function proj(grid, q, g::Float)
+        -     return sum([q[i] * proj(grid[i], g) for i in 1:length(grid)])
+        - end
+        - 
+        - """
+        - q1=sum_j c_j K_j
+        - q2=sum_k d_k K_k
+        - return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
+        - """
+        - function proj(basis, q1::Vector{Float}, q2::Vector{Float})
+        -     return q1'*basis.proj*q2
+        - end
+        -     
+        - function projKernel(basis)
+        0     K = zeros(Float, (basis.N, basis.N))
+        0     for i in 1:basis.N
+        0         for j in 1:basis.N
+        0             K[i,j] = proj(basis.grid[i], basis.grid[j])
+        -         end
+        -     end
+        0     return K
+        - end
+        - 
+        - """
+        - modified Gram-Schmidt process
+        - """
+        - function mGramSchmidt(basis, idx, g::Float)
+        0     qnew = zeros(Float, basis.N)
+        0         qnew[idx] = 1
+        - 
+        0     for qi in 1:basis.N
+        0         if qi == idx
+        -             continue
+        -         end
+        0         q = basis.Q[qi, :]
+        -         # println(proj(basis.grid, q, qnew), " vs ",q'*basis.proj*qnew)
+        -         # qnew = qnew - proj(basis.grid, q, qnew) .* q
+  4370176         qnew -= proj(basis, q, qnew) .* q  #<q, qnew> q
+        -     end
+        - 
+    49120     norm = sqrt(proj(basis, qnew, qnew))
+        0     return qnew / norm
+        - end
+        - 
+        - """
+        - Gram-Schmidt process
+        - """
+        - function GramSchmidt(basis, idx, g::Float)
+        -     q0 = zeros(Float, basis.N)
+        -     q0[idx] = 1
+        -     qnew = copy(q0)
+        - 
+        -     for qi in 1:basis.N
+        -         if qi == idx
+        -             continue
+        -         end
+        -         q = basis.Q[qi, :]
+        -         qnew -=  proj(basis, q, q0) .* q
+        -     end
+        -     
+        -     norm = sqrt(proj(basis, qnew, qnew))
+        -     return qnew / norm
+        - end
+        - 
+        - function residual(basis, g::Float)
+        -     # norm2 = proj(g, g) - sum((proj(basis, g)).^2)
+        - 
+        -     #norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
+        -     #qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
+        0     norm2 = proj(g, g)
+        -     # vec0=[proj(gi, g) for gi in basis.grid]
+        -     # norm2 -= vec'*basis.QQ*vec
+        -     # vec = proj(basis, g)
+        -     # norm2 -= vec'*vec
+        -     # println("maximum: ", maximum(vec'*vec-vec0'*basis.QQ*vec0))
+        -     # norm2 -= vec0'*basis.QQ*vec0
+        -     # for i in 1:basis.N
+        -     #     for j in 1:basis.N
+        -     #         norm2 -= basis.QQ[i,j]*proj(basis.grid[i], g)*proj(basis.grid[j], g)
+        -     #     end
+        -     # end
+        0     for (i, gi) in enumerate(basis.grid)
+        0         basis.tmp[i] = proj(gi, g) 
+        -     end
+        0     @views for i = 1:basis.N
+        0         norm2 -= (basis.Q[i, :]'*basis.tmp)^2
+        -     end
+        -     # mul!(basis.tmp, basis.Q, basis.tmp)
+        -     # basis.tmp = basis.Q*basis.tmp
+        -     # norm2 -= basis.tmp'*basis.tmp
+        - 
+        0     return sqrt(abs(norm2)) # norm2 may become slightly negative if ω concides with the existing frequencies
+        -     end
+        -     
+        - function findCandidate(basis, gmin::Float, gmax::Float)
+        -     N = 100
+        0     dg = abs(gmax - gmin) / N
+        0     r0 = residual(basis, gmin)
+        0     g = gmin + dg
+        0     r = residual(basis, g)
+        0     if r <= r0
+        0        println("warning: $r at $g < $r0 at $gmin  !")
+        - 
+        -     #    ω = LinRange(Float(0), Float(gmax), 1000)
+        -     #    y = [residual(basis, w) for w in ω]
+        -     #    p = plot(ω, y, xlims=(0.0, 10))
+        -     #    display(p)
+        -     #    readline()
+        - 
+        0     exit(0)
+        -     end
+        0     while r > r0
+        0         g += dg
+        -         r0 = r
+        0     r = residual(basis, g)
+        -     end
+        0     return g - dg
+        - end
+        - 
+        - 
+        - function testOrthgonal(basis)
+       16     println("testing orthognalization...")
+   163904     II = basis.Q * basis.proj * basis.Q'
+    81952     maxerr = maximum(abs.(II - I))
+        0     println("Max Orthognalization Error: ", maxerr)
+        - # @assert maxerr < atol
+        -         end
+        -     
+        - 
+        - """
+        - \\int_0^1 e^{-ω_1 τ}*e^{-ω_2*τ} dτ = (1-exp(-(ω_1+ω_2))/(ω_1+ω_2)
+        - """
+        - function proj(ω1::Float, ω2::Float)
+        0     ω = ω1 + ω2
+        0     if ω < 1e-6
+        0         return 1 - ω / 2 + ω^2 / 6 - ω^3 / 24 + ω^4 / 120 - ω^5 / 720
+        -     else
+        0     return (1 - exp(-ω)) / ω
+        -     end
+        - end
+        - 
+        - Norm(ω) = sqrt(abs(proj(ω, ω)))
+        - 
+     1840 if abspath(PROGRAM_FILE) == @__FILE__    
+        -     # freq, Q = findBasis(1.0e-3, Float(100))
+        0     basis = QR(100, 1e-3)
+        -     # @profview basis = QR(100000000, 1e-10)
+        0     @time basis = QR(100000000, 1e-10)
+        -     # readline()
+        -     # basis = QR(100, 1e-3)
+        - 
+        - #     ω = LinRange(Float(0), Float(100), 1000)
+        - # y = [residual(basis, w) for w in ω]
+        - #     p = plot(ω, y, xlims=(0.0, 100))
+        - #     display(p)
+        - #     readline()
+        - end
