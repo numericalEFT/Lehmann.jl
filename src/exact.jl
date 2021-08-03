@@ -9,6 +9,8 @@ using Plots
 # const Float = BigFloat
 const Float = Float128
 
+include("./kernel.jl")
+
 mutable struct Basis
     Λ::Float
     rtol::Float
@@ -118,7 +120,7 @@ function QR(Λ, rtol)
     y = [Residual(basis, w) for w in ω]
     p = plot(ω, y, xlims=(0.0, 100))
     plot!(p, candidate, residual, seriestype=:scatter)
-    display(p)
+display(p)
     readline()
 
     return basis
@@ -126,17 +128,6 @@ end
 
 Norm(ω) = sqrt(abs(proj(ω, ω)))
 
-"""
-\\int_0^1 e^{-ω_1 τ}*e^{-ω_2*τ} dτ = (1-exp(-(ω_1+ω_2))/(ω_1+ω_2)
-"""
-function proj(ω1::Float, ω2::Float)
-    ω = ω1 + ω2
-    if ω < 1e-6
-        return 1 - ω / 2 + ω^2 / 6 - ω^3 / 24 + ω^4 / 120 - ω^5 / 720
-    else
-    return (1 - exp(-ω)) / ω
-    end
-end
 
 
 """
@@ -157,14 +148,14 @@ function proj(basis, q1::Vector{Float}, q2::Vector{Float})
     end
     return K
 end
-
+    
 """
 modified Gram-Schmidt process
 """
 function mGramSchmidt(basis, idx, g::Float)
     qnew = zeros(Float, basis.N)
         qnew[idx] = 1
-
+        
     for qi in 1:basis.N
         if qi == idx
             continue
@@ -186,7 +177,7 @@ function GramSchmidt(basis, idx, g::Float)
     q0 = zeros(Float, basis.N)
     q0[idx] = 1
     qnew = copy(q0)
-
+        
     for qi in 1:basis.N
         if qi == idx
             continue
@@ -222,7 +213,7 @@ function findCandidate(basis, gmin::Float, gmax::Float)
     #    p = plot(ω, y, xlims=(0.0, 10))
     #    display(p)
     #    readline()
-
+    
     exit(0)
     end
     while r > r0
