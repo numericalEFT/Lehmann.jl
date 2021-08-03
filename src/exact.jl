@@ -4,9 +4,9 @@ using Roots
 using Quadmath
 using Plots
 
-const Float = Float64
+# const Float = Float64
 # const Float = BigFloat
-# const Float = Float128
+const Float = Float128
 
 mutable struct Basis
     Λ::Float
@@ -34,37 +34,44 @@ mutable struct Basis
 end
 
 function addBasis(basis, g0::Float)
-    if basis.N == 0
+    basis.N += 1
+    if basis.N == 1
         idx = 1
-        qnew = [1 / Norm(g0), ]
+        basis.grid = [g0, ]
+        basis.Q = zeros(Float, (basis.N, basis.N))
+        basis.Q[1,1] = 1 / Norm(g0)
     else
         idxList = findall(x -> x > g0, basis.grid)
+        # println(idxList, ", g0: ", g0)
         # if ω is larger than any existing freqencies, then idx is an empty list
-        idx = length(idxList) == 0 ? basis.N + 1 : idxList[1] # the index to insert the new frequency
+        idx = length(idxList) == 0 ? basis.N : idxList[1] # the index to insert the new frequency
         # idx = length(freq) + 1 # always add the new freq to the end
 
-        qnew, q00 = orthognalize(basis, g0)
-        insert!(qnew, idx, q00)
+        insert!(basis.grid, idx, g0)
+        # qnew, q00 = orthognalize(basis, g0)
+        # insert!(qnew, idx, q00)
+        _Q = copy(basis.Q)
+        basis.Q = zeros(Float, (basis.N, basis.N))
+        basis.Q[1:idx - 1, 1:idx - 1] = _Q[1:idx - 1, 1:idx - 1]
+        basis.Q[1:idx - 1, idx + 1:end] = _Q[1:idx - 1, idx:end]
+        basis.Q[idx + 1:end, 1:idx - 1] = _Q[idx:end, 1:idx - 1]
+        # println(basis.grid)
+        # println("size: ", basis.N, "   idx: ", idx)
+        basis.Q[idx + 1:end, idx + 1:end] = _Q[idx:end, idx:end]
+        basis.Q[idx, :] = mGramSchmidt(basis, idx, g0)
     end
-    basis.N += 1
-    insert!(basis.grid, idx, g0)
     # add a new column and a new row for the new grid point
-    _Q = copy(basis.Q)
-    basis.Q = zeros(Float, (basis.N, basis.N))
-    basis.Q[1:idx - 1, 1:idx - 1] = _Q[1:idx - 1, 1:idx - 1]
-    basis.Q[1:idx - 1, idx + 1:end] = _Q[1:idx - 1, idx:end]
-    basis.Q[idx + 1:end, 1:idx - 1] = _Q[idx:end, 1:idx - 1]
-    basis.Q[idx + 1:end, idx + 1:end] = _Q[idx + 1:end, idx + 1:end]
-    basis.Q[idx, :] = qnew
-    println(basis.grid)
-    println(basis.Q)
+    # basis.Q[idx, :] = qnew
+    # println(basis.grid)
+    # println(basis.Q)
 
-    testOrthgonal(basis)
-    ω = LinRange(Float(0), Float(10), 1000)
-    y = [residual(basis, w) for w in ω]
-    p = plot(ω, y, xlims=(0.0, 10))
-    display(p)
-    readline()
+    # println("0: ", residual(basis, Float(0)))
+    # testOrthgonal(basis)
+    # ω = LinRange(Float(0), Float(10), 1000)
+    # y = [residual(basis, w) for w in ω]
+    # p = plot(ω, y, xlims=(0.0, 10))
+    # display(p)
+    # readline()
 
 
     basis.residual = zeros(Float, basis.N)
@@ -81,7 +88,7 @@ function addBasis(basis, g0::Float)
     else
         g = findCandidate(basis, basis.grid[end], basis.grid[end] * 10)
     end
-    if g > basis.Λ
+if g > basis.Λ
         basis.candidate[end] = basis.Λ
         basis.residual[end] = 0
     else
@@ -129,16 +136,72 @@ return [<new basis, Q[:, i]>  for i ∈ 1:N ]
 """
 function proj(basis, g::Float)
     proj_j = [proj(gj, g) for gj in basis.grid]
-    return basis.Q*proj_j
+    return basis.Q * proj_j
 end
 
-function orthognalize(basis, g::Float)
-    qnew = proj(basis, g) .*(-1)
-    return qnew, 1 / residual(basis, g)
+"""
+q=sum_j c_j e^{-ω_j*τ}
+return <q, e^{-ωτ}>
+"""
+function proj(grid, q, g::Float)
+    return sum([q[i] * proj(grid[i], g) for i in 1:length(grid)])
+end
+
+"""
+q1=sum_j c_j e^{-ω_j*τ}
+q2=sum_k d_k e^{-ω_k*τ}
+return <q1, q2> = sum_k d_k <q1, e^{-ω_k*τ}>
+"""
+function proj(grid, q1::Vector{Float}, q2::Vector{Float})
+    # @assert length(freq) == length(q1) == length(q2)
+    return sum([q2[i] * proj(grid, q1, grid[i]) for i in 1:length(grid)])
+end
+
+"""
+modified Gram-Schmidt process
+"""
+function mGramSchmidt(basis, idx, g::Float)
+    # norm = residual(basis, g)
+    # qnew = proj(basis, g) .*(-1/norm)
+
+    # for (qi, q) in enumerate(Q)
+    #     qnew .-= proj(freq, q, ω) .* q
+    # end
+
+    # qnew = zeros(Float, basis.N)
+
+    # for qi in 1:basis.N
+    #     q = basis.Q[qi, :]
+    #     qnew .-= proj(basis.grid, q, g) .* q
+    # end
+
+    qnew = zeros(Float, basis.N)
+    qnew[idx] = 1
+
+    for qi in 1:basis.N
+        if qi == idx
+            continue
+        end
+        q = basis.Q[qi, :]
+        qnew = qnew - proj(basis.grid, q, qnew) .* q
+    end
+    
+    K = zeros(Float, (basis.N, basis.N))
+    for i in 1:basis.N
+        for j in 1:basis.N
+            K[i,j] = proj(basis.grid[i], basis.grid[j])
+        end
+    end
+    norm = sqrt(qnew'*K*qnew)
+    qnew /= norm
+    
+    return qnew
 end
 
 function residual(basis, g::Float)
-    norm2 = proj(g, g) - sum((proj(basis, g)).^2)
+    # norm2 = proj(g, g) - sum((proj(basis, g)).^2)
+    proj_g = proj(basis, g)
+    norm2 = proj(g, g) - proj_g' * proj_g
     return sqrt(abs(norm2)) # norm2 may become slightly negative if ω concides with the existing frequencies
     end
     
@@ -177,11 +240,12 @@ function testOrthgonal(basis)
             K[i,j] = proj(basis.grid[i], basis.grid[j])
         end
     end
-    II = basis.Q*K*basis.Q'
+    # println("K=", K)
+    II = basis.Q * K * basis.Q'
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 # @assert maxerr < atol
-end
+        end
     
 
 """
@@ -205,7 +269,7 @@ return -1 + 4ω / 3 - ω^2 + 8 * ω^3 / 15 - 2 * ω^4 / 9 + 8 * ω^5 / 105
     else
         return -(1 - exp(-2 * ω)) / (2 * ω^2) + exp(-2ω) / ω
     end
-        end
+end
 
 """
  derivative for proj(ω1, ω2)
@@ -219,26 +283,24 @@ return -1 / 2 + ω / 3 - ω^2 / 8 + ω^3 / 30 - ω^4 / 144 + ω^5 / 840
 end
 end
 
-"""
-q=sum_j c_j e^{-ω_j*τ}
-return <q, e^{-ωτ}>
-"""
-function proj(freq, q, ω::Float)
-    println(freq)
-    println(q)
-    @assert length(freq) == length(q)
-    return sum([q[i] * proj(freq[i], ω) for i in 1:length(freq)])
-end
+# """
+# q=sum_j c_j e^{-ω_j*τ}
+# return <q, e^{-ωτ}>
+# """
+# function proj(freq, q, ω::Float)
+#     @assert length(freq) == length(q)
+#     return sum([q[i] * proj(freq[i], ω) for i in 1:length(freq)])
+# end
     
-"""
-q1=sum_j c_j e^{-ω_j*τ}
-q2=sum_k d_k e^{-ω_k*τ}
-return <q1, q2> = sum_k d_k <q1, e^{-ω_k*τ}>
-"""
-function proj(freq, q1::Vector{Float}, q2::Vector{Float})
-    @assert length(freq) == length(q1) == length(q2)
-    return sum([q2[i] * proj(freq, q1, freq[i]) for i in 1:length(freq)])
-end
+# """
+# q1=sum_j c_j e^{-ω_j*τ}
+# q2=sum_k d_k e^{-ω_k*τ}
+# return <q1, q2> = sum_k d_k <q1, e^{-ω_k*τ}>
+# """
+# function proj(freq, q1::Vector{Float}, q2::Vector{Float})
+#     @assert length(freq) == length(q1) == length(q2)
+#     return sum([q2[i] * proj(freq, q1, freq[i]) for i in 1:length(freq)])
+# end
 
 Norm(ω) = sqrt(abs(proj(ω, ω)))
 
@@ -265,7 +327,7 @@ function DNorm2(freq, Q, ω::Float)
     end
     end
     return dnorm2 / (2 * Norm(freq, Q, ω))
-end
+        end
 
 """
 Project the kernel to the DLR basis
@@ -273,7 +335,7 @@ Project the kernel to the DLR basis
 function projectedKernel(freq, Q, ω::Float)
     # K(τ, ω) ≈ \sum_i <e^{-ωτ}, qi> qi = \sum_k (\sum_ij c_ij*c_ik <e^{-ωτ, e^{-ωj*τ}}> e^{-ω_k*τ})
     amp = zeros(Float, length(Q))
-        for k in 1:length(Q)
+for k in 1:length(Q)
         amp[k] = Float(0)
         for i in 1:length(Q)
             for j in 1:length(Q)
@@ -417,6 +479,9 @@ function findBasis(eps, Λ)
 
         newω = candidates[ωi]
         idx = addFreq!(freq, Q, newω)
+        # println(freq)
+        # println(Q)
+        # readline()
 
         @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", length(freq), newω, freq[idx - 1], (idx == length(freq)) ? Λ : freq[idx + 1])
         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
@@ -429,8 +494,8 @@ function findBasis(eps, Λ)
         candidates[idx - 1] = r1
         # residual[idx - 1] = Norm(freq, Q, r1)
             if newω < Λ
-            insert!(candidates, idx, r2)
-            # insert!(residual, idx, Norm(freq, Q, r2))
+        insert!(candidates, idx, r2)
+    # insert!(residual, idx, Norm(freq, Q, r2))
     end
         residual = [Norm(freq, Q, ω) for ω in candidates]
 
@@ -450,15 +515,32 @@ function findBasis(eps, Λ)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
     @printf("residual = %.10e\n", maxResidual)
 return freq, Q
-end
+    end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
-    # freq, Q = findBasis(1.0e-10, Float(100000000))
+    # freq, Q = findBasis(1.0e-3, Float(100))
     basis = QR(100, 1e-3)
+    testOrthgonal(basis)
 
-    # ω = LinRange(Float(0), Float(10), 1000)
-    # y = [Norm(freq, Q, w) for w in ω]
-    # p = plot(ω, y, xlims=(0.0, 10))
-    # display(p)
-    # readline()
+    # freq = [Float(0), ]
+    # Q = [[1 / Norm(freq[1]), ], ]
+    # addFreq!(freq, Q, Float(3))
+    # println(Q)
+    # addFreq!(freq, Q, Float(10))
+    # println("last round: ", Q)
+    # testOrthgonal(freq, Q)
+
+    # basis = Basis(100, 1e-3)
+    # addBasis(basis, Float(0))
+    # addBasis(basis, Float(3))
+    # println(basis.Q)
+    # addBasis(basis, Float(10))
+    # println(basis.Q)
+    # testOrthgonal(basis)
+
+    ω = LinRange(Float(0), Float(100), 1000)
+    y = [residual(basis, w) for w in ω]
+    p = plot(ω, y, xlims=(0.0, 100))
+    display(p)
+    readline()
 end
