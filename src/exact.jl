@@ -58,7 +58,8 @@ function addBasis(basis, g0::Float)
         # println(basis.grid)
         # println("size: ", basis.N, "   idx: ", idx)
         basis.Q[idx + 1:end, idx + 1:end] = _Q[idx:end, idx:end]
-        basis.Q[idx, :] = mGramSchmidt(basis, idx, g0)
+        # println(maximum(abs.(GramSchmidt(basis, idx, g0) .- mGramSchmidt(basis, idx, g0))))
+        basis.Q[idx, :] = GramSchmidt(basis, idx, g0)
     end
     # add a new column and a new row for the new grid point
     # basis.Q[idx, :] = qnew
@@ -184,6 +185,34 @@ function mGramSchmidt(basis, idx, g::Float)
         end
         q = basis.Q[qi, :]
         qnew = qnew - proj(basis.grid, q, qnew) .* q
+    end
+    
+    K = zeros(Float, (basis.N, basis.N))
+    for i in 1:basis.N
+        for j in 1:basis.N
+            K[i,j] = proj(basis.grid[i], basis.grid[j])
+        end
+    end
+    norm = sqrt(qnew'*K*qnew)
+    qnew /= norm
+    
+    return qnew
+end
+
+"""
+Gram-Schmidt process
+"""
+function GramSchmidt(basis, idx, g::Float)
+    q0 = zeros(Float, basis.N)
+    q0[idx] = 1
+    qnew = copy(q0)
+
+    for qi in 1:basis.N
+        if qi == idx
+            continue
+        end
+        q = basis.Q[qi, :]
+        qnew -=  proj(basis.grid, q, q0) .* q
     end
     
     K = zeros(Float, (basis.N, basis.N))
@@ -519,7 +548,8 @@ return freq, Q
 
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
-    basis = QR(100, 1e-3)
+    basis = QR(100000000, 1e-10)
+    # basis = QR(100, 1e-3)
     testOrthgonal(basis)
 
     # freq = [Float(0), ]
