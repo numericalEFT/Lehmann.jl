@@ -3,7 +3,7 @@ using LinearAlgebra, Printf
 using Roots
 using Quadmath
 using Plots
-using ProfileView
+# using ProfileView
 
 # const Float = Float64
 # const Float = BigFloat
@@ -15,17 +15,16 @@ mutable struct Basis
 
     N::Int
     grid::Vector{Float}
-    Q::Matrix{Float} # u_j = K_{g_i}*Q_{ij}
     residual::Vector{Float}
-    candidate::Vector{Float}
+    Q::Matrix{Float} # u_j = K_{g_i}*Q_{ij}
     proj::Matrix{Float} # the overlap of basis functions <K(g_i), K(g_j)>
     function Basis(Λ, rtol)
         _Q = Matrix{Float}(undef, (0, 0))
-        return new(Λ, rtol, 0, [], _Q, [], [], similar(_Q))
+        return new(Λ, rtol, 0, [], [], _Q, similar(_Q))
     end
 end
 
-function addBasis(basis, g0::Float)
+function addBasis!(basis, g0::Float)
     basis.N += 1
     if basis.N == 1
         idx = 1
@@ -50,15 +49,16 @@ function addBasis(basis, g0::Float)
         basis.Q[idx, :] = mGramSchmidt(basis, idx, g0)
     end
 
-    insert!(basis.residual, idx, Float(0))
-    insert!(basis.candidate, idx, Float(0))
-    # scanResidual!(basis, idx-9, idx+10, g0)
-scanResidual!(basis, 1, basis.N, g0)
-    return idx, basis
+    candidate, residual = scanResidual!(basis, g0, idx)
+    insert!(basis.residual, idx, maximum(residual))
+# scanResidual!(basis, idx-9, idx+10, g0)
+    return idx, candidate, residual
 end
 
-function scanResidual!(basis, head, tail, g0)
-    for i in head:tail # because of the separation of scales, the grids far away from idx is rarely affected
+function scanResidual!(basis, g0, idx)
+    candidate = zeros(Float, basis.N)
+    residual = zeros(Float, basis.N)
+    for i in 1:basis.N # because of the separation of scales, the grids far away from idx is rarely affected
     # for i in 1:basis.N
         if i < 1 || i > basis.N
             continue
@@ -70,31 +70,32 @@ function scanResidual!(basis, head, tail, g0)
                 g = findCandidate(basis, basis.grid[end], basis.grid[end] * 10)
             end
             if g > basis.Λ
-                basis.candidate[end] = basis.Λ
-                basis.residual[end] = residual(basis, basis.Λ)
+                candidate[end] = basis.Λ
+                residual[end] = Residual(basis, basis.Λ)
             else
-                basis.candidate[end] = g
-                basis.residual[end] = residual(basis, g)
+                candidate[end] = g
+                residual[end] = Residual(basis, g)
             end
         else # 1<=i<=basis.N-1
             g = findCandidate(basis, basis.grid[i], basis.grid[i + 1])
-            basis.candidate[i] = g
-basis.residual[i] = residual(basis, g)
+            candidate[i] = g
+            residual[i] = Residual(basis, g)
         end
     end
+    return candidate, residual
 end
 
 function QR(Λ, rtol)
     basis = Basis(Λ, rtol)
-    addBasis(basis, Float(0))
-    maxResidual, ωi = findmax(basis.residual)
+    idx, candidate, residual = addBasis!(basis, Float(0))
+    maxResidual, ωi = findmax(residual)
 
     while maxResidual > rtol
 
-        newω = basis.candidate[ωi]
-        idx, basis = addBasis(basis, newω)
+        newω = candidate[ωi]
+        idx, candidate, residual = addBasis!(basis, newω)
 
-        @printf("%3i : ω=%16.8f ∈ (%16.8f, %16.8f)\n", basis.N, newω, basis.grid[idx - 1], (idx == basis.N) ? Λ : basis.grid[idx + 1])
+        @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, basis.grid[idx - 1], (idx == basis.N) ? Λ : basis.grid[idx + 1], basis.residual[idx])
         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
         
     #     for i in 1:length(candidates)
@@ -102,16 +103,24 @@ function QR(Λ, rtol)
     # end
 
         # ω = LinRange(Float(0), Float(100), 1000)
-        # y = [residual(basis, w) for w in ω]
+        # y = [Residual(basis, w) for w in ω]
         # p = plot(ω, y, xlims=(0.0, 100))
         # display(p)
         # readline()
     
-        maxResidual, ωi = findmax(basis.residual)
+        maxResidual, ωi = findmax(residual)
     end
     testOrthgonal(basis)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
     @printf("residual = %.10e\n", maxResidual)
+
+    ω = LinRange(Float(0), Float(100), 1000)
+    y = [Residual(basis, w) for w in ω]
+    p = plot(ω, y, xlims=(0.0, 100))
+    plot!(p, candidate, residual, seriestype=:scatter)
+    display(p)
+    readline()
+
     return basis
 end
 
@@ -129,20 +138,6 @@ function proj(ω1::Float, ω2::Float)
     end
 end
 
-"""
-calculate the new basis projected to the existing orthonormal basis
-return [<new basis, Q[:, i]>  for i ∈ 1:N ]
-"""
-function proj(basis, g::Float)
-end
-    
-"""
-q=sum_j c_j K_j
-return <q, K_g>
-"""
-function proj(grid, q, g::Float)
-    return sum([q[i] * proj(grid[i], g) for i in 1:length(grid)])
-end
 
 """
 q1=sum_j c_j K_j
@@ -151,7 +146,7 @@ return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
 function proj(basis, q1::Vector{Float}, q2::Vector{Float})
     return q1' * basis.proj * q2
-end
+    end
     
         function projKernel(basis)
             K = zeros(Float, (basis.N, basis.N))
@@ -204,12 +199,10 @@ function GramSchmidt(basis, idx, g::Float)
     return qnew / norm
 end
 
-function residual(basis, g::Float)
-    # norm2 = proj(g, g) - sum((proj(basis, g)).^2)
-
+function Residual(basis, g::Float)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
-
+    
     KK = [proj(gj, g) for gj in basis.grid]
     norm2 = proj(g, g) - (norm(basis.Q * KK))^2
     return norm2 < 0 ? Float(0) : sqrt(norm2) 
@@ -218,14 +211,14 @@ end
 function findCandidate(basis, gmin::Float, gmax::Float)
     N = 16
     dg = abs(gmax - gmin) / N
-    r0 = residual(basis, gmin)
+    r0 = Residual(basis, gmin)
     g = gmin + dg
-    r = residual(basis, g)
-    if r <= r0
+    r = Residual(basis, g)
+    if r < r0
        println("warning: $r at $g < $r0 at $gmin  !")
 
     #    ω = LinRange(Float(0), Float(gmax), 1000)
-    #    y = [residual(basis, w) for w in ω]
+    #    y = [Residual(basis, w) for w in ω]
     #    p = plot(ω, y, xlims=(0.0, 10))
     #    display(p)
     #    readline()
@@ -235,7 +228,7 @@ function findCandidate(basis, gmin::Float, gmax::Float)
     while r > r0
     g += dg
         r0 = r
-    r = residual(basis, g)
+    r = Residual(basis, g)
     end
     return g - dg
 end
@@ -251,16 +244,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
-    basis = QR(100, 1e-3)
+    # basis = QR(100, 1e-3)
     @time basis = QR(100000000, 1e-10)
     # @time basis = QR(100, 1e-10)
     # readline()
     # basis = QR(100, 1e-3)
 
-    ω = LinRange(Float(0), Float(100), 1000)
-    y = [residual(basis, w) for w in ω]
-    p = plot(ω, y, xlims=(0.0, 100))
-    plot!(p, basis.candidate, basis.residual, seriestype=:scatter)
-    display(p)
-    readline()
 end
