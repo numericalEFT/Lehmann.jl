@@ -1,8 +1,8 @@
 using LinearAlgebra:Matrix, zero, similar
 using LinearAlgebra, Printf
-using Roots
+# using Roots
 using Quadmath
-using Plots
+# using Plots
 # using ProfileView
 
 # const Float = Float64
@@ -10,6 +10,7 @@ using Plots
 const Float = Float128
 
 include("./kernel.jl")
+include("./matfreq.jl")
 
 mutable struct Basis
     Λ::Float
@@ -87,7 +88,7 @@ function scanResidual!(basis, proj, g0, idx)
     return candidate, residual
 end
 
-function QR(Λ, rtol, proj, isMatfreq; N=nothing)
+function QR(Λ, rtol, proj; N=nothing)
     basis = Basis(Λ, rtol)
     idx, candidate, residual = addBasis!(basis, proj, Float(0))
     maxResidual, ωi = findmax(residual)
@@ -116,12 +117,12 @@ function QR(Λ, rtol, proj, isMatfreq; N=nothing)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
     @printf("residual = %.10e\n", maxResidual)
 
-    ω = LinRange(Float(0), Float(100), 1000)
-    y = [Residual(basis, proj, w) for w in ω]
-    p = plot(ω, y, xlims=(0.0, 100))
-    plot!(p, candidate, residual, seriestype=:scatter)
-display(p)
-    readline()
+#     ω = LinRange(Float(0), Float(100), 1000)
+#     y = [Residual(basis, proj, w) for w in ω]
+#     p = plot(ω, y, xlims=(0.0, 100))
+#     plot!(p, candidate, residual, seriestype=:scatter)
+# display(p)
+#     readline()
 
     return basis
 end
@@ -142,7 +143,7 @@ function projKernel(basis, proj)
     for i in 1:basis.N
     for j in 1:basis.N
             K[i,j] = proj(basis.Λ, basis.grid[i], basis.grid[j])
-        end
+end
     end
     return K
 end
@@ -224,18 +225,54 @@ end
 function testOrthgonal(basis)
     println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
-    maxerr = maximum(abs.(II - I))
+maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 end
     
+"""
+#Arguments:
+- `type`: type of kernel, :fermi, :boson
+- `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
+- `rtol`: tolerance absolute error
+"""
+function dlr(type, Λ, rtol)
+    println(rtol)
+    if type == :corr
+        println("Building ω grid ... ")
+        ωBasis = QR(Λ, rtol, projPH_ω)
+        println("Building τ grid ... ")
+        τBasis = QR(Λ / 2, rtol / 10, projPH_τ, N=ωBasis.N)
+        println("Building n grid ... ")
+        nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
+    elseif type == :acorr
+        println("Building ω grid ... ")
+        ωBasis = QR(Λ, rtol, projPHA_ω)
+        println("Building τ grid ... ")
+        τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, N=ωBasis.N)
+        println("Building n grid ... ")
+        nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+    end
+    rank = ωBasis.N
+    ωGrid = ωBasis.grid
+    τGrid = τBasis.grid / Λ
+    nGrid = nBasis
+    ########### output  ############################
+    @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
+        for r in 1:rank
+        @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
+    end
+
+    dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
+end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = 1000000
+    Λ = 1000
     # Λ = 100
-    @time ωBasis = QR(Λ, 1e-10, projPH_ω, false)
-    @time τBasis = QR(Λ / 2, 1e-11, projPH_τ, false, N=ωBasis.N)
+    @time ωBasis = QR(Λ, 1e-10, projPHA_ω)
+    @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, N=ωBasis.N)
+    nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     # @time basis = QR(100, 1e-10)
     # readline()
     # basis = QR(100, 1e-3)
