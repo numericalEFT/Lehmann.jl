@@ -1,6 +1,6 @@
 using LinearAlgebra:Matrix, zero, similar
 using LinearAlgebra, Printf
-using Roots
+# using Roots
 using Quadmath
 # using ProfileView
 
@@ -12,17 +12,17 @@ include("./kernel.jl")
 include("./matfreq.jl")
 
 
-using Plots
-function plotResidual(basis, proj, gmin, gmax, candidate=nothing, residual=nothing)
-    ω = LinRange(gmin, gmax, 1000)
-    y = [Residual(basis, proj, w) for w in ω]
-    p = plot(ω, y, xlims=(gmin, gmax))
-    if isnothing(candidate) == false
-        plot!(p, candidate, residual, seriestype=:scatter)
-    end
-    display(p)
-    readline()
-end
+# using Plots
+# function plotResidual(basis, proj, gmin, gmax, candidate=nothing, residual=nothing)
+#     ω = LinRange(gmin, gmax, 1000)
+#     y = [Residual(basis, proj, w) for w in ω]
+#     p = plot(ω, y, xlims=(gmin, gmax))
+#     if isnothing(candidate) == false
+#         plot!(p, candidate, residual, seriestype=:scatter)
+#     end
+#     display(p)
+#     readline()
+# end
 
 mutable struct Basis
     Λ::Float
