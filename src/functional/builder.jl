@@ -94,7 +94,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", 1, g0, 0, Λ, basis.residual[idx])
     maxResidual, ωi = findmax(residual)
 
-    while isnothing(N) ? maxResidual > rtol : basis.N < N
+    while isnothing(N) ? maxResidual > rtol/10 : basis.N < N
 
         newω = candidate[ωi]
         idx, candidate, residual = addBasis!(basis, proj, newω)
@@ -111,7 +111,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     testOrthgonal(basis)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
 @printf("residual = %.10e\n", maxResidual)
-plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
+# plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
 
@@ -211,7 +211,7 @@ function findCandidate(basis, proj, gmin::Float, gmax::Float)
         g = gmin+m*dg
 
         r1, r2, r3 = Residual(basis, proj, g-dg), Residual(basis, proj, g), Residual(basis, proj, g + dg)
-        if r2 > r1 && r2 > r3
+        if r2 >= r1 && r2 >= r3
             # plotResidual(basis, proj, gmin, gmax)
             return g
         end
@@ -221,7 +221,11 @@ function findCandidate(basis, proj, gmin::Float, gmax::Float)
         elseif r1<r2<r3
             l = m + 1
         else
-            println("warning: illedge!")
+            if abs(r1 - r2)<1e-17 && abs(r2-r3)<1e-17
+                return g
+            end
+            println("warning: illegl! ($l, $m, $r) with ($r1, $r2, $r3)")
+            plotResidual(basis, proj, gmin, gmax)
             exit(0)
         end
     end

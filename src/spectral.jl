@@ -59,10 +59,10 @@ g(τ>0) = e^{-ωτ}/(1+e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1+e^{ωβ})
 """
 @inline function kernelFermiT(τ::T, ω::T, β=T(1)) where {T <: AbstractFloat}
     (-β < τ <= β) || error("τ=$τ must be (-β, β] where β=$β")
-    if τ == T(0.0)
-        τ = -eps(T)
-    end
-    if τ > T(0.0)
+    # if τ == T(0.0)
+    #     τ = -eps(T)
+    # end
+    if τ >= T(0.0)
         if ω > T(0.0)
             return exp(-ω * τ) / (1 + exp(-ω * β))
         else
@@ -92,11 +92,11 @@ g(τ>0) = e^{-ωτ}/(1-e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1-e^{ωβ})
 """
 @inline function kernelBoseT(τ::T, ω::T, β=T(1)) where {T <: AbstractFloat}
     (-β < τ <= β) || error("τ must be (-β, β]")
-    if τ == T(0.0)
-        τ = -eps(T)
-    end
+    # if τ == T(0.0)
+    #     τ = -eps(T)
+    # end
 
-    if τ > T(0.0)
+    if τ >= T(0.0)
         if ω > T(0.0)
             # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
             return exp(-ω * τ) / (-expm1(-ω * β)) 

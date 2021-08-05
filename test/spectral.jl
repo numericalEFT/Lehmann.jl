@@ -5,7 +5,7 @@
     @test Spectral.density(type, ε, β) ≈ n(ε, β)
     @test Spectral.kernelT(type, eps(0.0), ε, β) ≈ 1.0 + sign * n(ε, β)
 
-    @test Spectral.kernelT(type, 0.0, ε, β) ≈ sign * n(ε, β) # τ=0.0 should be treated as the 0⁻
+    # @test Spectral.kernelT(type, 0.0, ε, β) ≈ sign * n(ε, β) # τ=0.0 should be treated as the 0⁻
     @test Spectral.kernelT(type, -eps(0.0), ε, β) ≈ sign * n(ε, β)
 
     @test Spectral.kernelT(type, -τ, ε, β) ≈ sign * Spectral.kernelT(type, β - τ, ε, β)

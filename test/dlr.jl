@@ -1,4 +1,4 @@
-using FastGaussQuadrature
+using FastGaussQuadrature, Printf
 
 function SemiCircle(type, Grid, β, Euv; IsMatFreq=false)
     # calculate Green's function defined by the spectral density
@@ -25,7 +25,7 @@ function SemiCircle(type, Grid, β, Euv; IsMatFreq=false)
                 a, b = pbp[ii], pbp[ii+1]
                 for jj in 1:n
                     x = (a+b)/2+(b-a)/2*xl[jj]
-                    if type==:corr && x<0.0 
+                    if (type==:corr ||type==:acorr) && x<0.0 
                         #spectral density is defined for positivie frequency only for correlation functions
                         continue
                     end
@@ -41,7 +41,7 @@ function SemiCircle(type, Grid, β, Euv; IsMatFreq=false)
                 G[τi] += ((b-a)/2)^1.5*wj[jj]*ker*sqrt(1+x)
             end
 
-            if type != :corr 
+            if type != :corr && type !=:acorr
                 #spectral density is defined for positivie frequency only for correlation functions
                 a, b = -1.0, -1.0/2
                 for jj in 1:n
@@ -70,7 +70,7 @@ function MultiPole(type, Grid, β, Euv; IsMatFreq=false)
     for (τi, τ) in enumerate(Grid)
         for ω in poles
 
-            if type==:corr && ω<0.0 
+            if (type==:corr || type==:acorr) && ω<0.0 
                 #spectral density is defined for positivie frequency only for correlation functions
                 continue
             end
@@ -116,9 +116,12 @@ end
 
         println("SemiCircle test case fit τ rtol=", rtol(Gsample[1, :], Gfitted[1, :]))
         println("Multi pole test case fit τ rtol=", rtol(Gsample[2, :], Gfitted[2, :]))
-    #     for (ti, t) in enumerate(τSample)
-    #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  Gfitted[2, ti], Gsample[2, ti] - Gfitted[2, ti])
-    # end
+        # for (ti, t) in enumerate(τSample)
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
+        # end
+        # for (ti, t) in enumerate(τSample)
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  Gfitted[2, ti], Gsample[2, ti] - Gfitted[2, ti])
+        # end
         @test rtol(Gsample[1, :], Gfitted[1, :]) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
         @test rtol(Gsample[2, :], Gfitted[2, :]) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
 
@@ -183,5 +186,6 @@ end
 
     test(:fermi, Euv=10.0, β=1000.0, eps=1e-10)
     test(:corr, Euv=10.0, β=1000.0, eps=1e-10)
+    test(:acorr, Euv=10.0, β=1000.0, eps=1e-12)
 
 end
