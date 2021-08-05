@@ -71,49 +71,47 @@ function addBasis!(basis, proj, g0::Float)
 end
 
 function scanResidual!(basis, proj, g0, idx)
-    candidate, residual = zeros(Float, basis.N), zeros(Float, basis.N)
+    grids = copy(basis.grid)
+    if basis.grid[1] > Float(0)
+        insert!(grids, 1, Float(0))
+    end
+    if basis.grid[end] < basis.Λ
+        append!(grids, basis.Λ)
+    end
+    candidate, residual = zeros(Float, length(grids) - 1), zeros(Float, length(grids) - 1)
 
-    for i in 1:basis.N # because of the separation of scales, the grids far away from idx is rarely affected
-        if i == 1
-            if basis.grid[1] > Float(0) # if the first grid is not 0
-                g = findCandidate(basis, proj, Float(0), basis.grid[1])
-            else # if the first grid is 0
-                g = Float(0)
-            end
-        else # 1<=i<=basis.N-1
-            # println("between ", basis.grid[i - 1], " , ", basis.grid[i])
-            g = findCandidate(basis, proj, basis.grid[i - 1], basis.grid[i])
-            # println("got ", g)
-        end
-        # println("$i -> $g")
+    for i in 1:length(grids) - 1 # because of the separation of scales, the grids far away from idx is rarely affected
+        g = findCandidate(basis, proj, grids[i], grids[i + 1])
         candidate[i] = g
         residual[i] = Residual(basis, proj, g)
     end
-    # println(basis.grid)
-    # println(candidate)
-    # println(residual)
     return candidate, residual
 end
 
-function QR(Λ, rtol, proj; N=nothing)
+function QR(Λ, rtol, proj, g0; N=nothing)
     basis = Basis(Λ, rtol)
-    idx, candidate, residual = addBasis!(basis, proj, Float(Λ))
+    idx, candidate, residual = addBasis!(basis, proj, Float(g0))
+    @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", 1, g0, 0, Λ, basis.residual[idx])
     maxResidual, ωi = findmax(residual)
 
     while isnothing(N) ? maxResidual > rtol : basis.N < N
 
         newω = candidate[ωi]
         idx, candidate, residual = addBasis!(basis, proj, newω)
+        # println(length(basis.grid))
+        # println(idx)
+        lower = (idx == 1) ? 0 : basis.grid[idx - 1]
+        upper = (idx == basis.N) ? Λ : basis.grid[idx + 1]
 
-        @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, (idx == 1) ? 0 : basis.grid[idx - 1], basis.grid[idx + 1], basis.residual[idx])
+        @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, lower, upper, basis.residual[idx])
         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
         # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
         maxResidual, ωi = findmax(residual)
     end
     testOrthgonal(basis)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
-    @printf("residual = %.10e\n", maxResidual)
-    plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
+@printf("residual = %.10e\n", maxResidual)
+# plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
 
@@ -184,33 +182,78 @@ function Residual(basis, proj, g::Float)
 end
     
 function findCandidate(basis, proj, gmin::Float, gmax::Float)
-    if gmin == 0 && gmax > 100  
-       gmax = 100 # if the first grid is 0, then the maximum won't be larger than 100
+    @assert gmax > gmin
+
+    if abs(gmin) < 100 * eps(Float(0)) && gmax > 100  
+       gmax = 100 # if the first grid is 0, then the maximum should be between (0, 100)
     end
-    if gmin > 0 && gmax / gmin > 100
+    if abs(gmin) > 100 * eps(Float(0)) && gmax / gmin > 100
        gmax = gmin * 100  # the maximum won't be larger than 100*gmin
     end
 
-    N = 16
-    dg = abs(gmax - gmin) / N
-    g = gmin
-    r0 = Residual(basis, proj, g)
-    r = Residual(basis, proj, g + dg)
-    if r < r0 && gmin > Float(0)
-        println("warning: $r at $(g + dg) < $r0 at $g  !")
-        exit(0)
-    end
-    while r > r0
-        g += dg
-        r0 = r
-        r = Residual(basis, proj, g + dg)
-    end
-    if g + dg > gmax
-        println("warning: $(g + dg) are not within ($gmin, $gmax)!")
-    end
-    return g
-end
+    N = 32
+    dg = (gmax - gmin) / N
 
+    ###################   if gmin/gmax are at the boundary 0/Λ, the maximum could be at the edge ##################
+    if abs(gmin) < 100 * eps(Float(0)) && Residual(basis, proj, gmin) > Residual(basis, proj, gmin + dg)
+        return gmin
+    end
+    if abs(gmax - basis.Λ) < 100 * eps(Float(gmax)) && Residual(basis, proj, gmax) > Residual(basis, proj, gmax - dg)
+        return gmax
+    end
+
+    ###################  the maximum must be between (gmin, gmax) for the remaining cases ##################
+    # check https://www.geeksforgeeks.org/find-the-maximum-element-in-an-array-which-is-first-increasing-and-then-decreasing/ for detail
+
+    l, r = 1, N-1 #avoid the boundary gmin and gmax
+    while l<=r
+        m = l + Int(round((r - l) / 2))
+        g = gmin+m*dg
+
+        r1, r2, r3 = Residual(basis, proj, g-dg), Residual(basis, proj, g), Residual(basis, proj, g + dg)
+        if r2 > r1 && r2 > r3
+            # plotResidual(basis, proj, gmin, gmax)
+            return g
+        end
+
+        if r3 < r2 < r1
+            r = m - 1
+        elseif r1<r2<r3
+            l = m + 1
+        else
+            println("warning: illedge!")
+            exit(0)
+        end
+    end
+    # plotResidual(basis, proj, gmin, gmax)
+    throw("failed to find maximum between ($gmin, $gmax)!")
+
+
+    # N = 16
+    # dg = (gmax - gmin) / N
+    # g = gmin
+    # r0 = Residual(basis, proj, g)
+    # r = Residual(basis, proj, g + dg)
+    # while r > r0 
+    #     g += dg
+    #     if abs(g - gmax) < 100 * eps(Float(gmax))
+    #         break
+    #     end
+    #     r0 = r
+    #     r = Residual(basis, proj, g + dg)
+    # end
+
+    # if abs(g - gmax) < 100 * eps(Float(gmax)) && gmax < basis.Λ # at the upper boundary, gmax could be the maximum
+    #     println("warning: $g touch the upper bound $gmax!")
+    #     # plotResidual(basis, proj, gmin, gmax)
+    # end
+    # if abs(g - gmin) < 100 * eps(Float(gmin)) && gmin > 0 # at the lower boundary, gmin could be the maximum
+    #             println("warning: $g touch the lower bound $gmin!")
+    #     # plotResidual(basis, proj, gmin, gmax)
+    # end
+    # return g
+end
+            
 function testOrthgonal(basis)
     println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
@@ -225,26 +268,26 @@ end
 - `rtol`: tolerance absolute error
 """
 function dlr(type, Λ, rtol)
-    println(rtol)
+    Λ = Float(Λ)
     if type == :corr
         println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPH_ω)
+        ωBasis = QR(Λ, rtol, projPH_ω, Λ)
         println("Building τ grid ... ")
-        τBasis = QR(Λ / 2, rtol / 10, projPH_τ, N=ωBasis.N)
+        τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
     elseif type == :acorr
         println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPHA_ω)
+        ωBasis = QR(Λ, rtol, projPHA_ω, Λ)
         println("Building τ grid ... ")
-        τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, N=ωBasis.N)
+        τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     end
-    rank = ωBasis.N
+            rank = ωBasis.N
     ωGrid = ωBasis.grid
     τGrid = τBasis.grid / Λ
-    nGrid = nBasis
+            nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
         for r in 1:rank
@@ -255,12 +298,12 @@ function dlr(type, Λ, rtol)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
-    # freq, Q = findBasis(1.0e-3, Float(100))
+            # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = 100
+    Λ = 1e12
     # Λ = 100
-    @time ωBasis = QR(Λ, 1e-3, projPHA_ω)
-    # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, N=ωBasis.N)
+    @time ωBasis = QR(Λ, 1e-10, projPH_ω, Λ)
+    @time τBasis = QR(Λ / 2, 1e-11, projPH_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 
     # @time basis = QR(100, 1e-10)
