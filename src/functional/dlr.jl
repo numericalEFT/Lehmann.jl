@@ -49,7 +49,7 @@ struct DLRGrid
     function DLRGrid(type, Euv, β, rtol=1e-12)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         @assert rtol > 0.0 "eps=$eps is not positive and nonzero!"
-        @assert 0 < Λ <= 1000000 "Energy scale $Λ must be in (0, 1000000)!"
+        @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
         if Λ < 100 
             Λ = Int(100)
         else
