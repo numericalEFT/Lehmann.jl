@@ -111,7 +111,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     testOrthgonal(basis)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
 @printf("residual = %.10e\n", maxResidual)
-# plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
+plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
 
@@ -302,8 +302,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # basis = QR(100, 1e-3)
     Λ = 1e12
     # Λ = 100
-    @time ωBasis = QR(Λ, 1e-10, projPH_ω, Λ)
-    @time τBasis = QR(Λ / 2, 1e-11, projPH_τ, Float(0), N=ωBasis.N)
+    @time ωBasis = QR(Λ, 1e-10, projPHA_ω, Λ)
+    @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 
     # @time basis = QR(100, 1e-10)
