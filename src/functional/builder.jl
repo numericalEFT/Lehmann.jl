@@ -1,8 +1,8 @@
 using LinearAlgebra:Matrix, zero, similar
 using LinearAlgebra, Printf
-# using Roots
+using Roots
 using Quadmath
-# using Plots
+using Plots
 # using ProfileView
 
 # const Float = Float64
@@ -62,43 +62,64 @@ function scanResidual!(basis, proj, g0, idx)
     candidate = zeros(Float, basis.N)
     residual = zeros(Float, basis.N)
     for i in 1:basis.N # because of the separation of scales, the grids far away from idx is rarely affected
-    # for i in 1:basis.N
-        if i < 1 || i > basis.N
-            continue
-        elseif i == basis.N
-            # take care of the last bin
-            if g0 < eps(Float(0))
-                g = findCandidate(basis, proj, Float(0), Float(10))
+        if i == 1
+            # take care of the first bin
+            if basis.grid[1] > Float(0)
+                g = findCandidate(basis, proj, Float(0), basis.grid[1])
+                candidate[1] = g
+                residual[1] = Residual(basis, proj, g)
             else
-                g = findCandidate(basis, proj, basis.grid[end], basis.grid[end] * 10)
-            end
-            if g > basis.Λ
-                candidate[end] = basis.Λ
-                residual[end] = Residual(basis, proj, basis.Λ)
-            else
-                candidate[end] = g
-                residual[end] = Residual(basis, proj, g)
+                candidate[1] = Float(0)
+                residual[1] = Float(0)
             end
         else # 1<=i<=basis.N-1
-            g = findCandidate(basis, proj, basis.grid[i], basis.grid[i + 1])
+            g = findCandidate(basis, proj, basis.grid[i - 1], basis.grid[i])
             candidate[i] = g
             residual[i] = Residual(basis, proj, g)
         end
+        # if i < 1 || i > basis.N
+        #     continue
+        # elseif i == basis.N
+        #     # take care of the last bin
+        #     if g0 < eps(Float(0))
+        #         g = findCandidate(basis, proj, Float(0), Float(100))
+        #     else
+        #         g = findCandidate(basis, proj, basis.grid[end], basis.grid[end] * 10)
+        #     end
+        #     if g > basis.Λ
+        #         candidate[end] = basis.Λ
+        #         residual[end] = Residual(basis, proj, basis.Λ)
+        #     else
+        #         candidate[end] = g
+        #         residual[end] = Residual(basis, proj, g)
+        #     end
+        # else # 1<=i<=basis.N-1
+        #     g = findCandidate(basis, proj, basis.grid[i], basis.grid[i + 1])
+        #     candidate[i] = g
+        #     residual[i] = Residual(basis, proj, g)
+        # end
     end
     return candidate, residual
 end
 
 function QR(Λ, rtol, proj; N=nothing)
     basis = Basis(Λ, rtol)
-    idx, candidate, residual = addBasis!(basis, proj, Float(0))
+    idx, candidate, residual = addBasis!(basis, proj, Float(Λ))
     maxResidual, ωi = findmax(residual)
+
+    # ω = LinRange(Float(0), Float(100), 1000)
+    # y = [Residual(basis, proj, w) for w in ω]
+    # p = plot(ω, y, xlims=(0.0, 100))
+    # display(p)
+    # readline()
 
     while isnothing(N) ? maxResidual > rtol : basis.N < N
 
         newω = candidate[ωi]
         idx, candidate, residual = addBasis!(basis, proj, newω)
 
-        @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, basis.grid[idx - 1], (idx == basis.N) ? Λ : basis.grid[idx + 1], basis.residual[idx])
+        # @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, basis.grid[idx - 1], (idx == basis.N) ? Λ : basis.grid[idx + 1], basis.residual[idx])
+        @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, (idx == 1) ? 0 : basis.grid[idx - 1], basis.grid[idx + 1], basis.residual[idx])
         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
         
     #     for i in 1:length(candidates)
@@ -106,7 +127,7 @@ function QR(Λ, rtol, proj; N=nothing)
     # end
 
         # ω = LinRange(Float(0), Float(100), 1000)
-        # y = [Residual(basis, w) for w in ω]
+        # y = [Residual(basis, proj, w) for w in ω]
         # p = plot(ω, y, xlims=(0.0, 100))
         # display(p)
         # readline()
@@ -197,28 +218,37 @@ function Residual(basis, proj, g::Float)
 end
     
 function findCandidate(basis, proj, gmin::Float, gmax::Float)
+    if gmin == 0  
+       gmax = 100
+    elseif gmax / gmin > 100
+       gmax = gmin * 100
+    end
+
     N = 16
     dg = abs(gmax - gmin) / N
-    r0 = Residual(basis, proj, gmin)
-    g = gmin + dg
-        r = Residual(basis, proj, g)
-        if r < r0
-       println("warning: $r at $g < $r0 at $gmin  !")
+    g = gmin
+    r0 = Residual(basis, proj, g)
+    r = Residual(basis, proj, g + dg)
+    if r < r0 && gmin > Float(0)
+        println("warning: $r at $(g + dg) < $r0 at $g  !")
 
-       ω = LinRange(Float(0), Float(10), 1000)
-        y = [Residual(basis, proj, w) for w in ω]
-       p = plot(ω, y, xlims=(0.0, 10))
-       display(p)
-       readline()
+        #    ω = LinRange(Float(0), Float(10), 1000)
+        #     y = [Residual(basis, proj, w) for w in ω]
+        #    p = plot(ω, y, xlims=(0.0, 10))
+            #    display(p)
+        #    readline()
 
-       exit(0)
+        exit(0)
     end
     while r > r0
-    g += dg
+        g += dg
         r0 = r
-    r = Residual(basis, proj, g)
+        r = Residual(basis, proj, g + dg)
     end
-    return g - dg
+    if g + dg > gmax
+        println("warning: $(g + dg) are not within ($gmin, $gmax)!")
+    end
+    return g
 end
 
 
@@ -268,11 +298,12 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = 1000
+    Λ = 1000000
     # Λ = 100
     @time ωBasis = QR(Λ, 1e-10, projPHA_ω)
-    @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, N=ωBasis.N)
-    nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+    # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, N=ωBasis.N)
+    # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+
     # @time basis = QR(100, 1e-10)
     # readline()
     # basis = QR(100, 1e-3)
