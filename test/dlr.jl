@@ -189,3 +189,30 @@ end
     test(:acorr, Euv=10.0, β=1000.0, eps=1e-12)
 
 end
+
+@testset "Plasmon" begin
+    rtol(x, y) = maximum(abs.(x-y))/maximum(abs.(x))
+
+    function plasmon(Euv, β, eps, type=:corr)
+        Sw(n, β) = 1/(1+(2π*n/β)^2)
+        dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
+        dlr10 = DLR.DLRGrid(type, Euv*10, β, eps) #construct dlr basis
+        Gwdlr = [Sw(n, β) for n in dlr.n]
+        nSample = [n for n in dlr10.n]
+        coeff = DLR.matfreq2dlr(type, Gwdlr, dlr)
+        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+
+        Gw0 = [Sw(n, β) for n in dlr10.n]
+        
+
+        # for (ni, n) in enumerate(nSample)
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gw0[ni]),  real(Gwfit[ni]), abs(Gw0[ni] - Gwfit[ni]))
+        # end
+
+        @test rtol(Gwfit, Gw0) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
+
+    end
+
+    plasmon(10.0, 1000.0, 1e-10)
+    
+end
