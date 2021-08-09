@@ -194,7 +194,14 @@ end
     rtol(x, y) = maximum(abs.(x-y))/maximum(abs.(x))
 
     function plasmon(Euv, β, eps, type=:corr)
-        Sw(n, β) = 1/(1+(2π*n/β)^2)
+        function Sw(n, β)
+            # return 1/(1+(2π*n/β)^2)
+            if n == 0
+                return 0.5
+            else
+                return 1/(1+(2π*n/β)^2)
+            end
+        end
         dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
         dlr10 = DLR.DLRGrid(type, Euv*10, β, eps) #construct dlr basis
         Gwdlr = [Sw(n, β) for n in dlr.n]
@@ -209,10 +216,11 @@ end
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gw0[ni]),  real(Gwfit[ni]), abs(Gw0[ni] - Gwfit[ni]))
         # end
 
+        println("Plasmon Matsubara frequency rtol=", rtol(Gwfit, Gw0))
         @test rtol(Gwfit, Gw0) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
 
     end
 
-    plasmon(10.0, 1000.0, 1e-10)
+    plasmon(2.0, 10000.0, 1e-10)
     
 end
