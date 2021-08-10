@@ -8,7 +8,7 @@ using Quadmath
 # const Float = BigFloat
 const Float = Float128
 
-include("./kernel.jl")
+include("./tau.jl")
 include("./matfreq.jl")
 
 
@@ -94,7 +94,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", 1, g0, 0, Λ, basis.residual[idx])
     maxResidual, ωi = findmax(residual)
 
-    while isnothing(N) ? maxResidual > rtol/10 : basis.N < N
+    while isnothing(N) ? maxResidual > rtol / 10 : basis.N < N
 
         newω = candidate[ωi]
         idx, candidate, residual = addBasis!(basis, proj, newω)
@@ -180,7 +180,7 @@ function Residual(basis, proj, g::Float)
     norm2 = proj(basis.Λ, g, g) - (norm(basis.Q * KK))^2
     return norm2 < 0 ? Float(0) : sqrt(norm2) 
 end
-    
+        
 function findCandidate(basis, proj, gmin::Float, gmax::Float)
     @assert gmax > gmin
 
@@ -205,12 +205,12 @@ function findCandidate(basis, proj, gmin::Float, gmax::Float)
     ###################  the maximum must be between (gmin, gmax) for the remaining cases ##################
     # check https://www.geeksforgeeks.org/find-the-maximum-element-in-an-array-which-is-first-increasing-and-then-decreasing/ for detail
 
-    l, r = 1, N-1 #avoid the boundary gmin and gmax
-    while l<=r
+    l, r = 1, N - 1 # avoid the boundary gmin and gmax
+    while l <= r
         m = l + Int(round((r - l) / 2))
-        g = gmin+m*dg
+        g = gmin + m * dg
 
-        r1, r2, r3 = Residual(basis, proj, g-dg), Residual(basis, proj, g), Residual(basis, proj, g + dg)
+        r1, r2, r3 = Residual(basis, proj, g - dg), Residual(basis, proj, g), Residual(basis, proj, g + dg)
         if r2 >= r1 && r2 >= r3
             # plotResidual(basis, proj, gmin, gmax)
             return g
@@ -218,10 +218,10 @@ function findCandidate(basis, proj, gmin::Float, gmax::Float)
 
         if r3 < r2 < r1
             r = m - 1
-        elseif r1<r2<r3
+        elseif r1 < r2 < r3
             l = m + 1
         else
-            if abs(r1 - r2)<1e-17 && abs(r2-r3)<1e-17
+            if abs(r1 - r2) < 1e-17 && abs(r2 - r3) < 1e-17
                 return g
             end
             println("warning: illegl! ($l, $m, $r) with ($r1, $r2, $r3)")
@@ -252,12 +252,12 @@ function findCandidate(basis, proj, gmin::Float, gmax::Float)
     #     # plotResidual(basis, proj, gmin, gmax)
     # end
     # if abs(g - gmin) < 100 * eps(Float(gmin)) && gmin > 0 # at the lower boundary, gmin could be the maximum
-    #             println("warning: $g touch the lower bound $gmin!")
+#             println("warning: $g touch the lower bound $gmin!")
     #     # plotResidual(basis, proj, gmin, gmax)
     # end
     # return g
 end
-            
+    
 function testOrthgonal(basis)
     println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
@@ -271,27 +271,29 @@ end
 - `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
 - `rtol`: tolerance absolute error
 """
-function dlr(type, Λ, rtol)
+function dlr_functional(type, Λ, rtol)
     Λ = Float(Λ)
     if type == :corr
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPH_ω, Λ)
         println("Building τ grid ... ")
-        τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
+        τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
+        # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
     elseif type == :acorr
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPHA_ω, Λ)
         println("Building τ grid ... ")
-        τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
+        τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :acorr)
+        # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     end
-            rank = ωBasis.N
+    rank = ωBasis.N
     ωGrid = ωBasis.grid
     τGrid = τBasis.grid / Λ
-            nGrid = nBasis
+    nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
         for r in 1:rank
