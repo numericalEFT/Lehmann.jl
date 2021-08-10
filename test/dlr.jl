@@ -203,7 +203,7 @@ end
             end
         end
         dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
-        dlr10 = DLR.DLRGrid(type, Euv*10, β, eps) #construct dlr basis
+        dlr10 = DLR.DLRGrid(type, Euv*100, β, eps) #construct dlr basis
         Gwdlr = [Sw(n, β) for n in dlr.n]
         nSample = [n for n in dlr10.n]
         coeff = DLR.matfreq2dlr(type, Gwdlr, dlr)
@@ -221,6 +221,6 @@ end
 
     end
 
-    plasmon(2.0, 10000.0, 1e-10)
+    plasmon(999.0, 1000.0, 1e-10)
     
 end

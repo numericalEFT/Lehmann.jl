@@ -1,3 +1,4 @@
+using Base:BufferStream
 using Lehmann
 using Test
 
