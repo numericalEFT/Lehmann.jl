@@ -220,12 +220,21 @@ end
         Gt = DLR.dlr2tau(type, coeff, dlr, dlr.τ)
         println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β)))
 
-        # coeff = DLR.tau2dlr(type, Gt, dlr)
+        Gt0=Gtau(dlr.τ, β)
+        coeff0 = DLR.tau2dlr(type, Gt0, dlr)
+
+        coeff1 = DLR.tau2dlr(type, Gt, dlr)
+        for (ni, ω) in enumerate(dlr.ω)
+            # @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni],  coeff1[ni], abs(coeff[ni] - coeff1[ni]))
+            @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni], coeff0[ni],  coeff1[ni])
+        end
+
         # for (ni, ω) in enumerate(dlr.ω)
-        #     println("$ω    $(coeff[ni])")
+        #     println("$ω    $(coeff[ni]), ")
         # end
 
-        Gwfit = DLR.tau2matfreq(type, Gt, dlr, nSample)
+        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        # Gwfit = DLR.tau2matfreq(type, Gt, dlr, nSample)
         println("Plasmon Matsubara fourier rtol=", rtol(Gw0, Gwfit))
 
 
