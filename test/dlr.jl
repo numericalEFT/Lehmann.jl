@@ -195,32 +195,51 @@ end
 
     function plasmon(Euv, β, eps, type=:corr)
         function Sw(n, β)
-            # return 1/(1+(2π*n/β)^2)
-            if n == 0
-                return 0.5
-            else
-                return 1/(1+(2π*n/β)^2)
-            end
+            return 1/(1+(2π*n/β)^2)
+            # if n == 0
+            #     return 0.5
+            # else
+            #     return 1/(1+(2π*n/β)^2)
+            # end
+        end
+        function Gtau(τ, β)
+            return @. (exp(-τ)+exp(-(β-τ)))/2/(1-exp(-β))
         end
         dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
-        dlr10 = DLR.DLRGrid(type, Euv*100, β, eps) #construct dlr basis
+        dlr10 = DLR.DLRGrid(type, Euv*10, β, eps) #construct dlr basis
         Gwdlr = [Sw(n, β) for n in dlr.n]
         nSample = [n for n in dlr10.n]
-        coeff = DLR.matfreq2dlr(type, Gwdlr, dlr)
-        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
-
         Gw0 = [Sw(n, β) for n in dlr10.n]
         
+        coeff = DLR.matfreq2dlr(type, Gwdlr, dlr)
+        
+        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        println("Plasmon Matsubara rtol=", rtol(Gw0, Gwfit))
+
+        # Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        Gt = DLR.dlr2tau(type, coeff, dlr, dlr.τ)
+        println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β)))
+
+        # coeff = DLR.tau2dlr(type, Gt, dlr)
+        # for (ni, ω) in enumerate(dlr.ω)
+        #     println("$ω    $(coeff[ni])")
+        # end
+
+        Gwfit = DLR.tau2matfreq(type, Gt, dlr, nSample)
+        println("Plasmon Matsubara fourier rtol=", rtol(Gw0, Gwfit))
+
 
         # for (ni, n) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gw0[ni]),  real(Gwfit[ni]), abs(Gw0[ni] - Gwfit[ni]))
         # end
 
         println("Plasmon Matsubara frequency rtol=", rtol(Gwfit, Gw0))
-        @test rtol(Gwfit, Gw0) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
+        # @test rtol(Gwfit, Gw0) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
 
     end
 
-    plasmon(999.0, 1000.0, 1e-10)
+    plasmon(1.0, 1000.0, 1e-10)
+    plasmon(1.0, 10000.0, 1e-10)
+    plasmon(1.0, 100000.0, 1e-10)
     
 end

@@ -68,6 +68,7 @@ struct DLRGrid
         end
 
         grid = readdlm(filename)
+        println("reading $filename")
 
         ω = grid[:, 2] / β
         n = Int.(grid[:, 4])
