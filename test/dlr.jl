@@ -195,15 +195,23 @@ end
 
     function plasmon(Euv, β, eps, type=:corr)
         function Sw(n, β)
-            return 1/(1+(2π*n/β)^2)
+            if type == :corr
+                return 1/(1+(2π*n/β)^2)
+            else
+                return 1/(1+(π*(2n+1)/β)^2)
+            end
             # if n == 0
             #     return 0.5
             # else
             #     return 1/(1+(2π*n/β)^2)
             # end
         end
-        function Gtau(τ, β)
-            return @. (exp(-τ)+exp(-(β-τ)))/2/(1-exp(-β))
+        function Gtau(τ, β, type)
+            if type == :corr
+                return @. (exp(-τ)+exp(-(β-τ)))/2/(1-exp(-β))
+            else
+                return @. (exp(-τ)-exp(-(β-τ)))/2/(1+exp(-β))
+            end
         end
         dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
         dlr10 = DLR.DLRGrid(type, Euv*10, β, eps) #construct dlr basis
@@ -215,19 +223,26 @@ end
         
         Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
         println("Plasmon Matsubara rtol=", rtol(Gw0, Gwfit))
+        @test rtol(Gw0, Gwfit) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
+        # for (ni, n) in enumerate(nSample)
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gw0[ni]),  real(Gwfit[ni]), abs(Gw0[ni] - Gwfit[ni]))
+        # end
 
-        # Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        Gt0=Gtau(dlr.τ, β, type)
         Gt = DLR.dlr2tau(type, coeff, dlr, dlr.τ)
-        println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β)))
+        println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β, type)))
+        @test rtol(Gt, Gt0) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
+        # for (n, τ) in enumerate(dlr.τ)
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", τ, Gt[n],  Gt0[n], abs(Gt[n] - Gt0[n]))
+        # end
 
-        Gt0=Gtau(dlr.τ, β)
         coeff0 = DLR.tau2dlr(type, Gt0, dlr)
 
         coeff1 = DLR.tau2dlr(type, Gt, dlr)
-        for (ni, ω) in enumerate(dlr.ω)
-            # @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni],  coeff1[ni], abs(coeff[ni] - coeff1[ni]))
-            @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni], coeff0[ni],  coeff1[ni])
-        end
+        # for (ni, ω) in enumerate(dlr.ω)
+        #     # @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni],  coeff1[ni], abs(coeff[ni] - coeff1[ni]))
+        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni], coeff0[ni],  coeff1[ni])
+        # end
 
         # for (ni, ω) in enumerate(dlr.ω)
         #     println("$ω    $(coeff[ni]), ")
@@ -243,12 +258,15 @@ end
         # end
 
         println("Plasmon Matsubara frequency rtol=", rtol(Gwfit, Gw0))
-        # @test rtol(Gwfit, Gw0) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gwfit, Gw0) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
 
     end
 
-    plasmon(1.0, 1000.0, 1e-10)
-    plasmon(1.0, 10000.0, 1e-10)
-    plasmon(1.0, 100000.0, 1e-10)
+    println("Testing ph symmetric correlator ...")
+    plasmon(1.0, 1000.0, 1e-10, :corr)
+    plasmon(1.0, 10000000.0, 1e-10, :corr)
+    println("Testing ph asymmetric correlator ...")
+    plasmon(1.0, 1000.0, 1e-10, :acorr)
+    plasmon(1.0, 10000000.0, 1e-10, :acorr)
     
 end

@@ -11,21 +11,21 @@ function Freq2Index(type, ωnList)
 end
 
 function MatFreqGrid(ωGrid, N, Λ, type::Symbol)
-    # degree = 1000
-    # np = Int(round(log(10 * Λ) / log(2)))
-    # xc = [(i - 1) / degree for i in 1:degree]
-    # panel = [2^(i - 1) - 1 for i in 1:(np + 1)]
-    # fineGrid = zeros(Int, np * degree)
-    # for i in 1:np
-    #     a, b = panel[i], panel[i + 1]
-    #     fineGrid[(i - 1) * degree + 1:i * degree] = Freq2Index(type, a .+ (b - a) .* xc)
-    # end
-    # unique!(fineGrid)
+    degree = 100
+    np = Int(round(log(10 * Λ) / log(2)))
+    xc = [(i - 1) / degree for i in 1:degree]
+    panel = [2^(i - 1) - 1 for i in 1:(np + 1)]
+    fineGrid = zeros(Int, np * degree)
+    for i in 1:np
+        a, b = panel[i], panel[i + 1]
+        fineGrid[(i - 1) * degree + 1:i * degree] = Freq2Index(type, a .+ (b - a) .* xc)
+    end
+    unique!(fineGrid)
     # # println(fineGrid[1:1000])
     # println(length(fineGrid))
 
-    Nωn = Int(ceil(Λ)) * 2 # expect Nω ~ para.Λ/2π, drop 2π on the safe side
-    fineGrid = [w for w in 0:Nωn]
+    # Nωn = Int(ceil(Λ)) * 2 # expect Nω ~ para.Λ/2π, drop 2π on the safe side
+    # fineGrid = [w for w in 0:Nωn]
 
 
     ωnkernel = zeros(Float64, (N, length(fineGrid)))

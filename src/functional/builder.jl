@@ -8,8 +8,9 @@ using Quadmath
 # const Float = BigFloat
 const Float = Float128
 
-include("./tau.jl")
+include("./kernel.jl")
 include("./matfreq.jl")
+include("./tau.jl")
 
 
 # using Plots
@@ -292,7 +293,8 @@ function dlr_functional(type, Λ, rtol)
     end
     rank = ωBasis.N
     ωGrid = ωBasis.grid
-    τGrid = τBasis.grid / Λ
+    # τGrid = τBasis / Λ
+    τGrid = τBasis
     nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")

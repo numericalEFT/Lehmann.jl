@@ -48,7 +48,7 @@ struct DLRGrid
     """
     function DLRGrid(type, Euv, β, rtol=1e-12)
         Λ = Euv * β # dlr only depends on this dimensionless scale
-        println("Get $Λ")
+        # println("Get $Λ")
         @assert rtol > 0.0 "eps=$eps is not positive and nonzero!"
         @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
         if Λ < 100 
@@ -68,7 +68,7 @@ struct DLRGrid
         end
 
         grid = readdlm(filename)
-        println("reading $filename")
+        # println("reading $filename")
 
         ω = grid[:, 2] / β
         n = Int.(grid[:, 4])
