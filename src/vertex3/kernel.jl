@@ -56,13 +56,17 @@ KK=int_0^{Λ} dτ K(ω,t1)*K(ω2,t2)=(1-e^{t1+t2})/(t1+t2)+(1-e^{2β-t1-t2})/(2�
 """
 function projPHA_τ(Λ::Float, t1::Float, t2::Float)
     return kernel(t1 + t2) + kernel(4 * Λ - t1 - t2) - kernel(2 * Λ - t1 + t2) - kernel(2 * Λ + t1 - t2)
-end
+    end
 
-function projExp_τ(Λ, dim, g1::Vector{Float}, g2::Vector{Float})
-    tiny = 1e-4
+function projExp_τ(Λ, dim, g1, g2)
+    # println(g1, ",  ", g2)
+    tiny = Float(1e-4)
     ω1, ω2 = g1[1] + g2[1], g1[2] + g2[2]
-    if ω1 < 1e-4 || ω2 < 1e-4
+    if ω1 < tiny || ω2 < tiny
         return Float(0.5)
+    elseif abs(ω1 - ω2) < tiny
+        ω = (ω1 + ω2) / 2
+        return (1 - exp(-ω) * (1 + ω)) / ω^2
     else
         return (ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2))
     end
