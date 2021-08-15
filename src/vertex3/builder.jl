@@ -4,9 +4,9 @@ using LinearAlgebra, Printf
 using Quadmath
 # using ProfileView
 
-# const Float = Float64
+const Float = Float64
 # const Float = BigFloat
-const Float = Float128
+# const Float = Float128
 
 include("./kernel.jl")
 
@@ -49,6 +49,10 @@ function plotResidual(basis)
     # contourf(z)
     p = heatmap(basis.fineGrid, basis.fineGrid, z)
     # p = heatmap(z)
+    x = [basis.grid[i, 1] for i in 1:basis.N]
+    y = [basis.grid[i, 2] for i in 1:basis.N]
+    scatter!(p, x, y)
+
     display(p)
     readline()
 end
@@ -147,20 +151,17 @@ function addBasis!(basis, projector, g0)
 
     if basis.N == 1
         idx = 1
-        basis.grid[1, :] = g0
+        basis.grid[1, :] .= g0
         basis.proj = projKernel(basis, projector)
         basis.Q[1,1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
     else
         basis.grid[1:end - 1, :] = _grid
-        # println(g0)
         basis.grid[end, :] .= g0
-        # println(basis.grid[end, :])
         basis.proj = projKernel(basis, projector)
         basis.Q[1:end - 1, 1:end - 1] = _Q
         basis.Q[end, :] = mGramSchmidt(basis, g0)
     end
 
-    # println(basis.N)
     updateResidual!(basis, projector)
     append!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
 
@@ -168,30 +169,42 @@ end
 
 function updateResidual!(basis, projector)
     q = basis.Q[end, :]
-    # println(q)
     # for (idx, g) in enumerate(iterateFineGrid(basis.D, basis.fineGrid))
     for idx in 1:basis.Nfine^basis.D
         c = idx2coord(basis.D, basis.Nfine, idx)
-        # println(c)
-        g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
-        proj = Float(0)
-        for j in 1:basis.N
-            proj += q[j] * projector(basis.Λ, basis.D, g, basis.grid[j, :])
-        end
+        if c[1] <= c[2]
+            g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
+            proj = Float(0)
+            for j in 1:basis.N
+                proj += q[j] * projector(basis.Λ, basis.D, g, basis.grid[j, :])
+            end
 
-        basis.residualFineGrid[idx] -= proj^2
+            basis.residualFineGrid[idx] -= proj^2
+            if basis.residualFineGrid[idx] < Float(0)
+                if basis.residualFineGrid[idx] < Float(-basis.rtol / 1000)
+                    println("warning: residual smaller than 0 at $(idx2coord(basis.D, basis.Nfine, idx)) has $(basis.residualFineGrid[idx])")
+                end
+                basis.residualFineGrid[idx] = Float(0)
+            end
+
+            ############  Mirror symmetry  #############################
+            idxp = coord2idx(basis.D, basis.Nfine, (c[2], c[1]))
+            basis.residualFineGrid[idxp] = basis.residualFineGrid[idx]
+        end
     end
 end
 
-function QR(dim, Λ, rtol, proj, g0; N=nothing)
+function QR(dim, Λ, rtol, proj; g0=nothing, N=nothing)
     basis = Basis(dim, Λ, rtol, proj)
-    for g in g0
-        addBasis!(basis, proj, g)
-        @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
+    if isnothing(g0) == false
+        for g in g0
+            addBasis!(basis, proj, g)
+            @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
+        end
     end
     maxResidual, idx = findmax(basis.residualFineGrid)
 
-    while isnothing(N) ? maxResidual > rtol / 10 : basis.N < N
+    while isnothing(N) ? sqrt(maxResidual) > rtol / 10 : basis.N < N
 
         c = idx2coord(basis.D, basis.Nfine, idx)
         g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
@@ -208,10 +221,11 @@ function QR(dim, Λ, rtol, proj, g0; N=nothing)
 
         maxResidual, idx = findmax(basis.residualFineGrid)
 
-        plotResidual(basis)
+        # plotResidual(basis)
     end
     testOrthgonal(basis)
-    @printf("residual = %.10e\n", maxResidual)
+    @printf("residual = %.16e\n", sqrt(maxResidual))
+    plotResidual(basis)
 # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
@@ -251,7 +265,7 @@ modified Gram-Schmidt process
         # println("proj:", projqq(basis, q, qnew))
     end
     # println(qnew)
-    return qnew / sqrt(projqq(basis, qnew, qnew))
+    return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
 end
 
 # """
@@ -329,13 +343,13 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
     Λ = Float(100)
-    rtol = Float(1e-8)
+    rtol = Float(1e-6)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
-    g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
+    # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
     # println(unilog(Λ, rtol))
     # Λ = 100
-    @time ωBasis = QR(dim, Λ, rtol, projExp_τ, g0)
+    @time ωBasis = QR(dim, Λ, rtol, projExp_τ)
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 
