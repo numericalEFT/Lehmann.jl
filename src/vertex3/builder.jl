@@ -4,9 +4,9 @@ using LinearAlgebra, Printf
 using Quadmath
 # using ProfileView
 
-const Float = Float64
+# const Float = Float64
 # const Float = BigFloat
-# const Float = Float128
+const Float = Float128
 
 include("./kernel.jl")
 
@@ -128,7 +128,7 @@ function unilog(Λ, rtol)
     # return grid
 
     degree = 8
-    ratio = Float(1.2)
+    ratio = Float(1.4)
     N = Int(floor(log(Λ) / log(ratio) + 1))
     panel = [Λ / ratio^(N - i) for i in 1:N]
     grid = Vector{Float}(undef, 0)
@@ -139,6 +139,30 @@ function unilog(Λ, rtol)
     append!(grid, Λ)
     println("Composite expoential grid size: $(length(grid))")
     return grid
+
+    # filename = string(@__DIR__, "/../functional/basis/$(string(:corr))/dlr$(Int(Λ))_1e$(1e-6).dlr")
+
+    # if isfile(filename) == false
+    #     error("$filename doesn't exist. DLR basis hasn't been generated.")
+    # end
+
+    # grid = readdlm(filename)
+    # # println("reading $filename")
+
+    # ω = grid[:, 2]
+
+    # degree = 8
+    # ratio = Float(1.4)
+    # N = Int(floor(log(Λ) / log(ratio) + 1))
+    # panel = [Λ / ratio^(N - i) for i in 1:N]
+    # grid = Vector{Float}(undef, 0)
+    # for i in 1:length(panel) - 1
+    #     uniform = [panel[i] + (panel[i + 1] - panel[i]) / degree * j for j in 0:degree - 1]
+    #     append!(grid, uniform)
+    # end
+    # append!(grid, Λ)
+    # println("Composite expoential grid size: $(length(grid))")
+    # return grid
 end
 
 function addBasis!(basis, projector, g0)
@@ -159,7 +183,7 @@ function addBasis!(basis, projector, g0)
         basis.grid[end, :] .= g0
         basis.proj = projKernel(basis, projector)
         basis.Q[1:end - 1, 1:end - 1] = _Q
-        basis.Q[end, :] = mGramSchmidt(basis, g0)
+        basis.Q[end, :] = GramSchmidt(basis, g0)
     end
 
     updateResidual!(basis, projector)
@@ -204,7 +228,7 @@ function QR(dim, Λ, rtol, proj; g0=nothing, N=nothing)
     end
     maxResidual, idx = findmax(basis.residualFineGrid)
 
-    while isnothing(N) ? sqrt(maxResidual) > rtol / 10 : basis.N < N
+    while isnothing(N) ? sqrt(maxResidual) > rtol : basis.N < N
 
         c = idx2coord(basis.D, basis.Nfine, idx)
         g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
@@ -235,7 +259,8 @@ q1=sum_j c_j K_j
 q2=sum_k d_k K_k
 return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
-projqq(basis, q1::Vector{Float}, q2::Vector{Float}) = q1' * basis.proj * q2
+# projqq(basis, q1::Vector{Float}, q2::Vector{Float}) = q1' * basis.proj * q2
+projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
 
 """
 <K(g_i), K(g_j)>
@@ -264,6 +289,29 @@ modified Gram-Schmidt process
         # println("q: ", q)
         # println("proj:", projqq(basis, q, qnew))
     end
+    # println(qnew)
+    return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
+end
+
+"""
+Gram-Schmidt process
+"""
+function GramSchmidt(basis, g)
+    qnew = zeros(Float, basis.N)
+    qnew[end] = 1
+    q0 = copy(qnew)
+    # println(basis.proj)
+        
+    for qi in 1:basis.N - 1
+        q = basis.Q[qi, :]
+        qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
+    end
+
+    # q0 = copy(qnew)
+    # for qi in 1:basis.N - 1
+    #     q = basis.Q[qi, :]
+    #     qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
+    # end
     # println(qnew)
     return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
 end
@@ -342,14 +390,15 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(100)
-    rtol = Float(1e-6)
+    Λ = Float(40)
+    rtol = Float(1e-8)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
     # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
     # println(unilog(Λ, rtol))
     # Λ = 100
-    @time ωBasis = QR(dim, Λ, rtol, projExp_τ)
+    # @time ωBasis = QR(dim, Λ, rtol, projExp_τ, N=100)
+    @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 
