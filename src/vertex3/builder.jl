@@ -1,10 +1,13 @@
+using Quadmath:BigFloat
 using LinearAlgebra:Matrix, zero, similar
 using LinearAlgebra, Printf
 # using Roots
 using Quadmath
 # using ProfileView
+using InteractiveUtils
 
-const Float = Float64
+const Float = Float128
+const FloatL = Float64
 # const Float = BigFloat
 # const Float = Float128
 
@@ -22,23 +25,6 @@ include("./kernel.jl")
 #     display(p)
 #     readline()
 # end
-
-# using GR
-# function plotResidual(basis)
-#     z = Float64.(basis.residualFineGrid)
-#     z = reshape(z, (basis.Nfine, basis.Nfine))
-#     # contourf(z)
-#     p = heatmap(basis.fineGrid, basis.fineGrid, z)
-#     # display(p)
-#     readline()
-# end
-# gr()
-# data = rand(21, 100)
-# heatmap(1:size(data, 1),
-#     1:size(data, 2), data,
-#     c=cgrad([:blue, :white,:red, :yellow]),
-#     xlabel="x values", ylabel="y values",
-#     title="My title")
 
 using Plots
 gr()
@@ -72,17 +58,17 @@ mutable struct Basis
 
     ##### fine grids and the their residuals #################
     Nfine::Integer
-    fineGrid::Vector{Float}
-    residualFineGrid::Vector{Float}
+    fineGrid::Vector{FloatL}
+    residualFineGrid::Vector{FloatL}
 
     function Basis(d, Λ, rtol, projector)
         _Q = Matrix{Float}(undef, (0, 0))
         _grid = Matrix{Float}(undef, (0, 0))
-        _finegrid = unilog(Λ, rtol)
-        Nfine = length(_finegrid)
-        _residualFineGrid = zeros(Float, Nfine^d)
 
         # initialize the residual on fineGrid with <g, g>
+        _finegrid = FloatL.(unilog(Λ, rtol))
+        Nfine = length(_finegrid)
+        _residualFineGrid = zeros(Float, Nfine^d)
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
             _residualFineGrid[gi] = projector(Λ, dim, g, g)
         end
@@ -111,12 +97,13 @@ function iterateFineGrid(dim, _finegrid)
     end
 end
 
-function idx2coord(dim, N, idx)
-    return ((idx - 1) ÷ N + 1, (idx - 1) % N + 1)
+function idx2coord(dim::Int, N::Int, idx::Int)
+    # return Tuple{Int, Int}((((idx - 1) ÷ N + 1, (idx - 1) % N + 1)))
+    return (((idx - 1) ÷ N + 1, (idx - 1) % N + 1))
 end
 
-function coord2idx(dim, N, coord)
-    return (coord[1] - 1) * N + coord[2]
+function coord2idx(dim::Int, N::Int, coord)
+    return Int((coord[1] - 1) * N + coord[2])
 end
 
 """
@@ -128,10 +115,10 @@ function unilog(Λ, rtol)
     # return grid
 
     degree = 8
-    ratio = Float(1.4)
+    ratio = FloatL(1.4)
     N = Int(floor(log(Λ) / log(ratio) + 1))
     panel = [Λ / ratio^(N - i) for i in 1:N]
-    grid = Vector{Float}(undef, 0)
+    grid = Vector{FloatL}(undef, 0)
     for i in 1:length(panel) - 1
         uniform = [panel[i] + (panel[i + 1] - panel[i]) / degree * j for j in 0:degree - 1]
         append!(grid, uniform)
@@ -167,6 +154,7 @@ end
 
 function addBasis!(basis, projector, g0)
     basis.N += 1
+    g0 = Float.(g0)
 
     _grid = copy(basis.grid)
     _Q = copy(basis.Q)
@@ -186,41 +174,43 @@ function addBasis!(basis, projector, g0)
         basis.Q[end, :] = GramSchmidt(basis, g0)
     end
 
-    updateResidual!(basis, projector, g0)
+    # @code_warntype updateResidual!(basis, projector)
+    updateResidual!(basis, projector)
     append!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
 
 end
 
-function updateResidual!(basis, projector, g0)
-    q = basis.Q[end, :]
-    factor = 10
-    # println("working on $g0")
-    # for (idx, g) in enumerate(iterateFineGrid(basis.D, basis.fineGrid))
-    for idx in 1:basis.Nfine^basis.D
-        c = idx2coord(basis.D, basis.Nfine, idx)
-        if c[1] <= c[2]
-            g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
-            # if (g[1] <= 10 && g[2] <= 10) || ((g0[1] / factor <= g[1] <= g0[1] * factor) && (g0[2] / factor <= g[2] <= g0[2] * factor))
-            # if (g[1] <= 10 && g[2] <= 10)
+function updateResidual!(basis, projector)
+    q = FloatL.(basis.Q[end, :])
+    Λ = FloatL(basis.Λ)
+    rtol = FloatL(basis.rtol)
+    fineGrid = FloatL.(basis.fineGrid)
+    grid = FloatL.(basis.grid)
+    N::Int, Nfine::Int, D::Int = basis.N, basis.Nfine, basis.D
 
-            proj = Float(0)
-            for j in 1:basis.N
-                proj += q[j] * projector(basis.Λ, basis.D, g, basis.grid[j, :])
+    for idx in 1:Nfine^D
+        c = idx2coord(D, Nfine, idx)
+        if c[1] <= c[2]
+            g = (fineGrid[c[1]], fineGrid[c[2]])
+
+            proj = FloatL(0)
+            for j in 1:N
+                proj += q[j] * projector(Λ, D, g, grid[j, :])
             end
 
             basis.residualFineGrid[idx] -= proj^2
-            if basis.residualFineGrid[idx] < Float(0)
-                if basis.residualFineGrid[idx] < Float(-basis.rtol / 1000)
-                    println("warning: residual smaller than 0 at $(idx2coord(basis.D, basis.Nfine, idx)) has $(basis.residualFineGrid[idx])")
+
+            if basis.residualFineGrid[idx] < FloatL(0)
+                if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
+                    println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
                     exit(0)
                 end
-                basis.residualFineGrid[idx] = Float(0)
+                basis.residualFineGrid[idx] = FloatL(0)
             end
 
                 ############  Mirror symmetry  #############################
             idxp = coord2idx(basis.D, basis.Nfine, (c[2], c[1]))
             basis.residualFineGrid[idxp] = basis.residualFineGrid[idx]
-            # end
         end
     end
 end
@@ -260,6 +250,7 @@ function QR(dim, Λ, rtol, proj; g0=nothing, N=nothing)
         # plotResidual(basis)
     end
     testOrthgonal(basis)
+    testResidual(basis, proj)
     @printf("residual = %.16e\n", sqrt(maxResidual))
     plotResidual(basis)
 # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
@@ -391,6 +382,11 @@ println("Max Orthognalization Error: ", maxerr)
 # display(II - I)
 # println()
 end
+
+function testResidual(basis, proj)
+    residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
+    println("Max deviation from zero residual: ", maximum(abs.(residual)))
+end
     
 """
 #Arguments:
@@ -425,7 +421,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(1000)
+    Λ = Float(100)
     rtol = Float(1e-6)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
@@ -433,7 +429,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # println(unilog(Λ, rtol))
     # Λ = 100
     # @time ωBasis = QR(dim, Λ, rtol, projExp_τ, N=100)
-    @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ, N=50)
+    # @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
+    @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
+    # @code_warntype QR(dim, Λ, rtol / 10, projExp_τ)
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 

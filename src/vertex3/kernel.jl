@@ -58,16 +58,16 @@ function projPHA_τ(Λ::Float, t1::Float, t2::Float)
     return kernel(t1 + t2) + kernel(4 * Λ - t1 - t2) - kernel(2 * Λ - t1 + t2) - kernel(2 * Λ + t1 - t2)
     end
 
-function projExp_τ(Λ, dim, g1, g2)
+function projExp_τ(Λ::T, dim, g1, g2) where T
     # println(g1, ",  ", g2)
-    tiny = Float(1e-4)
+    tiny = T(1e-4)
     ω1, ω2 = g1[1] + g2[1], g1[2] + g2[2]
     if ω1 < tiny || ω2 < tiny
-        return Float(0.5)
+        return T(0.5)
     elseif abs(ω1 - ω2) < tiny
         ω = (ω1 + ω2) / 2
-        return (1 - exp(-ω) * (1 + ω)) / ω^2
+        return T((1 - exp(-ω) * (1 + ω)) / ω^2)
     else
-        return (ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2))
+        return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
     end
 end
