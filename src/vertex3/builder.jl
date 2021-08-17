@@ -1,5 +1,6 @@
+using Printf:Threads
 using Quadmath:BigFloat
-using LinearAlgebra:Matrix, zero, similar
+using LinearAlgebra:Matrix, zero, similar, Threads
 using LinearAlgebra, Printf
 # using Roots
 using Quadmath
@@ -74,16 +75,6 @@ mutable struct Basis
             _residualFineGrid[gi] = projector(Λ, dim, g, g)
         end
 
-        # g1 = (_finegrid[1], _finegrid[1])
-        # println("compare: ", abs(projector(basis.Λ, basis.D, g1, g1) - _residualFineGrid[1]))
-        # for idx in 1:Nfine^d
-        #     c = idx2coord(d, Nfine, idx)
-        #     # println(c)
-        #     g = (_finegrid[c[1]], _finegrid[c[2]])
-        #     _residualFineGrid[idx] = projector(Λ, d, g, g)
-        # end
-        # println(_residualFineGrid)
-
         return new(d, Λ, rtol, 0, _grid, [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
     end
 end
@@ -99,7 +90,6 @@ function iterateFineGrid(dim, _finegrid)
 end
 
 function idx2coord(dim::Int, N::Int, idx::Int)
-    # return Tuple{Int, Int}((((idx - 1) ÷ N + 1, (idx - 1) % N + 1)))
     return (((idx - 1) ÷ N + 1, (idx - 1) % N + 1))
 end
 
@@ -201,29 +191,39 @@ function updateResidual!(basis, projector)
     grid = FloatL.(basis.grid)
     N::Int, Nfine::Int, D::Int = basis.N, basis.Nfine, basis.D
 
-    for idx in 1:Nfine^D
+    Threads.@threads for idx in 1:Nfine^D
+        # println(Threads.threadid())
         c = idx2coord(D, Nfine, idx)
         if c[1] <= c[2]
             g = (fineGrid[c[1]], fineGrid[c[2]])
+            KK = [projector(Λ, D, g, grid[j, :]) for j in 1:N]
+            basis.residualFineGrid[idx] -= (q' * KK)^2
 
-            proj = FloatL(0)
-            for j in 1:N
-                proj += q[j] * projector(Λ, D, g, grid[j, :])
-            end
+            # proj = FloatL(0)
+            # for j in 1:N
+            #     proj += q[j] * projector(Λ, D, g, grid[j, :])
+            # end
 
-            basis.residualFineGrid[idx] -= proj^2
+            # basis.residualFineGrid[idx] -= proj^2
 
-            if basis.residualFineGrid[idx] < FloatL(0)
-                if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
-                    println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
-                    exit(0)
-                end
-                basis.residualFineGrid[idx] = FloatL(0)
-            end
+            # if basis.residualFineGrid[idx] < FloatL(0)
+            #     if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
+            #         println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
+            #         exit(0)
+            #     end
+            #     basis.residualFineGrid[idx] = FloatL(0)
+            # end
 
-                ############  Mirror symmetry  #############################
+        end
+    end
+
+    ############  Mirror symmetry  #############################
+    for idx in 1:Nfine^D
+        # println(Threads.threadid())
+        c = idx2coord(D, Nfine, idx)
+        if c[1] > c[2]
             idxp = coord2idx(basis.D, basis.Nfine, (c[2], c[1]))
-            basis.residualFineGrid[idxp] = basis.residualFineGrid[idx]
+            basis.residualFineGrid[idx] = basis.residualFineGrid[idxp]
         end
     end
 end
