@@ -6,7 +6,7 @@ using LinearAlgebra, Printf
 using Quadmath
 # using ProfileView
 using InteractiveUtils
-using MPI
+# using MPI
 
 const Float = Float128
 const FloatL = Float64
@@ -35,7 +35,7 @@ function plotResidual(basis)
     z = Float64.(basis.residualFineGrid)
     z = reshape(z, (basis.Nfine, basis.Nfine))
     # contourf(z)
-    p = heatmap(basis.fineGrid, basis.fineGrid, z)
+    p = heatmap(basis.fineGrid, basis.fineGrid, z, xaxis=:log, yaxis=:log)
     # p = heatmap(z)
     x = [basis.grid[i, 1] for i in 1:basis.N]
     y = [basis.grid[i, 2] for i in 1:basis.N]
@@ -211,7 +211,7 @@ function updateResidual!(basis, projector)
             if basis.residualFineGrid[idx] < FloatL(0)
                 if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
                     println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
-                    exit(0)
+                    # exit(0)
                 end
                 basis.residualFineGrid[idx] = FloatL(0)
             end
@@ -401,11 +401,11 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
 
     # ########### initialized MPI #######################################
-    (MPI.Initialized() == false ) && MPI.Init()
-    comm = MPI.COMM_WORLD
-    Nworker = MPI.Comm_size(comm)  # number of MPI workers
-    rank = MPI.Comm_rank(comm)  # rank of current MPI worker
-    root = 0 # rank of the root worker 
+    # (MPI.Initialized() == false ) && MPI.Init()
+    # comm = MPI.COMM_WORLD
+    # Nworker = MPI.Comm_size(comm)  # number of MPI workers
+    # rank = MPI.Comm_rank(comm)  # rank of current MPI worker
+    # root = 0 # rank of the root worker 
     # ####################################################################
 
     # freq, Q = findBasis(1.0e-3, Float(100))
@@ -419,7 +419,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # Λ = 100
     # @time ωBasis = QR(dim, Λ, rtol, projExp_τ, N=100)
     # @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
-    @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
+    @time basis = QR(dim, Λ, rtol / 10, projExp_τ)
     # @code_warntype QR(dim, Λ, rtol / 10, projExp_τ)
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
@@ -427,5 +427,20 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # @time basis = QR(100, 1e-10)
     # readline()
     # basis = QR(100, 1e-3)
+    open("basis.dat", "w") do io
+        for i in 1:basis.N
+            println(io, basis.grid[i, 1], "   ", basis.grid[i, 2])
+        end
+    end
+    open("finegrid.dat", "w") do io
+        for i in 1:basis.Nfine
+            println(io, basis.fineGrid[i])
+        end
+    end
+    open("residual.dat", "w") do io
+        for i in 1:basis.Nfine^basis.D
+            println(io, basis.residualFineGrid[i])
+        end
+    end
 
 end
