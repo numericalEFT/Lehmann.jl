@@ -60,6 +60,7 @@ mutable struct Basis
     Nfine::Integer
     fineGrid::Vector{FloatL}
     residualFineGrid::Vector{FloatL}
+    gridIdx::Vector{Int} # grid for the basis
 
     function Basis(d, Λ, rtol, projector)
         _Q = Matrix{Float}(undef, (0, 0))
@@ -83,7 +84,7 @@ mutable struct Basis
         # end
         # println(_residualFineGrid)
 
-        return new(d, Λ, rtol, 0, _grid, [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid)
+        return new(d, Λ, rtol, 0, _grid, [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
     end
 end
 
@@ -152,14 +153,25 @@ function unilog(Λ, rtol)
     # return grid
 end
 
-function addBasis!(basis, projector, g0)
+function addBasis!(basis, projector, coord)
     basis.N += 1
-    g0 = Float.(g0)
+    g0 = Float.((basis.fineGrid[coord[1]], basis.fineGrid[coord[2]]))
+    # g0 = Float.(g0)
 
     _grid = copy(basis.grid)
     _Q = copy(basis.Q)
+    _grididx = copy(basis.gridIdx)
+
     basis.grid = zeros(Float, (basis.N, basis.D))
     basis.Q = zeros(Float, (basis.N, basis.N))
+
+    # basis.grid[1:end - 1, :] = _grid
+    # basis.grid[end, :] .= g0
+
+    # basis.gridIdx[1:end - 1, :] .= _grididx
+    # basis.gridIdx[end, :] .= coord
+
+    # basis.proj = projKernel(basis, projector)
 
     if basis.N == 1
         idx = 1
@@ -177,7 +189,8 @@ function addBasis!(basis, projector, g0)
     # @code_warntype updateResidual!(basis, projector)
     updateResidual!(basis, projector)
     append!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
-
+    append!(basis.gridIdx, coord2idx(basis.D, basis.Nfine, coord))
+    return g0
 end
 
 function updateResidual!(basis, projector)
@@ -215,11 +228,11 @@ function updateResidual!(basis, projector)
     end
 end
 
-function QR(dim, Λ, rtol, proj; g0=nothing, N=nothing)
+function QR(dim, Λ, rtol, proj; c0=nothing, N=nothing)
     basis = Basis(dim, Λ, rtol, proj)
-    if isnothing(g0) == false
-        for g in g0
-            addBasis!(basis, proj, g)
+    if isnothing(c0) == false
+        for c in c0
+            g = addBasis!(basis, proj, c)
             @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
         end
     end
@@ -228,19 +241,17 @@ function QR(dim, Λ, rtol, proj; g0=nothing, N=nothing)
     while isnothing(N) ? sqrt(maxResidual) > rtol : basis.N < N
 
         c = idx2coord(basis.D, basis.Nfine, idx)
-        g = (basis.fineGrid[c[1]], basis.fineGrid[c[2]])
 
         # residual = Residual(basis, proj, g)
         # residualp = Residual(basis, proj, g, 5)
         # println("$c has diff: ", abs(residual - residualp) / residual, "  for $residual vs $residualp")
 
-        addBasis!(basis, proj, g)
+        g = addBasis!(basis, proj, c)
         @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", basis.N, g[1], g[2], basis.residual[end])
         # testOrthgonal(basis)
 
-        if abs(g[1] - g[2]) > 1e-8
-            gp = (g[2], g[1])
-            addBasis!(basis, proj, gp)
+        if c[1] != c[2]
+            gp = addBasis!(basis, proj, (c[2], c[1]))
             @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", basis.N, gp[1], gp[2], basis.residual[end])
             # testOrthgonal(basis)
         end
@@ -384,8 +395,9 @@ println("Max Orthognalization Error: ", maxerr)
 end
 
 function testResidual(basis, proj)
-    residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
-    println("Max deviation from zero residual: ", maximum(abs.(residual)))
+    # residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
+    # println("Max deviation from zero residual: ", maximum(abs.(residual)))
+    println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 end
     
 """
