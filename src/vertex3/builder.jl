@@ -1,11 +1,12 @@
-using Printf:Threads
-using Quadmath:BigFloat
-using LinearAlgebra:Matrix, zero, similar, Threads
+# using Printf:Threads
+# using Quadmath:BigFloat
+# using LinearAlgebra:Matrix, zero, similar, Threads
 using LinearAlgebra, Printf
 # using Roots
 using Quadmath
 # using ProfileView
 using InteractiveUtils
+# using MPI
 
 const Float = Float128
 const FloatL = Float64
@@ -206,13 +207,13 @@ function updateResidual!(basis, projector)
 
             # basis.residualFineGrid[idx] -= proj^2
 
-            # if basis.residualFineGrid[idx] < FloatL(0)
-            #     if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
-            #         println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
-            #         exit(0)
-            #     end
-            #     basis.residualFineGrid[idx] = FloatL(0)
-            # end
+            if basis.residualFineGrid[idx] < FloatL(0)
+                if basis.residualFineGrid[idx] < FloatL(-rtol / 1000)
+                    println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
+                    exit(0)
+                end
+                basis.residualFineGrid[idx] = FloatL(0)
+            end
 
         end
     end
@@ -431,6 +432,15 @@ function dlr_functional(type, Λ, rtol)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__    
+
+    # ########### initialized MPI #######################################
+    # (MPI.Initialized() == false ) && MPI.Init()
+    # comm = MPI.COMM_WORLD
+    # Nworker = MPI.Comm_size(comm)  # number of MPI workers
+    # rank = MPI.Comm_rank(comm)  # rank of current MPI worker
+    # root = 0 # rank of the root worker 
+    # ####################################################################
+
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
     Λ = Float(100)
