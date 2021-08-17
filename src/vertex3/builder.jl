@@ -6,7 +6,7 @@ using LinearAlgebra, Printf
 using Quadmath
 # using ProfileView
 using InteractiveUtils
-# using MPI
+using MPI
 
 const Float = Float128
 const FloatL = Float64
@@ -185,14 +185,15 @@ function addBasis!(basis, projector, coord)
 end
 
 function updateResidual!(basis, projector)
-    q = FloatL.(basis.Q[end, :])
     Λ = FloatL(basis.Λ)
+    N::Int, Nfine::Int, D::Int = basis.N, basis.Nfine, basis.D
     rtol = FloatL(basis.rtol)
+
+    q = FloatL.(basis.Q[end, :])
     fineGrid = FloatL.(basis.fineGrid)
     grid = FloatL.(basis.grid)
-    N::Int, Nfine::Int, D::Int = basis.N, basis.Nfine, basis.D
 
-    Threads.@threads for idx in 1:Nfine^D
+    for idx in 1:Nfine^D
         # println(Threads.threadid())
         c = idx2coord(D, Nfine, idx)
         if c[1] <= c[2]
@@ -215,16 +216,9 @@ function updateResidual!(basis, projector)
                 basis.residualFineGrid[idx] = FloatL(0)
             end
 
-        end
-    end
-
-    ############  Mirror symmetry  #############################
-    for idx in 1:Nfine^D
-        # println(Threads.threadid())
-        c = idx2coord(D, Nfine, idx)
-        if c[1] > c[2]
+            ############  Mirror symmetry  #############################
             idxp = coord2idx(basis.D, basis.Nfine, (c[2], c[1]))
-            basis.residualFineGrid[idx] = basis.residualFineGrid[idxp]
+            basis.residualFineGrid[idxp] = basis.residualFineGrid[idx]
         end
     end
 end
@@ -322,36 +316,9 @@ function GramSchmidt(basis, g)
         q = basis.Q[qi, :]
         qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
     end
-
-    # q0 = copy(qnew    # println("GS: ", projqq(basis, qnew, qnew))
-    # println(qnew)
-    # end
-    # println("GS: ", projqq(basis, qnew, qnew))
-    # println(qnew)
     qnorm = qnew / sqrt(abs(projqq(basis, qnew, qnew)))
-    # println(Float64.(qnorm)' * basis.proj * Float64.(qnorm) - 1)
     return qnorm
 end
-
-# """
-# Gram-Schmidt process
-# """
-# function GramSchmidt(basis, idx, g::Float)
-#     q0 = zeros(Float, basis.N)
-#     q0[idx] = 1
-#     qnew = copy(q0)
-        
-#     for qi in 1:basis.N
-#         if qi == idx
-#     continue
-#     end
-#         q = basis.Q[qi, :]
-#         qnew -=  projqq(basis, q, q0) .* q
-#     end
-    
-#     norm = sqrt(projqq(basis, qnew, qnew))
-#     return qnew / norm
-# end
 
 within(g, g0, cutoff) = g0[1] < 5 || g0[2] < 5 || g[1] < 5 || g[2] < 5 || ((g[1] / cutoff <= g0[1] <= g[1] * cutoff) && (g[2] / cutoff <= g0[2] <= g[2] * cutoff))
 
@@ -434,11 +401,11 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
 
     # ########### initialized MPI #######################################
-    # (MPI.Initialized() == false ) && MPI.Init()
-    # comm = MPI.COMM_WORLD
-    # Nworker = MPI.Comm_size(comm)  # number of MPI workers
-    # rank = MPI.Comm_rank(comm)  # rank of current MPI worker
-    # root = 0 # rank of the root worker 
+    (MPI.Initialized() == false ) && MPI.Init()
+    comm = MPI.COMM_WORLD
+    Nworker = MPI.Comm_size(comm)  # number of MPI workers
+    rank = MPI.Comm_rank(comm)  # rank of current MPI worker
+    root = 0 # rank of the root worker 
     # ####################################################################
 
     # freq, Q = findBasis(1.0e-3, Float(100))
