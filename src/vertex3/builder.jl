@@ -1,3 +1,4 @@
+# using Core:Cuchar
 using Printf:Threads
 using Quadmath:BigFloat
 using LinearAlgebra:Matrix, zero, similar, Threads
@@ -6,6 +7,7 @@ using LinearAlgebra, Printf
 using Quadmath
 # using ProfileView
 using InteractiveUtils
+using CUDA
 
 const Float = Float128
 const FloatL = Float64
@@ -183,21 +185,76 @@ function addBasis!(basis, projector, coord)
     return g0
 end
 
+# function update(Λ, D, Nfine, q, grid, fineGrid, residual)
+#     @inbounds for idx in 1:Nfine^D
+#         # println(Threads.threadid())
+#         c = idx2coord(D, Nfine, idx)
+#         if c[1] <= c[2]
+#             g = (fineGrid[c[1]], fineGrid[c[2]])
+#             proj = FloatL(0)
+#             for j in 1:length(grid)
+#                 # @inbounds residual[idx] = 0.01
+#                 # proj += q[j] * projExp_τ(Λ, D, g, grid[j, :])
+
+#                 tiny = FloatL(1e-4)
+#                 ω1, ω2 = grid[j, 1] + g[1], grid[j, 2] + g[2]
+#                 if ω1 < tiny || ω2 < tiny
+#                     kk = FloatL(0.5)
+#                 elseif abs(ω1 - ω2) < tiny
+#                     ω = (ω1 + ω2) / 2
+#                     kk = (1 - exp(-ω) * (1 + ω)) / ω^2
+#                 else
+#                     kk = (ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2))
+#                 end
+
+#                 @inbounds proj += q[j] * kk
+#             # KK = [projExp_τ(Λ, D, g, grid[j, :]) for j in 1:length(grid)]
+#             # @inbounds residual[idx] -= (q' * KK)^2
+
+#                 # tiny = FloatL(1e-4)
+#                 # ω1::FloatL, ω2::FloatL = grid[j, 1] + g[1], grid[j, 2] + g[2]
+#                 # if ω1 < tiny || ω2 < tiny
+#                 #     return T(0.5)
+#                 # elseif abs(ω1 - ω2) < tiny
+#                 #     ω = (ω1 + ω2) / 2
+#                 #     return T((1 - exp(-ω) * (1 + ω)) / ω^2)
+#                 # else
+#                 #     return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+#                 # end
+
+#                 # proj += q[j] * projector(Λ, D, g, grid[j, :])
+#                 # proj += q[j] * 0.01
+#             end
+#             @inbounds residual[idx] -= proj^2
+#             # end
+#         end
+#     end
+# end
+
 function updateResidual!(basis, projector)
-    q = FloatL.(basis.Q[end, :])
     Λ = FloatL(basis.Λ)
     rtol = FloatL(basis.rtol)
+    q = FloatL.(basis.Q[end, :])
     fineGrid = FloatL.(basis.fineGrid)
     grid = FloatL.(basis.grid)
     N::Int, Nfine::Int, D::Int = basis.N, basis.Nfine, basis.D
 
-    Threads.@threads for idx in 1:Nfine^D
+    # q = CuArray{FloatL}(basis.Q[end, :])
+    # fineGrid = CuArray{FloatL}(basis.fineGrid)
+    # grid = CuArray{FloatL}(basis.grid)
+    # residual = CuArray{FloatL}(basis.residualFineGrid)
+
+    # @cuda update(Λ, D, Nfine, q, grid, fineGrid, residual)
+
+    for idx in 1:Nfine^D
         # println(Threads.threadid())
         c = idx2coord(D, Nfine, idx)
         if c[1] <= c[2]
             g = (fineGrid[c[1]], fineGrid[c[2]])
             KK = [projector(Λ, D, g, grid[j, :]) for j in 1:N]
+            # @inbounds residual[idx] -= (q' * KK)^2
             basis.residualFineGrid[idx] -= (q' * KK)^2
+
 
             # proj = FloatL(0)
             # for j in 1:N
@@ -218,6 +275,7 @@ function updateResidual!(basis, projector)
     end
 
     ############  Mirror symmetry  #############################
+    # basis.residualFineGrid = residual
     for idx in 1:Nfine^D
         # println(Threads.threadid())
         c = idx2coord(D, Nfine, idx)
@@ -280,57 +338,57 @@ projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
 """
 <K(g_i), K(g_j)>
 """    
-function projKernel(basis, proj)
-    K = zeros(Float, (basis.N, basis.N))
-    for i in 1:basis.N
-        for j in 1:basis.N
-            K[i,j] = proj(basis.Λ, basis.D, basis.grid[i, :], basis.grid[j, :])
+    function projKernel(basis, proj)
+        K = zeros(Float, (basis.N, basis.N))
+        for i in 1:basis.N
+            for j in 1:basis.N
+                K[i,j] = proj(basis.Λ, basis.D, basis.grid[i, :], basis.grid[j, :])
+            end
         end
+        return K
     end
-    return K
-end
     
-"""
+    """
 modified Gram-Schmidt process
 """
     function mGramSchmidt(basis, g)
-    qnew = zeros(Float, basis.N)
-    qnew[end] = 1
+        qnew = zeros(Float, basis.N)
+        qnew[end] = 1
     # println(basis.proj)
         
-    for qi in 1:basis.N - 1
-        q = basis.Q[qi, :]
-        qnew -= projqq(basis, q, qnew) .* q  # <q, qnew> q
+        for qi in 1:basis.N - 1
+            q = basis.Q[qi, :]
+            qnew -= projqq(basis, q, qnew) .* q  # <q, qnew> q
         # println("q: ", q)
         # println("proj:", projqq(basis, q, qnew))
-    end
+        end
     # println(qnew)
-    return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
-end
+        return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
+    end
 
-"""
+    """
 Gram-Schmidt process
 """
-function GramSchmidt(basis, g)
-    qnew = zeros(Float, basis.N)
-    qnew[end] = 1
-    q0 = copy(qnew)
+    function GramSchmidt(basis, g)
+        qnew = zeros(Float, basis.N)
+        qnew[end] = 1
+        q0 = copy(qnew)
     # println(basis.proj)
         
-    for qi in 1:basis.N - 1
-        q = basis.Q[qi, :]
-        qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
-    end
+        for qi in 1:basis.N - 1
+            q = basis.Q[qi, :]
+            qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
+        end
 
     # q0 = copy(qnew    # println("GS: ", projqq(basis, qnew, qnew))
     # println(qnew)
     # end
     # println("GS: ", projqq(basis, qnew, qnew))
     # println(qnew)
-    qnorm = qnew / sqrt(abs(projqq(basis, qnew, qnew)))
+        qnorm = qnew / sqrt(abs(projqq(basis, qnew, qnew)))
     # println(Float64.(qnorm)' * basis.proj * Float64.(qnorm) - 1)
-    return qnorm
-end
+        return qnorm
+    end
 
 # """
 # Gram-Schmidt process
@@ -352,53 +410,53 @@ end
 #     return qnew / norm
 # end
 
-within(g, g0, cutoff) = g0[1] < 5 || g0[2] < 5 || g[1] < 5 || g[2] < 5 || ((g[1] / cutoff <= g0[1] <= g[1] * cutoff) && (g[2] / cutoff <= g0[2] <= g[2] * cutoff))
+    within(g, g0, cutoff) = g0[1] < 5 || g0[2] < 5 || g[1] < 5 || g[2] < 5 || ((g[1] / cutoff <= g0[1] <= g[1] * cutoff) && (g[2] / cutoff <= g0[2] <= g[2] * cutoff))
 
-function Residual(basis, proj, g, cutoff=-1)
+    function Residual(basis, proj, g, cutoff=-1)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
     
-    if cutoff < 0
-        KK = [proj(basis.Λ, basis.D, basis.grid[j, :], g) for j in 1:basis.N]
-        norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
-        return norm2
-    else
-        KK = [proj(basis.Λ, basis.D, basis.grid[j, :], g) for j in 1:basis.N if within(basis.grid[j, :], g, cutoff)]
-        norm2 = proj(basis.Λ, basis.D, g, g)
-        for i in 1:basis.N
-            if within(basis.grid[i, :], g, cutoff)
-                pr = Float(0)
-                for j in 1:basis.N 
-                    gp = basis.grid[j, :]
-                    pr += basis.Q[i, j] * proj(basis.Λ, basis.D, g, gp)
-                end
-                norm2 -= pr^2
-            end
+        if cutoff < 0
+            KK = [proj(basis.Λ, basis.D, basis.grid[j, :], g) for j in 1:basis.N]
+            norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
+            return norm2
+        else
+            KK = [proj(basis.Λ, basis.D, basis.grid[j, :], g) for j in 1:basis.N if within(basis.grid[j, :], g, cutoff)]
+            norm2 = proj(basis.Λ, basis.D, g, g)
+            for i in 1:basis.N
+                if within(basis.grid[i, :], g, cutoff)
+                    pr = Float(0)
+                    for j in 1:basis.N 
+                        gp = basis.grid[j, :]
+                        pr += basis.Q[i, j] * proj(basis.Λ, basis.D, g, gp)
+                    end
+                    norm2 -= pr^2
         end
-        return norm2
-    end
+        end
+            return norm2
+        end
     # norm2 = proj(basis.Λ, basis.D, g, g)
     # for i in 1:basis.N
     #     norm2 -= (sum(basis.Q[i, :] .* KK))^2
     # end
     # return norm2 < 0 ? Float(0) : sqrt(norm2) 
     # return norm2
-end
+    end
         
-function testOrthgonal(basis)
-    println("testing orthognalization...")
-    II = basis.Q * basis.proj * basis.Q'
-    maxerr = maximum(abs.(II - I))
-println("Max Orthognalization Error: ", maxerr)
+    function testOrthgonal(basis)
+        println("testing orthognalization...")
+        II = basis.Q * basis.proj * basis.Q'
+        maxerr = maximum(abs.(II - I))
+        println("Max Orthognalization Error: ", maxerr)
 # display(II - I)
 # println()
-end
+    end
 
-function testResidual(basis, proj)
+    function testResidual(basis, proj)
     # residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
     # println("Max deviation from zero residual: ", maximum(abs.(residual)))
-    println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
-end
+        println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
+    end
     
 """
 #Arguments:
@@ -406,43 +464,43 @@ end
 - `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
 - `rtol`: tolerance absolute error
 """
-function dlr_functional(type, Λ, rtol)
-    Λ = Float(Λ)
-    println("Building ω grid ... ")
-    ωBasis = QR(2, Λ, rtol, projPH_ω, Λ)
+    function dlr_functional(type, Λ, rtol)
+        Λ = Float(Λ)
+        println("Building ω grid ... ")
+        ωBasis = QR(2, Λ, rtol, projPH_ω, Λ)
     # println("Building τ grid ... ")
     # τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
     # # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
     # println("Building n grid ... ")
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
     
-    rank = ωBasis.N
-    ωGrid = ωBasis.grid
+        rank = ωBasis.N
+        ωGrid = ωBasis.grid
     # τGrid = τBasis / Λ
-    τGrid = τBasis
-    nGrid = nBasis
+        τGrid = τBasis
+        nGrid = nBasis
     ########### output  ############################
-    @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
+        @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
         for r in 1:rank
-        @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
+            @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
+        end
+
+        dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
     end
 
-    dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
-end
-
-if abspath(PROGRAM_FILE) == @__FILE__    
+    if abspath(PROGRAM_FILE) == @__FILE__    
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(100)
-    rtol = Float(1e-6)
-    dim = 2
+        Λ = Float(100)
+        rtol = Float(1e-6)
+        dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
     # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
     # println(unilog(Λ, rtol))
     # Λ = 100
     # @time ωBasis = QR(dim, Λ, rtol, projExp_τ, N=100)
     # @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
-    @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
+        @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
     # @code_warntype QR(dim, Λ, rtol / 10, projExp_τ)
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
@@ -451,4 +509,4 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # readline()
     # basis = QR(100, 1e-3)
 
-end
+    end
