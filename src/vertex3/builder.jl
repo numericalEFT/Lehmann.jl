@@ -9,7 +9,7 @@ using InteractiveUtils
 # using MPI
 
 const Float = Float128
-const FloatL = Float64
+const FloatL = Float128
 # const Float = BigFloat
 # const Float = Float128
 
@@ -410,8 +410,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(100)
-    rtol = Float(1e-6)
+    Λ = Float(1000)
+    rtol = Float(1e-8)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
     # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
