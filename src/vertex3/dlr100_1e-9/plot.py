@@ -36,33 +36,33 @@ plt.contourf(xv, yv, residual, 16)
 plt.colorbar()
 
 
-tri = Delaunay(np.log(grid), qhull_options="QJ")
-plt.triplot(grid[:, 0], grid[:, 1], tri.simplices)
+# tri = Delaunay(np.log(grid), qhull_options="QJ")
+# plt.triplot(grid[:, 0], grid[:, 1], tri.simplices)
 
-print(len(grid))
-print(len(tri.simplices))
+# print(len(grid))
+# print(len(tri.simplices))
 # print(tri.simplices[0])
 
-coordx = []
-coordy = []
+# coordx = []
+# coordy = []
 
-for sim in tri.simplices:
-    initial = [grid[s] for s in sim]
-    x = (initial[0][0]+initial[1][0]+initial[2][0])/3
-    y = (initial[0][1]+initial[1][1]+initial[2][1])/3
-    # initial.append([x, y])
-    x0 = np.array([x, y])
-    initial = np.array(initial)
-    # print(initial.shape)
-    mimum = optimize.fmin(interplate, x0,
-                          xtol=0.05, ftol=1e-10, initial_simplex=initial)
-    coordx.append(mimum[0])
-    coordy.append(mimum[1])
-    # print(initial)
+# for sim in tri.simplices:
+#     initial = [grid[s] for s in sim]
+#     x = (initial[0][0]+initial[1][0]+initial[2][0])/3
+#     y = (initial[0][1]+initial[1][1]+initial[2][1])/3
+#     # initial.append([x, y])
+#     x0 = np.array([x, y])
+#     initial = np.array(initial)
+#     # print(initial.shape)
+#     mimum = optimize.fmin(interplate, x0,
+#                           xtol=0.05, ftol=1e-10, initial_simplex=initial)
+#     coordx.append(mimum[0])
+#     coordy.append(mimum[1])
+# print(initial)
 
 
 plt.scatter(grid[:, 0], grid[:, 1], c="yellow", alpha=0.5, s=6)
-plt.scatter(coordx, coordy, c="red", alpha=0.5, s=8)
+# plt.scatter(coordx, coordy, c="red", alpha=0.5, s=8)
 
 plt.xscale("log")
 plt.yscale("log")

@@ -225,12 +225,12 @@ end
 
 function QR(dim, Λ, rtol, proj; c0=nothing, N=nothing)
     basis = Basis(dim, Λ, rtol, proj)
-    if isnothing(c0) == false
-        for c in c0
-            g = addBasis!(basis, proj, c)
-            @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
-        end
-    end
+    # if isnothing(c0) == false
+    #     for c in c0
+    #         g = addBasis!(basis, proj, c)
+    #         @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
+    #     end
+    # end
     maxResidual, idx = findmax(basis.residualFineGrid)
 
     while isnothing(N) ? sqrt(maxResidual) > rtol : basis.N < N
@@ -401,11 +401,11 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__    
 
     # ########### initialized MPI #######################################
-    # (MPI.Initialized() == false ) && MPI.Init()
-    # comm = MPI.COMM_WORLD
-    # Nworker = MPI.Comm_size(comm)  # number of MPI workers
-    # rank = MPI.Comm_rank(comm)  # rank of current MPI worker
-    # root = 0 # rank of the root worker 
+    (MPI.Initialized() == false ) && MPI.Init()
+    comm = MPI.COMM_WORLD
+    Nworker = MPI.Comm_size(comm)  # number of MPI workers
+    rank = MPI.Comm_rank(comm)  # rank of current MPI worker
+    root = 0 # rank of the root worker 
     # ####################################################################
 
     # freq, Q = findBasis(1.0e-3, Float(100))
