@@ -230,8 +230,6 @@ function updateResidual!(basis, projector)
                 continue
             end
 
-            α
-
             idxshift = idx - basis.head + 1
             g = (fineGrid[c[1]], fineGrid[c[2]])
             KK = [projector(Λ, D, g, grid[j, :]) for j in 1:N]
