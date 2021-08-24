@@ -4,7 +4,7 @@ using LinearAlgebra, Printf
 # using Optim
 using Quadmath
 # using ProfileView
-using InteractiveUtils
+# using InteractiveUtils
 
 
 # const Float = Float64
@@ -17,17 +17,17 @@ include("tau.jl")
 include("findmax.jl")
 
 
-using Plots
-function plotResidual(basis, proj, gmin, gmax, candidate=nothing, residual=nothing)
-    ω = LinRange(gmin, gmax, 1000)
-    y = [Residual(basis, proj, w) for w in ω]
-    p = plot(ω, y, xlims=(gmin, gmax))
-    if isnothing(candidate) == false
-        plot!(p, candidate, residual, seriestype=:scatter)
-    end
-    display(p)
-    readline()
-end
+# using Plots
+# function plotResidual(basis, proj, gmin, gmax, candidate=nothing, residual=nothing)
+#     ω = LinRange(gmin, gmax, 1000)
+#     y = [Residual(basis, proj, w) for w in ω]
+#     p = plot(ω, y, xlims=(gmin, gmax))
+#     if isnothing(candidate) == false
+#         plot!(p, candidate, residual, seriestype=:scatter)
+#     end
+#     display(p)
+#     readline()
+# end
 
 mutable struct Basis
     Λ::Float
@@ -117,7 +117,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     # @code_warntype Residual(basis, proj, Float(1.0))
     # exit(0)
     maxResidual, ωi = findmax(basis.candidateResidual)
-    plotResidual(basis, proj, Float(0), Float(100), basis.candidate, basis.candidateResidual)
+    # plotResidual(basis, proj, Float(0), Float(100), basis.candidate, basis.candidateResidual)
 
     while isnothing(N) ? maxResidual > rtol / 10 : basis.N < N
 
@@ -137,7 +137,7 @@ function QR(Λ, rtol, proj, g0; N=nothing)
     testOrthgonal(basis)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
     @printf("residual = %.10e\n", maximum(basis.candidateResidual))
-    plotResidual(basis, proj, Float(0), Float(100), basis.candidate, basis.candidateResidual)
+    # plotResidual(basis, proj, Float(0), Float(100), basis.candidate, basis.candidateResidual)
     return basis
 end
 
@@ -231,6 +231,8 @@ function dlr_functional(type, Λ, rtol)
     if type == :corr
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
+        ωGrid = ωBasis.grid
+        rank = ωBasis.N
         println("Building τ grid ... ")
         τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
         # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
@@ -239,17 +241,28 @@ function dlr_functional(type, Λ, rtol)
     elseif type == :acorr
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),])
+        ωGrid = ωBasis.grid
+        rank = ωBasis.N
         println("Building τ grid ... ")
         τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :acorr)
         # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+    elseif type == :fermi
+        println("Building ω grid ... ")
+        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
+        ωGrid = vcat(-ωBasis.grid[end:-1:2], ωBasis.grid)
+        rank = length(ωGrid)
+        println("rank: $rank")
+        println("Building τ grid ... ")
+        τBasis = tauGrid(ωGrid, rank, Λ, rtol, :fermi)
+        # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
+        println("Building n grid ... ")
+        nBasis = MatFreqGrid(ωGrid, rank, Λ, :fermi)
     end
-    rank = ωBasis.N
-    ωGrid = ωBasis.grid
     # τGrid = τBasis / Λ
     τGrid = τBasis
-        nGrid = nBasis
+    nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
         for r in 1:rank

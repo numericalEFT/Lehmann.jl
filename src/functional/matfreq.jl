@@ -27,8 +27,13 @@ function MatFreqGrid(ωGrid, N, Λ, type::Symbol)
     # Nωn = Int(ceil(Λ)) * 2 # expect Nω ~ para.Λ/2π, drop 2π on the safe side
     # fineGrid = [w for w in 0:Nωn]
 
+    if type == :fermi
+        fineGrid = vcat(-fineGrid[end:-1:2], fineGrid)
+        ωnkernel = zeros(ComplexF64, (N, length(fineGrid)))
+    else
+        ωnkernel = zeros(Float64, (N, length(fineGrid)))
+    end
 
-    ωnkernel = zeros(Float64, (N, length(fineGrid)))
 
     for (ni, n) in enumerate(fineGrid)
         for r in 1:N

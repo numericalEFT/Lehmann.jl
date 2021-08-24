@@ -152,8 +152,8 @@ end
         # @test all(abs.(Gnsample - Gnfitted) .< 50eps) # dlr should represent the Green's function up to accuracy of the order eps
         println("SemiCircle test case fit iω rtol=", rtol(Gnsample[1, :], Gnfitted[1, :]))
         println("Multi pole test case fit iω rtol=", rtol(Gnsample[2, :], Gnfitted[2, :]))
-        @test rtol(Gnsample[1, :], Gnfitted[1, :]) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
-        @test rtol(Gnsample[2, :], Gnfitted[2, :]) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gnsample[1, :], Gnfitted[1, :]) .< 100eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gnsample[2, :], Gnfitted[2, :]) .< 100eps # dlr should represent the Green's function up to accuracy of the order eps
 
         #=========================================================================================#
         #                            Fourier Transform Test                                     #
@@ -168,8 +168,8 @@ end
 
         println("SemiCircle test case fourier τ to iω rtol=", rtol(Gnsample[1, :], Gnfourier[1, :]))
         println("Multipole test case fourier τ to iω rtol=", rtol(Gnsample[1, :], Gnfourier[1, :]))
-        @test rtol(Gnsample[1, :], Gnfourier[1, :]) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
-        @test rtol(Gnsample[2, :], Gnfourier[2, :]) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gnsample[1, :], Gnfourier[1, :]) .< 1000eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gnsample[2, :], Gnfourier[2, :]) .< 1000eps # dlr should represent the Green's function up to accuracy of the order eps
 
         Gfourier = DLR.matfreq2tau(type, Gndlr, dlr, τSample, axis=2, rtol=eps)
         # for (ti, t) in enumerate(τSample)
@@ -178,15 +178,15 @@ end
 
         println("SemiCircle test case fourier iω to τ rtol=", rtol(Gsample[1, :], Gfourier[1, :]))
         println("Multipole test case fourier  iω to τ rtol=", rtol(Gsample[1, :], Gfourier[1, :]))
-        @test rtol(Gsample[1, :], Gfourier[1, :]) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
-        @test rtol(Gsample[2, :], Gfourier[2, :]) .< 500eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gsample[1, :], Gfourier[1, :]) .< 1000eps # dlr should represent the Green's function up to accuracy of the order eps
+        @test rtol(Gsample[2, :], Gfourier[2, :]) .< 1000eps # dlr should represent the Green's function up to accuracy of the order eps
 
         printstyled("========================================================================\n", color=:yellow)
     end
 
-    test(:fermi, Euv=10.0, β=1000.0, eps=1e-10)
-    test(:corr, Euv=10.0, β=1000.0, eps=1e-10)
-    test(:acorr, Euv=10.0, β=1000.0, eps=1e-12)
+    test(:fermi, Euv=10.0, β=10000000.0, eps=1e-12)
+    test(:corr, Euv=10.0, β=100000.0, eps=1e-10)
+    test(:acorr, Euv=10.0, β=1000000.0, eps=1e-12)
 
 end
 
