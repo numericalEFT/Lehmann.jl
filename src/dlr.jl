@@ -17,7 +17,8 @@ struct DLRGrid
     DLR grids for imaginary-time/Matsubara frequency correlators
 
 #Members:
-- `type`: symbol :fermi, :corr, :acorr
+- `isFermi`: bool is fermionic or bosonic
+- `symmetry`: particle-hole symmetric :ph, or particle-hole asymmetric :pha, or :none
 - `Euv` : the UV energy scale of the spectral density 
 - `β` : inverse temeprature
 - `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
@@ -29,7 +30,8 @@ struct DLRGrid
 - `τ` : selected representative imaginary-time grid
 """
 struct DLRGrid
-    type::Symbol
+    isFermi::Bool
+    symmetry::Symbol
     Euv::Float64
     β::Float64
     Λ::Float64
@@ -43,15 +45,24 @@ struct DLRGrid
     τ::Vector{Float64}
 
     """
-    function DLRGrid(type, Euv, β, rtol=1e-12)
+    function DLRGrid(Euv, β, isFermi::Bool; symmetry::Symbol = :none, rtol = 1e-12, rebuild::Bool = false)
 
-        Create DLR grids
+    Create DLR grids
+
+    #Arguments:
+    - `Euv` : the UV energy scale of the spectral density 
+    - `β` : inverse temeprature
+    - `isFermi`: bool is fermionic or bosonic
+    - `symmetry`: particle-hole symmetric :ph, or particle-hole asymmetric :pha, or :none
+    - `rtol`: tolerance absolute error
+    - `rebuild` : load DLR basis from the file or recalculate on the fly
     """
-    function DLRGrid(type, Euv, β, rtol = 1e-12)
+    function DLRGrid(Euv, β, isFermi::Bool; symmetry::Symbol = :none, rtol = 1e-12, rebuild::Bool = false)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "eps=$eps is not positive and nonzero!"
         @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
+        @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
         if Λ < 100
             Λ = Int(100)
         else
@@ -62,7 +73,19 @@ struct DLRGrid
             rtolpower = -4
         end
 
-        filename = string(@__DIR__, "/functional/basis/$(string(type))/dlr$(Λ)_1e$(rtolpower).dlr")
+        if symmetry == :none
+            if isFermi
+                filename = string(@__DIR__, "/discrete/basis/fermi/dlr$(Λ)_1e$(rtolpower).dlr")
+            else
+                error("Generic bosonic dlr has not yet been implemented!")
+            end
+        elseif symmetry == :ph
+            filename = string(@__DIR__, "/functional/basis/corr/dlr$(Λ)_1e$(rtolpower).dlr")
+        elseif symmetry == :pha
+            filename = string(@__DIR__, "/functional/basis/acorr/dlr$(Λ)_1e$(rtolpower).dlr")
+        else
+            error("$symmetry is not implemented!")
+        end
 
         if isfile(filename) == false
             error("$filename doesn't exist. DLR basis hasn't been generated.")
@@ -73,15 +96,15 @@ struct DLRGrid
 
         ω = grid[:, 2] / β
         n = Int.(grid[:, 4])
-        if type == :fermi
+
+        if isFermi
             ωn = @. (2n + 1.0) * π / β
-        elseif type == :corr || type == :boson || type == :acorr
-            ωn = @. 2n * π / β
         else
-            error("$type not implemented!")
+            ωn = @. 2n * π / β
         end
+
         τ = grid[:, 3] * β
-        return new(type, Euv, β, Λ, rtol, length(ω), ω, n, ωn, τ)
+        return new(isFermi, symmetry, Euv, β, Λ, rtol, length(ω), ω, n, ωn, τ)
     end
 end
 
