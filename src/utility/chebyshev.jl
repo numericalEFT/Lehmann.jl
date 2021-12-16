@@ -1,3 +1,4 @@
+module Interp
 """
 barychebinit(n)
 
@@ -14,10 +15,10 @@ Reference: Berrut, J.P. and Trefethen, L.N., 2004. Barycentric lagrange interpol
 function barychebinit(n)
     x = zeros(Float64, n)
     w = similar(x)
-    for i in 1:n
+    for i = 1:n
         c = (2i - 1)π / (2n)
-        x[n - i + 1] = cos(c)
-        w[n - i + 1] = (-1)^(i - 1) * sin(c)
+        x[n-i+1] = cos(c)
+        w[n-i+1] = (-1)^(i - 1) * sin(c)
     end
     return x, w
 end
@@ -39,17 +40,18 @@ Reference: Berrut, J.P. and Trefethen, L.N., 2004. Barycentric lagrange interpol
 - Interpolation result
 """
 function barycheb(n, x, f, wc, xc)
-    for j in 1:n
+    for j = 1:n
         if x == xc[j]
             return f[j]
-        end    
+        end
     end
 
     num, den = 0.0, 0.0
-    for j in 1:n
+    for j = 1:n
         q = wc[j] / (x - xc[j])
         num += q * f[j]
         den += q
     end
     return num / den
+end
 end

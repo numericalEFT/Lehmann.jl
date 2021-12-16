@@ -7,7 +7,8 @@ export tau2dlr, tau2matfreq, matfreq2dlr, matfreq2tau, tau2matfreq, matfreq2tau
 using DelimitedFiles, LinearAlgebra
 # include("spectral.jl")
 using ..Spectral
-include("builder.jl")
+include("./functional/builder.jl")
+include("./discrete/builder.jl")
 
 
 """
@@ -46,11 +47,12 @@ struct DLRGrid
 
         Create DLR grids
     """
-    function DLRGrid(type, Euv, β, rtol=1e-12)
+    function DLRGrid(type, Euv, β, rtol = 1e-12)
         Λ = Euv * β # dlr only depends on this dimensionless scale
+        # println("Get $Λ")
         @assert rtol > 0.0 "eps=$eps is not positive and nonzero!"
-        @assert 0 < Λ <= 1000000 "Energy scale $Λ must be in (0, 1000000)!"
-        if Λ < 100 
+        @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
+        if Λ < 100
             Λ = Int(100)
         else
             Λ = 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
@@ -59,20 +61,21 @@ struct DLRGrid
         if abs(rtolpower) < 4
             rtolpower = -4
         end
-        
-        filename = string(@__DIR__, "/basis/$(string(type))/dlr$(Λ)_1e$(rtolpower).dlr")
+
+        filename = string(@__DIR__, "/functional/basis/$(string(type))/dlr$(Λ)_1e$(rtolpower).dlr")
 
         if isfile(filename) == false
             error("$filename doesn't exist. DLR basis hasn't been generated.")
         end
 
         grid = readdlm(filename)
+        # println("reading $filename")
 
         ω = grid[:, 2] / β
         n = Int.(grid[:, 4])
-        if type==:fermi
+        if type == :fermi
             ωn = @. (2n + 1.0) * π / β
-        elseif type ==:corr || type==:boson || type==:acorr
+        elseif type == :corr || type == :boson || type == :acorr
             ωn = @. 2n * π / β
         else
             error("$type not implemented!")
@@ -90,7 +93,7 @@ function _tensor2matrix(tensor, axis)
     n2 = reduce(*, partialsize)
     # println("working on size ", size(tensor))
     # println(axis)
-    permu = [i for i in 1:dim]
+    permu = [i for i = 1:dim]
     permu[1], permu[axis] = axis, 1
     ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
     ntensor = reshape(ntensor, (n1, n2)) # no copy is created
@@ -103,7 +106,7 @@ function _matrix2tensor(mat, partialsize, axis)
     tsize = vcat(size(mat)[1], partialsize)
     tensor = reshape(mat, Tuple(tsize))
     dim = length(partialsize) + 1
-    permu = [i for i in 1:dim]
+    permu = [i for i = 1:dim]
     permu[1], permu[axis] = axis, 1
     return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
 end
@@ -119,7 +122,7 @@ function tau2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
 - `axis`: the imaginary-time axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function tau2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
+function tau2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     τGrid = dlrGrid.τ
     ωGrid = dlrGrid.ω
@@ -153,11 +156,11 @@ function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis=1)
 - `axis`: imaginary-time axis in the data `dlrcoeff`
 - `rtol`: tolerance absolute error
 """
-function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis=1)
+function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
-    @assert all(τGrid .> 0.0) && all(τGrid .<= dlrGrid.β)
-    β=dlrGrid.β
-    ωGrid=dlrGrid.ω
+    # @assert all(τGrid .> 0.0) && all(τGrid .<= dlrGrid.β)
+    β = dlrGrid.β
+    ωGrid = dlrGrid.ω
 
     kernel = kernelT(type, τGrid, ωGrid, dlrGrid.β)
 
@@ -179,7 +182,7 @@ function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
 - `axis`: the Matsubara-frequency axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
+function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     nGrid = dlrGrid.n
     ωGrid = dlrGrid.ω
@@ -213,11 +216,11 @@ function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β=1.0; axis=1)
 - `axis`: Matsubara-frequency axis in the data `dlrcoeff`
 - `rtol`: tolerance absolute error
 """
-function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β=1.0; axis=1)
+function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β = 1.0; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     ωGrid = dlrGrid.ω
 
-    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β) 
+    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -239,9 +242,9 @@ function tau2matfreq(type, green, dlrGrid, nGrid; axis=1, rtol=1e-12)
 - `axis`: the imaginary-time axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function tau2matfreq(type, green, dlrGrid, nGrid; axis=1, rtol=1e-12)
-    coeff = tau2dlr(type, green, dlrGrid; axis=axis, rtol=rtol)
-    return dlr2matfreq(type, coeff, dlrGrid, nGrid, axis=axis)
+function tau2matfreq(type, green, dlrGrid, nGrid; axis = 1, rtol = 1e-12)
+    coeff = tau2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
+    return dlr2matfreq(type, coeff, dlrGrid, nGrid, axis = axis)
 end
 
 """
@@ -257,9 +260,9 @@ function matfreq2tau(type, green, dlrGrid, τGrid; axis=1, rtol=1e-12)
 - `axis`: Matsubara-frequency axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function matfreq2tau(type, green, dlrGrid, τGrid; axis=1, rtol=1e-12)
-    coeff = matfreq2dlr(type, green, dlrGrid; axis=axis, rtol=rtol)
-    return dlr2tau(type, coeff, dlrGrid, τGrid, axis=axis)
+function matfreq2tau(type, green, dlrGrid, τGrid; axis = 1, rtol = 1e-12)
+    coeff = matfreq2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
+    return dlr2tau(type, coeff, dlrGrid, τGrid, axis = axis)
 end
 
 end

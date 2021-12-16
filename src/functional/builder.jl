@@ -1,4 +1,7 @@
-using LinearAlgebra:Matrix, zero, similar
+
+module Functional
+
+using LinearAlgebra: Matrix, zero, similar
 using LinearAlgebra, Printf
 # using Roots
 # using Optim
@@ -6,6 +9,7 @@ using Quadmath
 # using ProfileView
 # using InteractiveUtils
 
+include("../utility/chebyshev.jl")
 
 # const Float = Float64
 # const Float = BigFloat
@@ -52,9 +56,9 @@ function addBasis!(basis, proj, g0::Float)
     basis.N += 1
     if basis.N == 1
         idx = 1
-        basis.grid = [g0, ]
+        basis.grid = [g0,]
         basis.Q = zeros(Float, (basis.N, basis.N))
-        basis.Q[1,1] = 1 / sqrt(proj(basis.Λ, g0, g0))
+        basis.Q[1, 1] = 1 / sqrt(proj(basis.Λ, g0, g0))
         basis.proj = projKernel(basis, proj)
     else
         idxList = findall(x -> x > g0, basis.grid)
@@ -65,10 +69,10 @@ function addBasis!(basis, proj, g0::Float)
         basis.proj = projKernel(basis, proj)
         _Q = copy(basis.Q)
         basis.Q = zeros(Float, (basis.N, basis.N))
-        basis.Q[1:idx - 1, 1:idx - 1] = _Q[1:idx - 1, 1:idx - 1]
-        basis.Q[1:idx - 1, idx + 1:end] = _Q[1:idx - 1, idx:end]
-        basis.Q[idx + 1:end, 1:idx - 1] = _Q[idx:end, 1:idx - 1]
-        basis.Q[idx + 1:end, idx + 1:end] = _Q[idx:end, idx:end]
+        basis.Q[1:idx-1, 1:idx-1] = _Q[1:idx-1, 1:idx-1]
+        basis.Q[1:idx-1, idx+1:end] = _Q[1:idx-1, idx:end]
+        basis.Q[idx+1:end, 1:idx-1] = _Q[idx:end, 1:idx-1]
+        basis.Q[idx+1:end, idx+1:end] = _Q[idx:end, idx:end]
         # println(maximum(abs.(GramSchmidt(basis, idx, g0) .- mGramSchmidt(basis, idx, g0))))
         basis.Q[idx, :] = mGramSchmidt(basis, idx, g0)
     end
@@ -91,21 +95,21 @@ function scanResidual!(basis, proj, g0, idx)
     # println(g0, " and ", idx)
     # println(grids)
 
-    for i in 1:length(grids) - 1 # because of the separation of scales, the grids far away from idx is rarely affected
-        g = findCandidate(basis, proj, grids[i], grids[i + 1])
+    for i = 1:length(grids)-1 # because of the separation of scales, the grids far away from idx is rarely affected
+        g = findCandidate(basis, proj, grids[i], grids[i+1])
         basis.candidate[i] = g
         basis.candidateResidual[i] = Residual(basis, proj, g)
     end
 end
 
 function printCandidate(basis, idx)
-    lower = (idx == 1) ? 0 : basis.grid[idx - 1]
-    upper = (idx == basis.N) ? basis.Λ : basis.grid[idx + 1]
+    lower = (idx == 1) ? 0 : basis.grid[idx-1]
+    upper = (idx == basis.N) ? basis.Λ : basis.grid[idx+1]
 
     @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, basis.grid[idx], lower, upper, basis.residual[idx])
 end
 
-function QR(Λ, rtol, proj, g0; N=nothing)
+function QR(Λ, rtol, proj, g0; N = nothing)
     basis = Basis(Λ, rtol)
     # println(g0)
     for g in g0
@@ -150,29 +154,29 @@ projqq(basis, q1::Vector{Float}, q2::Vector{Float}) = q1' * basis.proj * q2
 
 """
 <K(g_i), K(g_j)>
-"""    
+"""
 function projKernel(basis, proj)
     K = zeros(Float, (basis.N, basis.N))
-    for i in 1:basis.N
-        for j in 1:basis.N
-            K[i,j] = proj(basis.Λ, basis.grid[i], basis.grid[j])
+    for i = 1:basis.N
+        for j = 1:basis.N
+            K[i, j] = proj(basis.Λ, basis.grid[i], basis.grid[j])
         end
     end
     return K
 end
-    
+
 """
 modified Gram-Schmidt process
 """
 function mGramSchmidt(basis, idx, g::Float)
     qnew = zeros(Float, basis.N)
     qnew[idx] = 1
-        
-    for qi in 1:basis.N
+
+    for qi = 1:basis.N
         if qi == idx
             continue
         end
-    q = basis.Q[qi, :]
+        q = basis.Q[qi, :]
         qnew -= projqq(basis, q, qnew) .* q  # <q, qnew> q
     end
     return qnew / sqrt(projqq(basis, qnew, qnew))
@@ -185,7 +189,7 @@ end
 #     q0 = zeros(Float, basis.N)
 #     q0[idx] = 1
 #     qnew = copy(q0)
-        
+
 #     for qi in 1:basis.N
 #         if qi == idx
 #     continue
@@ -193,7 +197,7 @@ end
 #         q = basis.Q[qi, :]
 #         qnew -=  projqq(basis, q, q0) .* q
 #     end
-    
+
 #     norm = sqrt(projqq(basis, qnew, qnew))
 #     return qnew / norm
 # end
@@ -201,7 +205,7 @@ end
 function Residual(basis, proj, g::Float)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
-    
+
     KK = [proj(basis.Λ, gj, g) for gj in basis.grid]
     norm2 = proj(basis.Λ, g, g) - (norm(basis.Q * KK))^2
 
@@ -209,17 +213,17 @@ function Residual(basis, proj, g::Float)
     # for j in 1:basis.N
     #     norm2 -= basisQ[j, :]
     # end
-    return norm2 < 0 ? Float(0) : sqrt(norm2) 
+    return norm2 < 0 ? Float(0) : sqrt(norm2)
 end
 
-    
+
 function testOrthgonal(basis)
     println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
-maxerr = maximum(abs.(II - I))
+    maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 end
-    
+
 """
 #Arguments:
 - `type`: type of kernel, :fermi, :boson
@@ -265,20 +269,22 @@ function dlr_functional(type, Λ, rtol)
     nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
-        for r in 1:rank
+    for r = 1:rank
         @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
     end
 
     dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__    
-            # freq, Q = findBasis(1.0e-3, Float(100))
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
     Λ = 1e10
     # Λ = 100
     # @time ωBasis = QR(Λ, 1e-13, projPH_ω, [Float(0), Float(Λ)])
-    @time ωBasis = QR(Λ, 1e-12, projPHA_ω, [Float(Λ), ])
+    @time ωBasis = Functional.QR(Λ, 1e-12, projPHA_ω, [Float(Λ),])
     # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
 
