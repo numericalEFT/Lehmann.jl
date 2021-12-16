@@ -226,13 +226,16 @@ end
 
 """
 #Arguments:
+- `isFermi`: is fermionic or bosonic
+- `symmetry`: particle-hole symmetric for :ph, asymmetric for :pha, or nothing for :none
 - `type`: type of kernel, :fermi, :boson
 - `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
 - `rtol`: tolerance absolute error
+- `verbose`: 0 to suppress all output, any positive integer to print the internal information
 """
-function dlr_functional(type, Λ, rtol)
+function build(isFermi::Bool, symmetry::Symbol, Λ, rtol, verbose = 0)
     Λ = Float(Λ)
-    if type == :corr
+    if symmetry == :ph
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
         ωGrid = ωBasis.grid
@@ -242,7 +245,7 @@ function dlr_functional(type, Λ, rtol)
         # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
-    elseif type == :acorr
+    elseif symmetry == :pha
         println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),])
         ωGrid = ωBasis.grid
@@ -252,17 +255,19 @@ function dlr_functional(type, Λ, rtol)
         # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
         println("Building n grid ... ")
         nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
-    elseif type == :fermi
-        println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
-        ωGrid = vcat(-ωBasis.grid[end:-1:2], ωBasis.grid)
-        rank = length(ωGrid)
-        println("rank: $rank")
-        println("Building τ grid ... ")
-        τBasis = tauGrid(ωGrid, rank, Λ, rtol, :fermi)
-        # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
-        println("Building n grid ... ")
-        nBasis = MatFreqGrid(ωGrid, rank, Λ, :fermi)
+    else
+        error("$symmetry is not implemented!")
+        # elseif type == :fermi
+        #     println("Building ω grid ... ")
+        #     ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
+        #     ωGrid = vcat(-ωBasis.grid[end:-1:2], ωBasis.grid)
+        #     rank = length(ωGrid)
+        #     println("rank: $rank")
+        #     println("Building τ grid ... ")
+        #     τBasis = tauGrid(ωGrid, rank, Λ, rtol, :fermi)
+        #     # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
+        #     println("Building n grid ... ")
+        #     nBasis = MatFreqGrid(ωGrid, rank, Λ, :fermi)
     end
     # τGrid = τBasis / Λ
     τGrid = τBasis
@@ -273,7 +278,7 @@ function dlr_functional(type, Λ, rtol)
         @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
     end
 
-    dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
+    return Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
 end
 
 end

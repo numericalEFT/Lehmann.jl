@@ -57,10 +57,10 @@ struct DLRGrid
     - `rtol`: tolerance absolute error
     - `rebuild` : load DLR basis from the file or recalculate on the fly
     """
-    function DLRGrid(Euv, β, isFermi::Bool; symmetry::Symbol = :none, rtol = 1e-12, rebuild::Bool = false)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none, rebuild::Bool = false)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
-        @assert rtol > 0.0 "eps=$eps is not positive and nonzero!"
+        @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
         @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
         if Λ < 100
