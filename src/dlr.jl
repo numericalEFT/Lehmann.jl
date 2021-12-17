@@ -62,7 +62,11 @@ struct DLRGrid
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
 
         if Λ > 1e8
-            printstyled("Warning: current implementation may cause ~ 3-4 digits loss beyond Λ=1e8!\n", color = :red)
+            printstyled("Warning: current implementation may cause ~ 3-4 digits loss for Λ ≥ 1e8!\n", color = :red)
+        end
+
+        if rtol >= 1e-6
+            printstyled("Warning: current implementation may cause ~ 3-4 digits loss for rtol ≥ 1e-6!\n", color = :red)
         end
 
         if Λ < 100
