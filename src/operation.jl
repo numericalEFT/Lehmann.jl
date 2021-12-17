@@ -35,12 +35,12 @@ function tau2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
 - `axis`: the imaginary-time axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function tau2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
+function tau2dlr(green, dlrGrid::DLRGrid; axis = 1)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     τGrid = dlrGrid.τ
     ωGrid = dlrGrid.ω
 
-    kernel = kernelT(type, τGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, dlrGrid.β)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -69,13 +69,13 @@ function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis=1)
 - `axis`: imaginary-time axis in the data `dlrcoeff`
 - `rtol`: tolerance absolute error
 """
-function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis = 1)
+function dlr2tau(dlrcoeff, dlrGrid::DLRGrid, τGrid; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     # @assert all(τGrid .> 0.0) && all(τGrid .<= dlrGrid.β)
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    kernel = kernelT(type, τGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, β)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -95,12 +95,12 @@ function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
 - `axis`: the Matsubara-frequency axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
+function matfreq2dlr(green, dlrGrid::DLRGrid; axis = 1)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     nGrid = dlrGrid.n
     ωGrid = dlrGrid.ω
 
-    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -129,11 +129,11 @@ function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β=1.0; axis=1)
 - `axis`: Matsubara-frequency axis in the data `dlrcoeff`
 - `rtol`: tolerance absolute error
 """
-function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β = 1.0; axis = 1)
+function dlr2matfreq(dlrcoeff, dlrGrid::DLRGrid, nGrid; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     ωGrid = dlrGrid.ω
 
-    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -155,9 +155,9 @@ function tau2matfreq(type, green, dlrGrid, nGrid; axis=1, rtol=1e-12)
 - `axis`: the imaginary-time axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function tau2matfreq(type, green, dlrGrid, nGrid; axis = 1, rtol = 1e-12)
-    coeff = tau2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
-    return dlr2matfreq(type, coeff, dlrGrid, nGrid, axis = axis)
+function tau2matfreq(green, dlrGrid, nGrid; axis = 1)
+    coeff = tau2dlr(green, dlrGrid; axis = axis)
+    return dlr2matfreq(coeff, dlrGrid, nGrid, axis = axis)
 end
 
 """
@@ -173,7 +173,7 @@ function matfreq2tau(type, green, dlrGrid, τGrid; axis=1, rtol=1e-12)
 - `axis`: Matsubara-frequency axis in the data `green`
 - `rtol`: tolerance absolute error
 """
-function matfreq2tau(type, green, dlrGrid, τGrid; axis = 1, rtol = 1e-12)
-    coeff = matfreq2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
-    return dlr2tau(type, coeff, dlrGrid, τGrid, axis = axis)
+function matfreq2tau(green, dlrGrid, τGrid; axis = 1)
+    coeff = matfreq2dlr(green, dlrGrid; axis = axis)
+    return dlr2tau(coeff, dlrGrid, τGrid, axis = axis)
 end

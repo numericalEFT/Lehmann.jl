@@ -10,10 +10,9 @@ include("discrete/builder.jl")
 include("functional/builder.jl")
 
 include("dlr.jl")
-include("operation.jl")
-# export DLR
+export DLRGrid
 
-export DLRGrid, dlr
-export tau2dlr, tau2matfreq, matfreq2dlr, matfreq2tau, tau2matfreq, matfreq2tau
+include("operation.jl")
+export tau2dlr, dlr2tau, matfreq2dlr, dlr2matfreq, tau2matfreq, matfreq2tau
 
 end

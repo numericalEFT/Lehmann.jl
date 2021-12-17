@@ -58,7 +58,7 @@ struct DLRGrid
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
-        @assert 0 < Λ <= 100000000000000 "Energy scale $Λ must be in (0, 1000000)!"
+        @assert Λ > 0 "Energy scale $Λ must be positive!"
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
         if Λ < 100
             Λ = Int(100)
@@ -87,37 +87,38 @@ struct DLRGrid
 
         dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [])
         if rebuild
-            build(dlr, folder, filename, algorithm)
+            build!(dlr, folder, filename, algorithm)
         else
-            load(dlr, folder, filename)
-            # dlr = 
+            load!(dlr, folder, filename)
         end
-
-        # return new(isFermi, symmetry, Euv, β, Λ, rtol, length(ω), ω, n, ωn, τ)
         return dlr
     end
 end
 
-function load(dlrGrid, folder, filename)
+Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+
+function load!(dlrGrid::DLRGrid, folder, filename)
     searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
+    function finddlr(folder, filename)
+        for dir in folder
+            if length(searchdir(dir, filename)) > 0
+                #dlr file found
+                return joinpath(dir, filename)
+            end
+        end
+        error("DLR file $filename doesn't exist in the folders $folder. Please generate it first!")
+    end
 
     folder = isnothing(folder) ? [] : collect(folder)
     push!(folder, string(@__DIR__, "/../basis/"))
 
-
-    for dir in folder
-        println("search ", searchdir(dir, filename))
-    end
-
-    if isfile(filename) == false
-        error("$filename doesn't exist. DLR basis hasn't been generated.")
-    end
-
-    grid = readdlm(filename)
+    grid = readdlm(finddlr(folder, filename), comments = true, comment_char = '#')
     # println("reading $filename")
 
-    ω = grid[:, 2] / β
-    τ = grid[:, 3] * β
+    β = dlrGrid.β
+    ω, τ = grid[:, 2], grid[:, 3]
 
     if dlrGrid.isFermi
         n = Int.(grid[:, 4])
@@ -126,11 +127,15 @@ function load(dlrGrid, folder, filename)
         n = Int.(grid[:, 5])
         ωn = @. 2n * π / β
     end
-
-    return ω, τ, ωn
+    for r = 1:length(ω)
+        push!(dlrGrid.ω, ω[r] / β)
+        push!(dlrGrid.τ, τ[r] * β)
+        push!(dlrGrid.n, n[r])
+        push!(dlrGrid.ωn, ωn[r])
+    end
 end
 
-function build(dlrGrid, folder, filename, algorithm)
+function build!(dlrGrid::DLRGrid, folder, filename, algorithm)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
     if algorithm == :discrete
