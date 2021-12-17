@@ -237,7 +237,7 @@ end
 function build(dlrGrid, print::Bool = true)
     print && println("Using the functional algorithm to build DLR ...")
     Λ = Float(dlrGrid.Λ)
-    rtol = Float(dlrGrid.Λ)
+    rtol = Float(dlrGrid.rtol)
     symmetry = dlrGrid.symmetry
     if symmetry == :ph
         print && println("Building ω grid ... ")
@@ -260,7 +260,7 @@ function build(dlrGrid, print::Bool = true)
         # println("Building n grid ... ")
         # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     else
-        error("$symmetry is not implemented!")
+        error("Functional algorithm for the symmetry $symmetry has not yet been implemented!")
         # elseif type == :fermi
         #     println("Building ω grid ... ")
         #     ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
@@ -274,7 +274,8 @@ function build(dlrGrid, print::Bool = true)
         #     nBasis = MatFreqGrid(ωGrid, rank, Λ, :fermi)
     end
 
-    degree = 48
+    ωGrid = Float64.(ωGrid)
+    degree = 128
     τ = Discrete.τChebyGrid(dlrGrid, degree, print)
     kernel = Discrete.preciseKernelT(dlrGrid, τ, ωGrid, print)
     Discrete.testInterpolation(dlrGrid, τ, ωGrid, kernel, print)

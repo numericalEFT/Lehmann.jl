@@ -60,6 +60,11 @@ struct DLRGrid
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
         @assert Λ > 0 "Energy scale $Λ must be positive!"
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
+
+        if Λ > 1e8
+            printstyled("Warning: current implementation may cause ~ 3-4 digits loss beyond Λ=1e8!\n", color = :red)
+        end
+
         if Λ < 100
             Λ = Int(100)
         else
@@ -108,7 +113,7 @@ function load!(dlrGrid::DLRGrid, folder, filename)
                 return joinpath(dir, filename)
             end
         end
-        error("DLR file $filename doesn't exist in the folders $folder. Please generate it first!")
+        error("Cann't find the DLR file $filename in the folders $folder. Please generate it first!")
     end
 
     folder = isnothing(folder) ? [] : collect(folder)

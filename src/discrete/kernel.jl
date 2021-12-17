@@ -93,10 +93,12 @@ function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
 """
 function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
     # Assume τ.grid is particle-hole symmetric!!!
-    @assert (τ.np - 1) * τ.degree == τ.ngrid
-    kernel = zeros(Float64, (τ.ngrid, ω.ngrid))
+    # if (τ isa CompositeChebyshevGrid)
+    #     @assert (τ.np - 1) * τ.degree == τ.ngrid
+    # end
     τGrid = (τ isa CompositeChebyshevGrid) ? τ.grid : τ
     ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω
+    kernel = zeros(Float64, (length(τGrid), length(ωGrid)))
     symmetry = dlrGrid.symmetry
 
     if symmetry == :none && (τ isa CompositeChebyshevGrid) && (ω isa CompositeChebyshevGrid)
@@ -118,11 +120,13 @@ end
 
 function testInterpolation(dlrGrid, τ, ω, kernel, print = true)
     ############# test interpolation accuracy in τ #######
+    τGrid = (τ isa CompositeChebyshevGrid) ? τ.grid : τ
+    ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω
     if τ isa CompositeChebyshevGrid
         τ2 = CompositeChebyshevGrid(τ.degree * 2, τ.panel)
         kernel2 = preciseKernelT(dlrGrid, τ2, ω, print)
         err = 0.0
-        for ωi = 1:length(ω.grid)
+        for ωi = 1:length(ωGrid)
             tmp = 0.0
             for i = 1:τ2.np-1
                 for k = 1:τ2.degree
@@ -142,7 +146,7 @@ function testInterpolation(dlrGrid, τ, ω, kernel, print = true)
         ω2 = CompositeChebyshevGrid(ω.degree * 2, ω.panel)
         kernel2 = preciseKernelT(dlrGrid, τ, ω2)
         err = 0.0
-        for τi = 1:length(τ.grid)
+        for τi = 1:length(τGrid)
             tmp = 0.0
             for i = 1:ω2.np-1
                 for k = 1:ω2.degree
