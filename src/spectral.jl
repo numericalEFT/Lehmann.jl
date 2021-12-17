@@ -399,23 +399,17 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 end
 
 """
-    density(type, ω, β=1.0)
+    density(isFermi::Bool, ω, β=1.0)
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
 # Arguments
-- `type`: symbol :fermi, :bose
+- `isFermi`: fermionic or bosonic
 - `ω`: energy 
 - `β`: the inverse temperature 
 """
-@inline function density(type::Symbol, ω::T, β = T(1)) where {T<:AbstractFloat}
-    if type == :fermi
-        return fermiDirac(ω, β)
-    elseif type == :bose
-        return boseEinstein(ω, β)
-    else
-        @error "Type $type      is not implemented!"
-    end
+@inline function density(isFermi::Bool, ω::T, β = T(1)) where {T<:AbstractFloat}
+    return isFermi ? fermiDirac(ω, β) : boseEinstein(ω, β)
 end
 
 """
