@@ -1,14 +1,11 @@
 """
 discrete Lehmann representation for imaginary-time/Matsubara-freqeuncy correlator
 """
-module DLR
-export DLRGrid, dlr
-export tau2dlr, tau2matfreq, matfreq2dlr, matfreq2tau, tau2matfreq, matfreq2tau
-using DelimitedFiles, LinearAlgebra
 # include("spectral.jl")
-using ..Spectral
-include("./functional/builder.jl")
-include("./discrete/builder.jl")
+# using ..Spectral
+# include("./functional/builder.jl")
+# include("./discrete/builder.jl")
+# include("operation.jl")
 
 
 """
@@ -38,7 +35,7 @@ struct DLRGrid
     rtol::Float64
 
     # dlr grids
-    size::Int # rank of the dlr representation
+    # size::Int # rank of the dlr representation
     ω::Vector{Float64}
     n::Vector{Int} # integers, (2n+1)π/β gives the Matsubara frequency
     ωn::Vector{Float64} # (2n+1)π/β
@@ -57,7 +54,7 @@ struct DLRGrid
     - `rtol`: tolerance absolute error
     - `rebuild` : load DLR basis from the file or recalculate on the fly
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
@@ -76,217 +73,87 @@ struct DLRGrid
 
         if symmetry == :none
             if isFermi
-                filename = string(@__DIR__, "/discrete/basis/fermi/dlr$(Λ)_1e$(rtolpower).dlr")
+                filename = "universal_$(Λ)_1e$(rtolpower).dlr"
             else
                 error("Generic bosonic dlr has not yet been implemented!")
             end
         elseif symmetry == :ph
-            filename = string(@__DIR__, "/functional/basis/corr/dlr$(Λ)_1e$(rtolpower).dlr")
+            filename = "ph_$(Λ)_1e$(rtolpower).dlr"
         elseif symmetry == :pha
-            filename = string(@__DIR__, "/functional/basis/acorr/dlr$(Λ)_1e$(rtolpower).dlr")
+            filename = "pha_$(Λ)_1e$(rtolpower).dlr"
         else
             error("$symmetry is not implemented!")
         end
 
-        if isfile(filename) == false
-            error("$filename doesn't exist. DLR basis hasn't been generated.")
-        end
-
-        grid = readdlm(filename)
-        # println("reading $filename")
-
-        ω = grid[:, 2] / β
-        n = Int.(grid[:, 4])
-
-        if isFermi
-            ωn = @. (2n + 1.0) * π / β
+        dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [])
+        if rebuild
+            build(dlr, folder, filename, algorithm)
         else
-            ωn = @. 2n * π / β
+            load(dlr, folder, filename)
+            # dlr = 
         end
 
-        τ = grid[:, 3] * β
-        return new(isFermi, symmetry, Euv, β, Λ, rtol, length(ω), ω, n, ωn, τ)
+        # return new(isFermi, symmetry, Euv, β, Λ, rtol, length(ω), ω, n, ωn, τ)
+        return dlr
     end
 end
 
-function _tensor2matrix(tensor, axis)
-    # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
-    dim = length(size(tensor))
-    n1 = size(tensor)[axis]
-    partialsize = deleteat!(collect(size(tensor)), axis) # the size of the tensor except the axis-th dimension
-    n2 = reduce(*, partialsize)
-    # println("working on size ", size(tensor))
-    # println(axis)
-    permu = [i for i = 1:dim]
-    permu[1], permu[axis] = axis, 1
-    ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
-    ntensor = reshape(ntensor, (n1, n2)) # no copy is created
-    return ntensor, partialsize
+function load(dlrGrid, folder, filename)
+    searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
+
+    folder = isnothing(folder) ? [] : collect(folder)
+    push!(folder, string(@__DIR__, "/../basis/"))
+
+
+    for dir in folder
+        println("search ", searchdir(dir, filename))
+    end
+
+    if isfile(filename) == false
+        error("$filename doesn't exist. DLR basis hasn't been generated.")
+    end
+
+    grid = readdlm(filename)
+    # println("reading $filename")
+
+    ω = grid[:, 2] / β
+    τ = grid[:, 3] * β
+
+    if dlrGrid.isFermi
+        n = Int.(grid[:, 4])
+        ωn = @. (2n + 1.0) * π / β
+    else
+        n = Int.(grid[:, 5])
+        ωn = @. 2n * π / β
+    end
+
+    return ω, τ, ωn
 end
 
-function _matrix2tensor(mat, partialsize, axis)
-    # internal function to reshape matrix to a tensor, then swap the first index with the axis-th dimension
-    @assert size(mat)[2] == reduce(*, partialsize) # total number of elements of mat and the tensor must match
-    tsize = vcat(size(mat)[1], partialsize)
-    tensor = reshape(mat, Tuple(tsize))
-    dim = length(partialsize) + 1
-    permu = [i for i = 1:dim]
-    permu[1], permu[axis] = axis, 1
-    return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
-end
-
-"""
-function tau2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
-
-    imaginary-time domain to DLR representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `green` : green's function in imaginary-time domain
-- `axis`: the imaginary-time axis in the data `green`
-- `rtol`: tolerance absolute error
-"""
-function tau2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
-    @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
-    τGrid = dlrGrid.τ
-    ωGrid = dlrGrid.ω
-
-    kernel = kernelT(type, τGrid, ωGrid, dlrGrid.β)
-    typ = promote_type(eltype(kernel), eltype(green))
-    kernel = convert.(typ, kernel)
-    green = convert.(typ, green)
-    # kernel, ipiv, info = LAPACK.getrf!(Float64.(kernel)) # LU factorization
-    kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
-
-    g, partialsize = _tensor2matrix(green, axis)
-
-    coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
-    # coeff = kernel \ g #solve green=kernel*coeff
-    # println("coeff: ", maximum(abs.(coeff)))
-
-    return _matrix2tensor(coeff, partialsize, axis)
-end
-
-"""
-function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis=1)
-
-    DLR representation to imaginary-time representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `dlrcoeff` : DLR coefficients
-- `dlrGrid` : DLRGrid
-- `τGrid` : expected fine imaginary-time grids ∈ (0, β]
-- `axis`: imaginary-time axis in the data `dlrcoeff`
-- `rtol`: tolerance absolute error
-"""
-function dlr2tau(type, dlrcoeff, dlrGrid::DLRGrid, τGrid; axis = 1)
-    @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
-    # @assert all(τGrid .> 0.0) && all(τGrid .<= dlrGrid.β)
+function build(dlrGrid, folder, filename, algorithm)
+    isFermi = dlrGrid.isFermi
     β = dlrGrid.β
-    ωGrid = dlrGrid.ω
-
-    kernel = kernelT(type, τGrid, ωGrid, dlrGrid.β)
-
-    coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
-
-    G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    return _matrix2tensor(G, partialsize, axis)
-end
-
-"""
-function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis=1, rtol=1e-12)
-
-    Matsubara-frequency representation to DLR representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `green` : green's function in Matsubara-frequency domain
-- `axis`: the Matsubara-frequency axis in the data `green`
-- `rtol`: tolerance absolute error
-"""
-function matfreq2dlr(type, green, dlrGrid::DLRGrid; axis = 1, rtol = 1e-12)
-    @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
-    nGrid = dlrGrid.n
-    ωGrid = dlrGrid.ω
-
-    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β)
-    typ = promote_type(eltype(kernel), eltype(green))
-    kernel = convert.(typ, kernel)
-    green = convert.(typ, green)
-    # kernel, ipiv, info = LAPACK.getrf!(Complex{Float64}.(kernel)) # LU factorization
-    kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
-
-    g, partialsize = _tensor2matrix(green, axis)
-
-    coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
-    # coeff = kernel \ g # solve green=kernel*coeff
-    # coeff/=dlrGrid.Euv
-
-    return _matrix2tensor(coeff, partialsize, axis)
-end
-
-"""
-function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β=1.0; axis=1)
-
-    DLR representation to Matsubara-frequency representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `dlrcoeff` : DLR coefficients
-- `dlrGrid` : DLRGrid
-- `nGrid` : expected fine Matsubara-freqeuncy grids (integer)
-- `axis`: Matsubara-frequency axis in the data `dlrcoeff`
-- `rtol`: tolerance absolute error
-"""
-function dlr2matfreq(type, dlrcoeff, dlrGrid::DLRGrid, nGrid, β = 1.0; axis = 1)
-    @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
-    ωGrid = dlrGrid.ω
-
-    kernel = kernelΩ(type, nGrid, ωGrid, dlrGrid.β)
-
-    coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
-
-    G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    return _matrix2tensor(G, partialsize, axis)
-end
-
-"""
-function tau2matfreq(type, green, dlrGrid, nGrid; axis=1, rtol=1e-12)
-
-    Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `green` : green's function in imaginary-time domain
-- `dlrGrid` : DLRGrid
-- `nGrid` : expected fine Matsubara-freqeuncy grids (integer)
-- `axis`: the imaginary-time axis in the data `green`
-- `rtol`: tolerance absolute error
-"""
-function tau2matfreq(type, green, dlrGrid, nGrid; axis = 1, rtol = 1e-12)
-    coeff = tau2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
-    return dlr2matfreq(type, coeff, dlrGrid, nGrid, axis = axis)
-end
-
-"""
-function matfreq2tau(type, green, dlrGrid, τGrid; axis=1, rtol=1e-12)
-
-    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
-
-#Members:
-- `type`: symbol :fermi, :corr, :acorr
-- `green` : green's function in Matsubara-freqeuncy repsentation
-- `dlrGrid` : DLRGrid
-- `τGrid` : expected fine imaginary-time grids
-- `axis`: Matsubara-frequency axis in the data `green`
-- `rtol`: tolerance absolute error
-"""
-function matfreq2tau(type, green, dlrGrid, τGrid; axis = 1, rtol = 1e-12)
-    coeff = matfreq2dlr(type, green, dlrGrid; axis = axis, rtol = rtol)
-    return dlr2tau(type, coeff, dlrGrid, τGrid, axis = axis)
-end
-
+    if algorithm == :discrete
+        ω, τ, nF, nB = Discrete.build(dlrGrid, true)
+    elseif algorithm == :functional
+        error("not implemented!")
+    else
+        error("$algorithm has not yet been implemented!")
+    end
+    rank = length(ω)
+    if isnothing(folder) == false
+        open(joinpath(folder, filename), "w") do io
+            @printf(io, "# %5s  %25s  %25s  %25s  %20s\n", "index", "freq", "tau", "fermi n", "bose n")
+            for r = 1:rank
+                @printf(io, "%5i  %32.17g  %32.17g  %16i  %16i\n", r, ω[r], τ[r], nF[r], nB[r])
+            end
+        end
+    end
+    for r = 1:rank
+        push!(dlrGrid.ω, ω[r] / β)
+        push!(dlrGrid.τ, τ[r] * β)
+        n = isFermi ? nF[r] : nB[r]
+        push!(dlrGrid.n, n)
+        push!(dlrGrid.ωn, isFermi ? (2n + 1.0) * π / β : 2n * π / β)
+    end
 end

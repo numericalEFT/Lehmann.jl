@@ -134,7 +134,7 @@ function build(dlrGrid, print::Bool = true)
         print && @printf("%5i  %32.17g  %32.17g  %8i %8i\n", r, ωGrid[r], τGrid[r], nFermiGrid[r], nBoseGrid[r])
     end
 
-    dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nFermiGrid)])
-    return dlr
+    # dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nFermiGrid)])
+    return ωGrid, τGrid, nFermiGrid, nBoseGrid
 end
 end
