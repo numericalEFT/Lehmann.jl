@@ -138,10 +138,10 @@ end
 function build!(dlrGrid::DLRGrid, folder, filename, algorithm)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
-    if algorithm == :discrete
+    if algorithm == :discrete || dlrGrid.symmetry == :none
         ω, τ, nF, nB = Discrete.build(dlrGrid, true)
-    elseif algorithm == :functional
-        error("not implemented!")
+    elseif algorithm == :functional && (dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha)
+        ω, τ, nF, nB = Functional.build(dlrGrid, true)
     else
         error("$algorithm has not yet been implemented!")
     end

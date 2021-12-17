@@ -10,6 +10,7 @@ using Quadmath
 # using InteractiveUtils
 
 include("../utility/chebyshev.jl")
+using ..Discrete
 
 # const Float = Float64
 # const Float = BigFloat
@@ -233,28 +234,31 @@ end
 - `rtol`: tolerance absolute error
 - `verbose`: 0 to suppress all output, any positive integer to print the internal information
 """
-function build(isFermi::Bool, symmetry::Symbol, Λ, rtol, verbose = 0)
-    Λ = Float(Λ)
+function build(dlrGrid, print::Bool = true)
+    print && println("Using the functional algorithm to build DLR ...")
+    Λ = Float(dlrGrid.Λ)
+    rtol = Float(dlrGrid.Λ)
+    symmetry = dlrGrid.symmetry
     if symmetry == :ph
-        println("Building ω grid ... ")
+        print && println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
         ωGrid = ωBasis.grid
         rank = ωBasis.N
-        println("Building τ grid ... ")
-        τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
+        # print && println("Building τ grid ... ")
+        # τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
         # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
-        println("Building n grid ... ")
-        nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
+        # println("Building n grid ... ")
+        # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
     elseif symmetry == :pha
-        println("Building ω grid ... ")
+        print && println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),])
         ωGrid = ωBasis.grid
         rank = ωBasis.N
-        println("Building τ grid ... ")
-        τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :acorr)
-        # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
-        println("Building n grid ... ")
-        nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+        # println("Building τ grid ... ")
+        # τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :acorr)
+        # # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
+        # println("Building n grid ... ")
+        # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     else
         error("$symmetry is not implemented!")
         # elseif type == :fermi
@@ -269,16 +273,39 @@ function build(isFermi::Bool, symmetry::Symbol, Λ, rtol, verbose = 0)
         #     println("Building n grid ... ")
         #     nBasis = MatFreqGrid(ωGrid, rank, Λ, :fermi)
     end
+
+    degree = 48
+    τ = Discrete.τChebyGrid(dlrGrid, degree, print)
+    kernel = Discrete.preciseKernelT(dlrGrid, τ, ωGrid, print)
+    Discrete.testInterpolation(dlrGrid, τ, ωGrid, kernel, print)
+
+    τIndex = Discrete.τnQR(kernel, rank, print)
+    τGrid = sort(τ.grid[τIndex])
+
+    nFineGrid, nFermiKernel, nBoseKernel = Discrete.preciseKernelΩn(dlrGrid, ωGrid, print)
+
+    nFermiIndex = Discrete.τnQR(nFermiKernel, rank, print)
+    nFermiGrid = sort(nFineGrid[nFermiIndex])
+
+    nBoseIndex = Discrete.τnQR(nBoseKernel, rank, print)
+    nBoseGrid = sort(nFineGrid[nBoseIndex])
+
     # τGrid = τBasis / Λ
-    τGrid = τBasis
-    nGrid = nBasis
+    # τGrid = τBasis
+    # nGrid = nBasis
     ########### output  ############################
-    @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
+    # @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
+    # for r = 1:rank
+    #     @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
+    # end
+    ########### output  ############################
+    print && @printf("%5s  %32s  %32s  %11s  %11s\n", "index", "real freq", "tau", "fermi ωn", "bose ωn")
     for r = 1:rank
-        @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
+        print && @printf("%5i  %32.17g  %32.17g  %16i %16i\n", r, ωGrid[r], τGrid[r], nFermiGrid[r], nBoseGrid[r])
     end
 
-    return Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
+    return ωGrid, τGrid, nFermiGrid, nBoseGrid
+    # return Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
 end
 
 end

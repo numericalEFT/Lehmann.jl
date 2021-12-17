@@ -188,11 +188,11 @@ end
         printstyled("========================================================================\n", color = :yellow)
     end
 
-    test(true, :none, 10.0, 100000.0, 1e-12)
-    test(false, :ph, 10.0, 100000.0, 1e-10)
-    test(true, :ph, 10.0, 100000.0, 1e-10)
-    test(false, :pha, 10.0, 100000.0, 1e-10)
-    test(true, :pha, 10.0, 100000.0, 1e-10)
+    test(true, :none, 10.0, 1000000.0, 1e-12)
+    test(false, :ph, 10.0, 1000000.0, 1e-10)
+    test(true, :ph, 10.0, 1000000.0, 1e-10)
+    test(false, :pha, 10.0, 1000000.0, 1e-10)
+    test(true, :pha, 10.0, 1000000.0, 1e-10)
 
 end
 
