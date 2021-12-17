@@ -8,8 +8,10 @@ function _tensor2matrix(tensor, axis)
     # println(axis)
     permu = [i for i = 1:dim]
     permu[1], permu[axis] = axis, 1
+    partialsize = collect(size(tensor)[permu][2:end])
     ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
     ntensor = reshape(ntensor, (n1, n2)) # no copy is created
+
     return ntensor, partialsize
 end
 
