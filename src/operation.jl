@@ -13,7 +13,8 @@ function _tensor2matrix(tensor, axis)
         permu = [i for i = 1:dim]
         permu[1], permu[axis] = axis, 1
         partialsize = collect(size(tensor)[permu][2:end])
-        ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
+        ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created 
+        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
         ntensor = reshape(ntensor, (n1, n2)) # no copy is created
         return ntensor, partialsize
     end
@@ -33,7 +34,9 @@ function _matrix2tensor(mat, partialsize, axis)
     else
         permu = [i for i = 1:dim]
         permu[1], permu[axis] = axis, 1
-        return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
+        return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created
+        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
+        # return ntensor
     end
 end
 
@@ -87,7 +90,7 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
 function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == size(dlrGrid)
-    # @assert all(τGrid .> 0.0) && all(τGrid .<= dlrGrid.β)
+
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
