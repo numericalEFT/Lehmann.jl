@@ -38,10 +38,12 @@ end
         ########################## imaginary-time to dlr #######################################
         coeff = tau2dlr(dlr, Gdlr)
         Gfitted = dlr2tau(dlr, coeff, τSample)
-        compare("τ→dlr→τ $case", Gsample, Gfitted, eps, 100, para)
+        compare("dlr τ → dlr → generic τ $case", Gsample, Gfitted, eps, 100, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
         # end
+
+        compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, 1000, para)
         #=========================================================================================#
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
@@ -60,7 +62,8 @@ end
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gnsample[1, ni]),  real(Gnfitted[1, ni]), abs(Gnsample[1, ni] - Gnfitted[1, ni]))
         # end
 
-        compare("iω→dlr→iω $case ", Gnsample, Gnfitted, eps, 100, para)
+        compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
+        compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, 1000, para)
 
         #=========================================================================================#
         #                            Fourier Transform Test                                     #
@@ -76,6 +79,11 @@ end
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
+
+        #=========================================================================================#
+        #                            Fit DLR from generic grid                                    #
+        #=========================================================================================#
+
     end
 
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
@@ -156,3 +164,19 @@ end
     coeff = Lehmann._weightedLeastSqureFit(Gτ, nothing, kernel)
     @test coeff ≈ [3.5, 1.4]
 end
+
+# @testset "DLR from generic grids" begin
+#     Euv, β = 1000.0, 10.0
+#     eps = 1e-10
+#     isFermi = true
+#     symmetry = :none
+#     para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
+#     dlr = DLRGrid(Euv, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
+#     dlr10 = DLRGrid(Euv * 10, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
+
+#     Gτ, error = SemiCircle(isFermi, symmetry, dlr10.τ, β, Euv, IsMatFreq = false)
+#     @assert maximum(error) < eps
+#     Gn, error = SemiCircle(isFermi, symmetry, dlr10.n, β, Euv, IsMatFreq = true)
+#     @assert maximum(error) < eps
+
+# end

@@ -216,36 +216,73 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
 end
 
 """
-function tau2matfreq(dlrGrid, green, τGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
 
     Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
 
 #Members:
-- `green` : green's function in imaginary-time domain
 - `dlrGrid` : DLRGrid
-- `τGrid` : expected fine imaginary-time grids 
+- `green` : green's function in imaginary-time domain
+- `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
+- `τGrid` : the imaginary-time grid that Green's function is defined on. 
 - `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
 - `axis`: the imaginary-time axis in the data `green`
 """
-function tau2matfreq(dlrGrid, green, nGrid = dlrGrid.n, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
     coeff = tau2dlr(dlrGrid, green, τGrid; weight = weight, axis = axis)
-    return dlr2matfreq(dlrGrid, coeff, nGrid, axis = axis)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
 
 """
-function matfreq2tau(type, green, dlrGrid, τGrid; axis=1, rtol=1e-12)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; weight = nothing, axis = 1)
 
     Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
 - `dlrGrid` : DLRGrid
 - `green` : green's function in Matsubara-freqeuncy repsentation
+- `τNewGrid` : expected fine imaginary-time grids
 - `nGrid` : the n grid that Green's function is defined on. 
-- `τGrid` : expected fine imaginary-time grids
 - `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
 - `axis`: Matsubara-frequency axis in the data `green`
 """
-function matfreq2tau(dlrGrid, green, τGrid = dlrGrid.τ, nGrid = dlrGrid.n; weight = nothing, axis = 1)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; weight = nothing, axis = 1)
     coeff = matfreq2dlr(dlrGrid, green, nGrid; weight = weight, axis = axis)
-    return dlr2tau(dlrGrid, coeff, τGrid, axis = axis)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
+end
+
+"""
+function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+
+    Interpolation from the old imaginary-time grid to a new grid using the DLR representation
+
+#Members:
+- `dlrGrid` : DLRGrid
+- `green` : green's function in imaginary-time domain
+- `τNewGrid` : expected fine imaginary-time grids
+- `τGrid` : the imaginary-time grid that Green's function is defined on. 
+- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `axis`: the imaginary-time axis in the data `green`
+"""
+function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+    coeff = tau2dlr(dlrGrid, green, τGrid; weight = weight, axis = axis)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
+end
+
+"""
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; weight = nothing, axis = 1)
+
+    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
+
+#Members:
+- `dlrGrid` : DLRGrid
+- `green` : green's function in Matsubara-freqeuncy repsentation
+- `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
+- `nGrid` : the n grid that Green's function is defined on. 
+- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `axis`: Matsubara-frequency axis in the data `green`
+"""
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; weight = nothing, axis = 1)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; weight = weight, axis = axis)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
