@@ -42,7 +42,7 @@ struct DLRGrid
     τ::Vector{Float64}
 
     """
-    function DLRGrid(Euv, β, isFermi::Bool; symmetry::Symbol = :none, rtol = 1e-12, rebuild::Bool = false)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional)
 
     Create DLR grids
 
@@ -52,7 +52,9 @@ struct DLRGrid
     - `isFermi`: bool is fermionic or bosonic
     - `symmetry`: particle-hole symmetric :ph, or particle-hole asymmetric :pha, or :none
     - `rtol`: tolerance absolute error
-    - `rebuild` : load DLR basis from the file or recalculate on the fly
+    - `rebuild` : set false to load DLR basis from the file, set true to recalculate the DLR basis on the fly
+    - `folder` : the folder to load the DLR file if rebuild = false, or the folder to save the DLR file if rebuild = true
+    - `algorithm` : if rebuild = true, then set :functional to use the functional algorithm to generate the DLR basis, or set :discrete to use the matrix algorithm.
     """
     function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional)
         Λ = Euv * β # dlr only depends on this dimensionless scale

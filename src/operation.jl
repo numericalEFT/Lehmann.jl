@@ -10,8 +10,6 @@ function _tensor2matrix(tensor, axis)
     elseif axis == 2 && dim == 2 #for matrix, simply transpose, no copy is created
         return transpose(tensor), partialsize
     else
-        # println("working on size ", size(tensor))
-        # println(axis)
         permu = [i for i = 1:dim]
         permu[1], permu[axis] = axis, 1
         partialsize = collect(size(tensor)[permu][2:end])
