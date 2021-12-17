@@ -188,22 +188,20 @@ end
         printstyled("========================================================================\n", color = :yellow)
     end
 
-    test(true, :none, 10.0, 1000000.0, 1e-12)
-    # test(false, :ph, 10.0, 10000000.0, 1e-10)
-    # test(true, :ph, 10.0, 10000000.0, 1e-10)
-    # test(false, :pha, 10.0, 10000000.0, 1e-10)
-    # test(true, :pha, 10.0, 10000000.0, 1e-10)
-    # test(:corr, Euv = 10.0, β = 100000.0, eps = 1e-10)
-    # test(:acorr, Euv = 10.0, β = 1000000.0, eps = 1e-12)
+    test(true, :none, 10.0, 100000.0, 1e-12)
+    test(false, :ph, 10.0, 100000.0, 1e-10)
+    test(true, :ph, 10.0, 100000.0, 1e-10)
+    test(false, :pha, 10.0, 100000.0, 1e-10)
+    test(true, :pha, 10.0, 100000.0, 1e-10)
 
 end
 
 @testset "Plasmon" begin
     rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
-    function plasmon(Euv, β, eps, type = :corr)
+    function plasmon(isFermi, symmetry, Euv, β, eps)
         function Sw(n, β)
-            if type == :corr
+            if isFermi == false
                 return 1 / (1 + (2π * n / β)^2)
             else
                 return 1 / (1 + (π * (2n + 1) / β)^2)
@@ -215,38 +213,38 @@ end
             # end
         end
         function Gtau(τ, β, type)
-            if type == :corr
+            if type == :ph
                 return @. (exp(-τ) + exp(-(β - τ))) / 2 / (1 - exp(-β))
             else
                 return @. (exp(-τ) - exp(-(β - τ))) / 2 / (1 + exp(-β))
             end
         end
-        dlr = DLR.DLRGrid(type, Euv, β, eps) #construct dlr basis
-        dlr10 = DLR.DLRGrid(type, Euv * 10, β, eps) #construct dlr basis
+        dlr = DLRGrid(Euv, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
+        dlr10 = DLRGrid(Euv * 10, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
         Gwdlr = [Sw(n, β) for n in dlr.n]
         nSample = [n for n in dlr10.n]
         Gw0 = [Sw(n, β) for n in dlr10.n]
 
-        coeff = DLR.matfreq2dlr(type, Gwdlr, dlr)
+        coeff = matfreq2dlr(Gwdlr, dlr)
 
-        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        Gwfit = dlr2matfreq(coeff, dlr, nSample)
         println("Plasmon Matsubara rtol=", rtol(Gw0, Gwfit))
         @test rtol(Gw0, Gwfit) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
         # for (ni, n) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gw0[ni]),  real(Gwfit[ni]), abs(Gw0[ni] - Gwfit[ni]))
         # end
 
-        Gt0 = Gtau(dlr.τ, β, type)
-        Gt = DLR.dlr2tau(type, coeff, dlr, dlr.τ)
-        println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β, type)))
+        Gt0 = Gtau(dlr.τ, β, dlr.symmetry)
+        Gt = dlr2tau(coeff, dlr, dlr.τ)
+        println("Plasmon Matsubara Gtau rtol=", rtol(Gt, Gtau(dlr.τ, β, dlr.symmetry)))
         @test rtol(Gt, Gt0) .< 50eps # dlr should represent the Green's function up to accuracy of the order eps
         # for (n, τ) in enumerate(dlr.τ)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", τ, Gt[n],  Gt0[n], abs(Gt[n] - Gt0[n]))
         # end
 
-        coeff0 = DLR.tau2dlr(type, Gt0, dlr)
+        coeff0 = tau2dlr(Gt0, dlr)
 
-        coeff1 = DLR.tau2dlr(type, Gt, dlr)
+        coeff1 = tau2dlr(Gt, dlr)
         # for (ni, ω) in enumerate(dlr.ω)
         #     # @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni],  coeff1[ni], abs(coeff[ni] - coeff1[ni]))
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", ω, coeff[ni], coeff0[ni],  coeff1[ni])
@@ -256,7 +254,7 @@ end
         #     println("$ω    $(coeff[ni]), ")
         # end
 
-        Gwfit = DLR.dlr2matfreq(type, coeff, dlr, nSample)
+        Gwfit = dlr2matfreq(coeff, dlr, nSample)
         # Gwfit = DLR.tau2matfreq(type, Gt, dlr, nSample)
         println("Plasmon Matsubara fourier rtol=", rtol(Gw0, Gwfit))
 
@@ -271,10 +269,10 @@ end
     end
 
     println("Testing ph symmetric correlator ...")
-    plasmon(1.0, 1000.0, 1e-10, :corr)
-    plasmon(1.0, 10000000.0, 1e-10, :corr)
+    plasmon(false, :ph, 1.0, 1000.0, 1e-10)
+    plasmon(false, :ph, 1.0, 10000000.0, 1e-10)
     println("Testing ph asymmetric correlator ...")
-    plasmon(1.0, 1000.0, 1e-10, :acorr)
-    plasmon(1.0, 10000000.0, 1e-10, :acorr)
+    plasmon(true, :pha, 1.0, 1000.0, 1e-10)
+    plasmon(true, :pha, 1.0, 10000000.0, 1e-10)
 
 end
