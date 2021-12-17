@@ -129,9 +129,9 @@ function build(dlrGrid, print::Bool = true)
     nBoseGrid = sort(nFineGrid[nBoseIndex])
 
     ########### output  ############################
-    print && @printf("%5s  %32s  %32s  %8s  %8s\n", "index", "real freq", "tau", "fermi ωn", "bose ωn")
+    print && @printf("%5s  %32s  %32s  %11s  %11s\n", "index", "real freq", "tau", "fermi ωn", "bose ωn")
     for r = 1:rank
-        print && @printf("%5i  %32.17g  %32.17g  %8i %8i\n", r, ωGrid[r], τGrid[r], nFermiGrid[r], nBoseGrid[r])
+        print && @printf("%5i  %32.17g  %32.17g  %16i %16i\n", r, ωGrid[r], τGrid[r], nFermiGrid[r], nBoseGrid[r])
     end
 
     # dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nFermiGrid)])

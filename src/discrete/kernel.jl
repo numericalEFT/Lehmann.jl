@@ -160,33 +160,37 @@ function testInterpolation(dlrGrid, τ, ω, kernel, print = true)
 end
 
 function preciseKernelΩn(dlrGrid, ω, print::Bool = true)
-    ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω
-    ###########  dlr grid for ωn  ###################
-    symmetry = dlrGrid.symmetry
-    Λ = dlrGrid.Λ
-    rank = length(ωGrid)
-
-    if symmetry == :ph || symmetry == :pha
-        Nωn = Int(ceil(Λ)) * 2 # expect Nω ~ para.Λ/2π, drop 2π on the safe side
-        ωnkernel = zeros(Float64, (rank, Nωn + 1))
-        ωnGrid = [w for w = 0:Nωn]
-        # fermionic Matsubara frequency ωn=(2n+1)π for type==:acorr
-        # bosonic Matsubara frequency ωn=2nπ for type==:corr
-    else
-        Nωn = Int(ceil(Λ)) * 2 # expect Nω ~ para.Λ/2π, drop 2π on the safe side
-        ωnkernel = zeros(Complex{Float64}, (rank, 2Nωn + 1))
-        ωnGrid = [w for w = -Nωn:Nωn] # fermionic Matsubara frequency ωn=(2n+1)π
+    function Freq2Index(isFermi, ωnList)
+        if isFermi
+            # ωn=(2n+1)π
+            return [Int(round((ωn / π - 1) / 2)) for ωn in ωnList]
+        else
+            # ωn=2nπ
+            return [Int(round(ωn / π / 2)) for ωn in ωnList]
+        end
     end
 
-    # return both the fermionic and the bosonic kernels
-    return ωnGrid, Spectral.kernelΩ(true, symmetry, ωnGrid, ωGrid, 1.0), Spectral.kernelΩ(false, symmetry, ωnGrid, ωGrid, 1.0)
+    function nGrid(isFermi, symmetry, Λ)
+        # generate n grid from a logarithmic fine grid
+        degree = 100
+        np = Int(round(log(10 * Λ) / log(2)))
+        xc = [(i - 1) / degree for i = 1:degree]
+        panel = [2^(i - 1) - 1 for i = 1:(np+1)]
+        nGrid = zeros(Int, np * degree)
+        for i = 1:np
+            a, b = panel[i], panel[i+1]
+            nGrid[(i-1)*degree+1:i*degree] = Freq2Index(isFermi, a .+ (b - a) .* xc)
+        end
+        unique!(nGrid)
+        return symmetry == :none ? vcat(-nGrid[end:-1:2], nGrid) : nGrid
+    end
 
-    # for (ni, n) in enumerate(ωnGrid)
-    #     for r = 1:rank
-    #         ωnkernel[r, ni] = Spectral.kernelΩ(type, n, ωGridDLR[r])
-    #     end
-    # end
-    # nqr = qr(ωnkernel, Val(true)) # julia qr has a strange, Val(true) will do a pivot QR
-    # nGridDLR = sort(ωnGrid[nqr.p[1:rank]])
-    # return nGridDLR, nqr.p[1:rank]
+    ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω
+    symmetry = dlrGrid.symmetry
+    n = nGrid(dlrGrid.isFermi, symmetry, dlrGrid.Λ)
+
+    nkernelFermi = Spectral.kernelΩ(true, symmetry, n, Float64.(ωGrid), 1.0)
+    nkernelBose = Spectral.kernelΩ(false, symmetry, n, Float64.(ωGrid), 1.0)
+
+    return n, nkernelFermi, nkernelBose
 end
