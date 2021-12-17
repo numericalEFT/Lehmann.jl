@@ -44,6 +44,10 @@ end
         # end
 
         compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, 1000, para)
+
+        noise = eps * rand(eltype(Gsample), length(Gsample))
+        GNoisy = Gsample .+ noise
+        compare("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error = abs.(noise)), Gdlr, eps, 1000, para)
         #=========================================================================================#
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
@@ -64,6 +68,10 @@ end
 
         compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
         compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, 1000, para)
+
+        noise = eps * rand(eltype(Gnsample), length(Gnsample))
+        GnNoisy = Gnsample .+ noise
+        compare("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error = abs.(noise)), Gndlr, eps, 1000, para)
 
         #=========================================================================================#
         #                            Fourier Transform Test                                     #

@@ -40,25 +40,28 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
-function _weightedLeastSqureFit(Gτ, weight, kernel)
+function _weightedLeastSqureFit(Gτ, error, kernel)
     """
     the current algorithm with weight is only accurate up to 1e-9
     """
-    # solve the linear equation: (Kᵀ⋅W⋅K) A = (Kᵀ⋅W) Gτ, where A is the spectral density to calculate
+    # solve the linear equation: (Kᵀ⋅W⋅K) A = (Kᵀ⋅W) Gτ, where A is the spectral density to calculate, W=1/error^2
     # assume Gτ: (Nτ, N), kernel: (Nω, Nτ), weight: (Nτ, N)
     # B: (Nω, Nω),  C: (Nω, N)
-    if isnothing(weight)
+    if isnothing(error)
         B = kernel
         C = Gτ
     else
-        @assert size(weight) == size(Gτ)
-        for i = 1:size(weight)[1]
-            weight[i, :] /= average(weight[i, :])
+        @assert size(error) == size(Gτ)
+        for i = 1:size(error)[1]
+            error[i, :] /= sum(error[i, :]) / length(error[i, :])
         end
 
-        W = Diagonal(weight)
-        B = transpose(kernel) * W * kernel
-        C = transpose(kernel) * W * Gτ
+        # W = Diagonal(weight)
+        # B = transpose(kernel) * W * kernel
+        # C = transpose(kernel) * W * Gτ
+        w = 1.0 ./ error
+        B = Diagonal(w) * kernel
+        C = w .* Gτ
     end
 
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
@@ -79,10 +82,10 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
 - `dlrGrid`: DLRGrid struct.
 - `green` : green's function in imaginary-time domain.
 - `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: the imaginary-time axis in the data `green`.
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
@@ -96,11 +99,11 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; weight = nothing,
 
     g, partialsize = _tensor2matrix(green, axis)
 
-    if isnothing(weight) == false
-        @assert size(weight) == size(green)
-        weight, psize = _tensor2matrix(weight, axis)
+    if isnothing(error) == false
+        @assert size(error) == size(green)
+        error, psize = _tensor2matrix(error, axis)
     end
-    coeff = _weightedLeastSqureFit(g, weight, kernel)
+    coeff = _weightedLeastSqureFit(g, error, kernel)
 
     # ker = deepcopy(kernel)
     # gt = deepcopy(g)
@@ -155,13 +158,10 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 - `dlrGrid`: DLRGrid struct.
 - `green` : green's function in Matsubara-frequency domain
 - `nGrid` : the n grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: the Matsubara-frequency axis in the data `green`
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; weight = nothing, axis = 1)
-    if isnothing(weight) == false
-        @assert size(weight) == size(green)
-    end
+function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(nGrid)
     @assert eltype(nGrid) <: Integer
@@ -175,11 +175,11 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; weight = nothin
 
     g, partialsize = _tensor2matrix(green, axis)
 
-    if isnothing(weight) == false
-        @assert size(weight) == size(green)
-        weight, psize = _tensor2matrix(weight, axis)
+    if isnothing(error) == false
+        @assert size(error) == size(green)
+        error, psize = _tensor2matrix(error, axis)
     end
-    coeff = _weightedLeastSqureFit(g, weight, kernel)
+    coeff = _weightedLeastSqureFit(g, error, kernel)
 
     # kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
     # coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
@@ -216,7 +216,7 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
 end
 
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1)
 
     Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
 
@@ -225,16 +225,16 @@ function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; 
 - `green` : green's function in imaginary-time domain
 - `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
 - `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: the imaginary-time axis in the data `green`
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
-    coeff = tau2dlr(dlrGrid, green, τGrid; weight = weight, axis = axis)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis)
     return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
 
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; weight = nothing, axis = 1)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1)
 
     Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
@@ -243,11 +243,11 @@ function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; 
 - `green` : green's function in Matsubara-freqeuncy repsentation
 - `τNewGrid` : expected fine imaginary-time grids
 - `nGrid` : the n grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: Matsubara-frequency axis in the data `green`
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; weight = nothing, axis = 1)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; weight = weight, axis = axis)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis)
     return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
 end
 
@@ -261,16 +261,16 @@ function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; weight = nothin
 - `green` : green's function in imaginary-time domain
 - `τNewGrid` : expected fine imaginary-time grids
 - `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: the imaginary-time axis in the data `green`
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
-    coeff = tau2dlr(dlrGrid, green, τGrid; weight = weight, axis = axis)
+function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis)
     return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
 end
 
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; weight = nothing, axis = 1)
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1)
 
     Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
@@ -279,10 +279,10 @@ function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; weight = n
 - `green` : green's function in Matsubara-freqeuncy repsentation
 - `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
 - `nGrid` : the n grid that Green's function is defined on. 
-- `weight` : weight matrix of the Green's function. Assume the data is not correlated, so that weight ~ 1/σ_i^2 where σ_i is the error of the i-th element of the Green's function.
+- `error` : error the Green's function. 
 - `axis`: Matsubara-frequency axis in the data `green`
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; weight = nothing, axis = 1)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; weight = weight, axis = axis)
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis)
     return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
