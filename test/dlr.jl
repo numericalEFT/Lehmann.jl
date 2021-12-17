@@ -188,3 +188,28 @@ end
     #     plasmon(true, :pha, 1.0, 10000000.0, 1e-10)
 
 end
+
+@testset "Tensor ↔ Matrix Mapping" begin
+    a = rand(3)
+    acopy = deepcopy(a)
+    b, psize = Lehmann._tensor2matrix(a, 1)
+    anew = Lehmann._matrix2tensor(b, psize, 1)
+    @test acopy ≈ anew
+
+    a = rand(3, 4)
+    acopy = deepcopy(a)
+    for axis = 1:2
+        b, psize = Lehmann._tensor2matrix(a, axis)
+        anew = Lehmann._matrix2tensor(b, psize, axis)
+        @test acopy ≈ anew
+    end
+
+    a = rand(3, 4, 5)
+    acopy = deepcopy(a)
+    for axis = 1:3
+        b, psize = Lehmann._tensor2matrix(a, axis)
+        anew = Lehmann._matrix2tensor(b, psize, axis)
+        @test acopy ≈ anew
+    end
+
+end

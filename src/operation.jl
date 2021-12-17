@@ -4,15 +4,21 @@ function _tensor2matrix(tensor, axis)
     n1 = size(tensor)[axis]
     partialsize = deleteat!(collect(size(tensor)), axis) # the size of the tensor except the axis-th dimension
     n2 = reduce(*, partialsize)
-    # println("working on size ", size(tensor))
-    # println(axis)
-    permu = [i for i = 1:dim]
-    permu[1], permu[axis] = axis, 1
-    partialsize = collect(size(tensor)[permu][2:end])
-    ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
-    ntensor = reshape(ntensor, (n1, n2)) # no copy is created
 
-    return ntensor, partialsize
+    if axis == 1 #no need to permutate the axis
+        return reshape(tensor, (n1, n2)), partialsize
+    elseif axis == 2 && dim == 2 #for matrix, simply transpose, no copy is created
+        return transpose(tensor), partialsize
+    else
+        # println("working on size ", size(tensor))
+        # println(axis)
+        permu = [i for i = 1:dim]
+        permu[1], permu[axis] = axis, 1
+        partialsize = collect(size(tensor)[permu][2:end])
+        ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
+        ntensor = reshape(ntensor, (n1, n2)) # no copy is created
+        return ntensor, partialsize
+    end
 end
 
 function _matrix2tensor(mat, partialsize, axis)
@@ -21,9 +27,16 @@ function _matrix2tensor(mat, partialsize, axis)
     tsize = vcat(size(mat)[1], partialsize)
     tensor = reshape(mat, Tuple(tsize))
     dim = length(partialsize) + 1
-    permu = [i for i = 1:dim]
-    permu[1], permu[axis] = axis, 1
-    return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
+
+    if axis == 1
+        return tensor
+    elseif axis == 2 && dim == 2
+        return transpose(tensor) #transpose do not create copy
+    else
+        permu = [i for i = 1:dim]
+        permu[1], permu[axis] = axis, 1
+        return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created even for axis=1
+    end
 end
 
 """
