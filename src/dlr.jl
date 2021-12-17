@@ -57,7 +57,7 @@ struct DLRGrid
     - `rtol`: tolerance absolute error
     - `rebuild` : load DLR basis from the file or recalculate on the fly
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none, rebuild::Bool = false)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
@@ -68,6 +68,7 @@ struct DLRGrid
         else
             Λ = 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
         end
+
         rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n
         if abs(rtolpower) < 4
             rtolpower = -4

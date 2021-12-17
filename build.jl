@@ -10,6 +10,7 @@ for lambda in Λ
     for err in rtol
         # dlr = DLR.dlr(:fermi, lambda, 10.0^err)
         dlr = DLR.DLRGrid(1.0, lambda, 10.0^err, true, :none)
+        println(dlr.Λ, " and ", dlr.rtol)
         gird = DLR.Discrete.build(dlr, true)
         # dlr = DLR.dlr_functional(:fermi, lambda, 10.0^err)
         # filename = "basis/dlr$(Int(lambda))_1e$err.dlr"

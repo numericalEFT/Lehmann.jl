@@ -106,7 +106,9 @@ function build(dlrGrid, print::Bool = true)
     Λ = dlrGrid.Λ
     rtol = dlrGrid.rtol
     τ = τChebyGrid(dlrGrid, degree, print)
-    ω = τChebyGrid(dlrGrid, degree, print)
+    ω = ωChebyGrid(dlrGrid, degree, print)
+    print && println("τ grid size = $(τ.ngrid)")
+    print && println("ω grid size = $(ω.ngrid)")
 
     kernel = preciseKernelT(dlrGrid, τ, ω, print)
     testInterpolation(dlrGrid, τ, ω, kernel, print)
