@@ -56,7 +56,7 @@ function SemiCircle(isFermi, symmetry, Grid, β, Euv; IsMatFreq = false)
     g2 = Green(48, IsMatFreq)
     err = abs.(g1 - g2)
 
-    println("Semi-circle case integration error = ", maximum(err))
+    # println("Semi-circle case integration error = ", maximum(err))
     return g2, err
 end
 

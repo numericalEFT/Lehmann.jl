@@ -106,6 +106,13 @@ struct DLRGrid
     end
 end
 
+"""
+Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
+
+get the rank of the DLR grid, namely the number of the DLR coefficients.
+"""
 Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)

@@ -2,7 +2,7 @@ module Lehmann
 using StaticArrays
 using DelimitedFiles, LinearAlgebra
 using Printf
-using Einsum
+# using Einsum
 
 include("spectral.jl")
 export Spectral
