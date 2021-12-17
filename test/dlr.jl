@@ -147,3 +147,12 @@ end
     compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ; axis = 3), tensorGn, eps, 1000.0, para)
     compare("τ ↔ iω tensor", matfreq2tau(dlr, tensorGn; axis = 3), tensorGτ, eps, 1000.0, para)
 end
+
+@testset "Least square fitting" begin
+    Gτ = [6.0, 5.0, 7.0, 10.0]
+    kernel = zeros(4, 2)
+    kernel[:, 1] = [1.0, 1.0, 1.0, 1.0]
+    kernel[:, 2] = [1.0, 2.0, 3.0, 4.0]
+    coeff = Lehmann._weightedLeastSqureFit(Gτ, nothing, kernel)
+    @test coeff ≈ [3.5, 1.4]
+end
