@@ -19,8 +19,14 @@ makedocs(;
             "manual/kernel.md"
         ],
         "API reference" => Any[
-            map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
-        # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+            "lib/dlr.md",
+            "lib/spectral.md",
+            "lib/discrete.md",
+            "lib/functional.md",
+            "lib/sample.md",
+            "lib/utility.md",
+            # map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+            # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
         ]
     ]
 )
