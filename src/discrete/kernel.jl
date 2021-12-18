@@ -1,6 +1,3 @@
-include("../utility/chebyshev.jl")
-# using Interp
-
 struct CompositeChebyshevGrid
     degree::Int # Chebyshev degree
     x::Vector{Float64} # Chebyshev nodes

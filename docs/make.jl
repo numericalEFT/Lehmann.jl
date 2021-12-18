@@ -17,7 +17,7 @@ makedocs(;
         "Home" => "index.md",
         "Manual" => Any[
         ],
-        "Library" => Any[
+        "API reference" => Any[
             map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
         # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
         ]
@@ -25,6 +25,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/numericalEFT/Lehmann.jl.git",
+    repo = "github.com/numericaleft/Lehmann.jl.git",
     devbranch = "main"
 )

@@ -9,7 +9,6 @@ using Quadmath
 # using ProfileView
 # using InteractiveUtils
 
-include("../utility/chebyshev.jl")
 using ..Discrete
 
 # const Float = Float64

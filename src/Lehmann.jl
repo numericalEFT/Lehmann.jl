@@ -3,6 +3,8 @@ using StaticArrays
 using DelimitedFiles, LinearAlgebra
 using Printf
 
+include("utility/chebyshev.jl")
+
 include("spectral.jl")
 export Spectral
 
