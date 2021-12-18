@@ -2,12 +2,12 @@ using FastGaussQuadrature, Printf
 
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
-SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, dlr.symmetry, grid, type, dlr.rtol, 24)
+SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, dlr.symmetry, grid, type, dlr.rtol, 24, true)
 
 function MultiPole(dlr, grid, type)
     Euv = dlr.Euv
     poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
-    return Sample.MultiPole(dlr.β, dlr.isFermi, dlr.symmetry, grid, type, poles)
+    return Sample.MultiPole(dlr.β, dlr.isFermi, dlr.symmetry, grid, type, poles, true)
 end
 
 function compare(case, a, b, eps, requiredratio, para = "")

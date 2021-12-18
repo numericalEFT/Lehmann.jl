@@ -55,7 +55,6 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         for i = 1:size(error)[1]
             error[i, :] /= sum(error[i, :]) / length(error[i, :])
         end
-
         # W = Diagonal(weight)
         # B = transpose(kernel) * W * kernel
         # C = transpose(kernel) * W * Gτ
@@ -63,13 +62,9 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         B = Diagonal(w) * kernel
         C = w .* Gτ
     end
-
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
-
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-
-    coeff = B \ C #solve green=kernel*coeff
-
+    coeff = B \ C #solve C = B * coeff
     return coeff
 end
 
@@ -90,7 +85,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, dlrGrid.β, true)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -123,7 +118,7 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, β)
+    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, β, true)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -150,7 +145,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β, true)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -179,10 +174,10 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
 function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == size(dlrGrid)
-    ωGrid = dlrGrid.ω
     @assert eltype(nGrid) <: Integer
+    ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β)
+    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β, true)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 

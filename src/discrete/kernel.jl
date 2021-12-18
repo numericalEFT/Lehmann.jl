@@ -106,7 +106,7 @@ function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
         #symmetrize K(τ, ω)=K(β-τ, -ω) for τ>0 
         @assert isodd(τ.np) #symmetrization is only possible for odd τ panels
         halfτ = ((τ.np - 1) ÷ 2) * τ.degree
-        kernel[1:halfτ, :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid, 1.0)
+        kernel[1:halfτ, :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid, 1.0, true)
         kernel[end:-1:(halfτ+1), :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid[end:-1:1], 1.0, true)
         # use the fermionic kernel for both the fermionic and bosonic propagators
     else
