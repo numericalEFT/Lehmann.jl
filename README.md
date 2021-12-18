@@ -21,6 +21,9 @@ We provide the following components to ease the numerical manipulation of the Gr
 
 - Fast and accurate Green's function interpolation with a cost O(log(1/T)log(1/ϵ)) and an accuracy ~100ϵ.
 
+- Fit a Green's function with noisy.
+
+
 ## Installation
 
 This package has been registered. So, simply type `import Pkg; Pkg.add("Lehmann")` in the Julia REPL to install.

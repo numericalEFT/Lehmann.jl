@@ -59,7 +59,8 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         # B = transpose(kernel) * W * kernel
         # C = transpose(kernel) * W * Gτ
         w = 1.0 ./ error
-        B = Diagonal(w) * kernel
+        B = w .* kernel
+        # B = Diagonal(w) * kernel
         C = w .* Gτ
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization

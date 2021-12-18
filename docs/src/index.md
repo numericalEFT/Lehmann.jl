@@ -44,6 +44,8 @@ We provide the following components to ease the numerical manipulation of the Gr
 
 - Fast and accurate Green's function interpolation with a cost $\sim O(log(1/T)log(1/ϵ))$ and an accuracy ~100ϵ.
 
+- Fit a Green's function with noisy.
+
 # Reference
 
 If this library helps you to create software or publications, please let us know, and cite
