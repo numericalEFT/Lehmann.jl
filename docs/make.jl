@@ -15,7 +15,8 @@ makedocs(;
     ),
     pages = [
         "Home" => "index.md",
-        "Manual" => Any[
+        "Manual" => [
+            "manual/kernel.md"
         ],
         "API reference" => Any[
             map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
