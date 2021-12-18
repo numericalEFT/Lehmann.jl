@@ -11,13 +11,14 @@ dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters a
 # dlr.τ gives the imaginary-time grids
 # dlr.ωn and dlr.n gives the Matsubara-frequency grids. The latter is the integer version.
 
-# generate an example of Green's function on the dlr.τ grid
-Nτ = 10000
+println("Prepare the Green's function sample ...")
+Nτ = 10000 # many τ points are needed because Gτ is quite singular near the boundary
 τgrid = collect(LinRange(0.0, β / 2, Nτ))  # create a τ grid
 println("Prepare the Green's function sample ...")
 Gτ = Sample.SemiCircle(Euv, β, isFermi, symmetry, τgrid, :τ)
 
-spectral = tau2dlr(dlr, Gτ, τgrid) # compact representation of Gτ with only ~20 coefficients
+# compact representation of Gτ with only ~20 coefficients
+spectral = tau2dlr(dlr, Gτ, τgrid)
 
 println("Benchmark the interpolation ...")
 τ = collect(LinRange(0.0, β / 2, Nτ * 2))  # create a dense τ grid to interpolate

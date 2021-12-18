@@ -26,6 +26,9 @@ We provide the following components to ease the numerical manipulation of the Gr
 This package has been registered. So, simply type `import Pkg; Pkg.add("Lehmann")` in the Julia REPL to install.
 
 ## Basis Usage
+
+In the following [demo](example/demo.jl), we will show how to compress a Green's function of ~10000 data point into ~20 DLR coefficients, and perform fast interpolation and fourier transform up to the accuracy ~1e-10.
+
 ```julia
 using Lehmann
 β = 100.0 # inverse temperature
@@ -40,13 +43,13 @@ dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters a
 # dlr.τ gives the imaginary-time grids
 # dlr.ωn and dlr.n gives the Matsubara-frequency grids. The latter is the integer version.
 
-# generate an example of Green's function on the dlr.τ grid
-Nτ = 10000
-τgrid = collect(LinRange(0.0, β / 2, Nτ))  # create a τ grid
 println("Prepare the Green's function sample ...")
+Nτ = 10000 # many τ points are needed because Gτ is quite singular near the boundary
+τgrid = collect(LinRange(0.0, β / 2, Nτ))  # create a τ grid
 Gτ = Sample.SemiCircle(Euv, β, isFermi, symmetry, τgrid, :τ)
 
-spectral = tau2dlr(dlr, Gτ, τgrid) # compact representation of Gτ with only ~20 coefficients!
+# compact representation of Gτ with only ~20 coefficients
+spectral = tau2dlr(dlr, Gτ, τgrid) 
 
 println("Benchmark the interpolation ...")
 τ = collect(LinRange(0.0, β / 2, Nτ * 2))  # create a dense τ grid to interpolate
@@ -75,7 +78,7 @@ If this library helps you to create software or publications, please let us know
 [2] ["libdlr: Efficient imaginary time calculations using the discrete Lehmann representation", Jason Kaye and Hugo U.R. Strand, arXiv:2110.06765](https://arxiv.org/abs/2110.06765)
 
 ## Related Package
-[libdlr](https://github.com/jasonkaye/libdlr) by Jason Kaye and Hugo U.R. Strand.
+[__libdlr__](https://github.com/jasonkaye/libdlr) by Jason Kaye and Hugo U.R. Strand.
 
 ## Questions and Contributions
 
