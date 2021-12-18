@@ -68,12 +68,14 @@ println("Fourier transform accuracy: ", maximum(abs.(Gexact - Gfourier)))
 
 ## Citation
 
-If this library helps you to create software or publications, please let
-us know, and cite
+If this library helps you to create software or publications, please let us know, and cite
 
 [1] ["Discrete Lehmann representation of imaginary time Green's functions", Jason Kaye, Kun Chen, and Olivier Parcollet, arXiv:2107.13094](https://arxiv.org/abs/2107.13094)
 
 [2] ["libdlr: Efficient imaginary time calculations using the discrete Lehmann representation", Jason Kaye and Hugo U.R. Strand, arXiv:2110.06765](https://arxiv.org/abs/2110.06765)
+
+## Related Package
+[libdlr](https://github.com/jasonkaye/libdlr) by Jason Kaye and Hugo U.R. Strand.
 
 ## Questions and Contributions
 
