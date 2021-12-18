@@ -2,7 +2,7 @@ module Sample
 using FastGaussQuadrature
 using ..Spectral
 """
-function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24)
+    SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24, regularized::Bool = true)
 
 Generate Green's function from a semicircle spectral density. 
 Return the function on Grid and the systematic error.
@@ -16,8 +16,9 @@ Return the function on Grid and the systematic error.
 - `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
 - `rtol`: accuracy to achieve
 - `degree`: polynomial degree for integral
+- `regularized`: use regularized bosonic kernel if symmetry = :none
 """
-function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24)
+function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24, regularized::Bool = true)
     # calculate Green's function defined by the spectral density
     # S(ω) = sqrt(1 - (ω / Euv)^2) / Euv # semicircle -1<ω<1
     if type == :τ
@@ -53,7 +54,7 @@ function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol
                         #spectral density is defined for positivie frequency only for correlation functions
                         continue
                     end
-                    ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β)
+                    ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β, regularized) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β, regularized)
                     G[τi] += (b - a) / 2 * wl[jj] * ker * sqrt(1 - x^2)
                 end
             end
@@ -61,7 +62,7 @@ function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol
             a, b = 1.0 / 2, 1.0
             for jj = 1:n
                 x = (a + b) / 2 + (b - a) / 2 * xj[jj]
-                ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β)
+                ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β, regularized) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β, regularized)
                 G[τi] += ((b - a) / 2)^1.5 * wj[jj] * ker * sqrt(1 + x)
             end
 
@@ -70,7 +71,7 @@ function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol
                 a, b = -1.0, -1.0 / 2
                 for jj = 1:n
                     x = (a + b) / 2 + (b - a) / 2 * (-xj[n-jj+1])
-                    ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β)
+                    ker = IsMatFreq ? Spectral.kernelΩ(isFermi, symmetry, τ, Euv * x, β, regularized) : Spectral.kernelT(isFermi, symmetry, τ, Euv * x, β, regularized)
                     G[τi] += ((b - a) / 2)^1.5 * wj[n-jj+1] * ker * sqrt(1 - x)
                 end
             end
@@ -88,7 +89,7 @@ function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol
 end
 
 """
-function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles)
+    MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles, regularized::Bool = true)
 
 Generate Green's function from a spectral density with delta peaks specified by the argument ``poles``. 
 Return the function on Grid and the systematic error.
@@ -100,8 +101,9 @@ Return the function on Grid and the systematic error.
 - `Grid`: grid to evalute on
 - `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
 - `poles`: a list of frequencies for the delta functions
+- `regularized`: use regularized bosonic kernel if symmetry = :none
 """
-function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles)
+function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles, regularized::Bool = true)
     # poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # poles=[0.8Euv, 1.0Euv]
     # poles = [0.0]
@@ -123,9 +125,9 @@ function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, pole
             end
 
             if IsMatFreq == false
-                g[τi] += Spectral.kernelT(isFermi, symmetry, τ, ω, β)
+                g[τi] += Spectral.kernelT(isFermi, symmetry, τ, ω, β, regularized)
             else
-                g[τi] += Spectral.kernelΩ(isFermi, symmetry, τ, ω, β)
+                g[τi] += Spectral.kernelΩ(isFermi, symmetry, τ, ω, β, regularized)
             end
         end
     end

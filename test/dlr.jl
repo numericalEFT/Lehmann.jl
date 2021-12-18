@@ -114,6 +114,7 @@ end
         for l in Λ
             for r in rtol
                 test(case, true, :none, 1.0, l, r)
+                test(case, false, :none, 1.0, l, r)
                 test(case, false, :ph, 1.0, l, r)
                 test(case, true, :ph, 1.0, l, r)
                 test(case, false, :pha, 1.0, l, r)

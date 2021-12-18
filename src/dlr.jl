@@ -83,11 +83,11 @@ struct DLRGrid
         end
 
         if symmetry == :none
-            if isFermi
-                filename = "universal_$(Λ)_1e$(rtolpower).dlr"
-            else
-                error("Generic bosonic dlr has not yet been implemented!")
-            end
+            # if isFermi
+            filename = "universal_$(Λ)_1e$(rtolpower).dlr"
+            # else
+            #     error("Generic bosonic dlr has not yet been implemented!")
+            # end
         elseif symmetry == :ph
             filename = "ph_$(Λ)_1e$(rtolpower).dlr"
         elseif symmetry == :pha

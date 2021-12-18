@@ -6,19 +6,25 @@ export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τ, ω, β)
+    kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type.
 
 # Arguments
-- `symmetry`: symbol :none for no symmetry, :ph for particle-hole symmetric, :pha for particle-hole antisymmetric
+- `isFermi`: fermionic or bosonic
+- `symmetry`: :ph, :pha, or :none
 - `τ`: the imaginary time, must be (-β, β]
-- `ω`: frequency
-- `β = 1.0`: the inverse temperature 
+- `ω`: energy 
+- `β`: the inverse temperature 
+- `regularized`: use regularized kernel or not
 """
-@inline function kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T) where {T<:AbstractFloat}
+@inline function kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     if symmetry == :none
-        return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT(τ, ω, β)
+        if regularized
+            return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT_regular(τ, ω, β)
+        else
+            return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT(τ, ω, β)
+        end
     elseif symmetry == :ph
         return isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
     elseif symmetry == :pha
@@ -28,14 +34,15 @@ Compute the imaginary-time kernel of different type.
     end
 end
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τGrid::Vector{T}, ωGrid::Vector{T}, β::T=1.0) where {T<:AbstractFloat}
+    kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+
 Compute kernel with given τ and ω grids.
 """
-function kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T) where {T<:AbstractFloat}
+function kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     kernel = zeros(T, (length(τGrid), length(ωGrid)))
     for (τi, τ) in enumerate(τGrid)
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[τi, ωi] = kernelT(isFermi, symmetry, τ, ω, β)
+            kernel[τi, ωi] = kernelT(isFermi, symmetry, τ, ω, β, regularized)
         end
     end
     return kernel
@@ -106,6 +113,40 @@ g(τ>0) = e^{-ωτ}/(1-e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1-e^{ωβ})
             return exp(-ω * (τ + β)) / (-expm1(-ω * β))
         else
             return exp(-ω * τ) / expm1(ω * β)
+        end
+    end
+end
+
+"""
+    kernelBoseT_regular(τ, ω, β)
+
+Compute the imaginary-time bosonic kernel with a regulator near ω=0. Machine accuracy ~eps(g) is guaranteed``
+```math
+g(τ>0) = e^{-ωτ}/(1+e^{-ωβ}), g(τ≤0) = e^{-ωτ}/(1+e^{ωβ})
+```
+
+# Arguments
+- `τ`: the imaginary time, must be (-β, β]
+- `ω`: frequency
+- `β`: the inverse temperature 
+"""
+@inline function kernelBoseT_regular(τ::T, ω::T, β::T) where {T<:AbstractFloat}
+    (-β < τ <= β) || error("τ must be (-β, β]")
+    # if τ == T(0.0)
+    #     τ = -eps(T)
+    # end
+
+    if τ >= T(0.0)
+        if ω > T(0.0)
+            return exp(-ω * τ) / (1 + exp(-ω * β))
+        else
+            return exp(ω * (β - τ)) / (1 + exp(ω * β))
+        end
+    else
+        if ω > T(0.0)
+            return exp(-ω * (τ + β)) / (1 + exp(-ω * β))
+        else
+            return exp(-ω * τ) / (1 + exp(ω * β))
         end
     end
 end
@@ -192,19 +233,25 @@ end
 
 
 """
-    kernelΩ(type, n, ω, β)
+    kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
 # Arguments
-- `type`: symbol :fermi, :bose, :corr
+- `isFermi`: fermionic or bosonic
+- `symmetry`: :ph, :pha, or :none
 - `n`: index of the Matsubara frequency
 - `ω`: energy 
 - `β`: the inverse temperature 
+- `regularized`: use regularized kernel or not
 """
-@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T) where {T<:AbstractFloat}
+@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     if symmetry == :none
-        return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
+        if regularized
+            return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
+        else
+            return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
+        end
     elseif symmetry == :ph
         return isFermi ? kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
     elseif symmetry == :pha
@@ -216,13 +263,14 @@ end
 
 """
     kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
+
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
-function kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
+function kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
     for (ni, n) in enumerate(nGrid)
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[ni, ωi] = kernelΩ(isFermi, symmetry, n, ω, β)
+            kernel[ni, ωi] = kernelΩ(isFermi, symmetry, n, ω, β, regularized)
         end
     end
     return kernel
@@ -267,6 +315,41 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
     # fermionic Matsurbara frequency
     ω_n = (2 * n) * π / β
     G = -1.0 / (ω_n * im - ω)
+    if !isfinite(G)
+        throw(DomainError(-1, "Got $G for the parameter $n, $ω and $β"))
+    end
+    return Complex{T}(G)
+end
+
+"""
+    kernelBoseΩ_regular(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+
+Compute the bosonic kernel in Matsubara frequency with a regulartor near ω=0
+```math
+g(iω_n) = -(1-e^{-ωβ})/(1+e^{-ωβ})/(iω_n-ω),
+```
+where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Many-particle Systems" by J. Negele and H. Orland, Page 95
+
+# Arguments
+- `n`: index of the Matsubara frequency
+- `ω`: energy 
+- `β`: the inverse temperature 
+"""
+@inline function kernelBoseΩ_regular(n::Int, ω::T, β::T) where {T<:AbstractFloat}
+    # fermionic Matsurbara frequency
+    ω_n = (2 * n) * π / β
+    x = ω * β
+
+    if n == 0 && abs(x) < 1.0e-5
+        G = β * (1 - x / 2 + x^2 / 6) / (1 + exp(-x)) #β*(1-e^{-x})/x
+    else
+        # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
+        if ω > T(0.0)
+            G = -1.0 / (ω_n * im - ω) * (-expm1(-x)) / (1 + exp(-x))
+        else
+            G = -1.0 / (ω_n * im - ω) * expm1(x) / (exp(x) + 1)
+        end
+    end
     if !isfinite(G)
         throw(DomainError(-1, "Got $G for the parameter $n, $ω and $β"))
     end
