@@ -118,7 +118,7 @@ function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, pole
         for ω in poles
 
             if (symmetry == :ph || symmetry == :pha) && ω < 0.0
-                #spectral density is defined for positivie frequency only for correlation functions
+                #spectral density is not defined for negative frequency
                 continue
             end
 
