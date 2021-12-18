@@ -352,7 +352,6 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
     if ω < T(0.0)
         throw(DomainError("real frequency should be positive!"))
     end
-    x = ω * β
     ω_n = (2n + 1) * π / β
     K = 2ω / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
     if !isfinite(K)
@@ -399,7 +398,7 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 end
 
 """
-    density(isFermi::Bool, ω, β=1.0)
+    density(isFermi::Bool, ω, β)
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
@@ -408,7 +407,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 - `ω`: energy 
 - `β`: the inverse temperature 
 """
-@inline function density(isFermi::Bool, ω::T, β = T(1)) where {T<:AbstractFloat}
+@inline function density(isFermi::Bool, ω::T, β::T) where {T<:AbstractFloat}
     return isFermi ? fermiDirac(ω, β) : boseEinstein(ω, β)
 end
 
@@ -424,7 +423,7 @@ f(ω) = 1/(e^{ωβ}+1)
 - `ω`: frequency
 - `β`: the inverse temperature 
 """
-@inline function fermiDirac(ω::T, β = T(1)) where {T<:AbstractFloat}
+@inline function fermiDirac(ω::T, β::T) where {T<:AbstractFloat}
     x = ω * β
     if -T(50.0) < x < T(50.0)
         return 1.0 / (1.0 + exp(x))
@@ -447,7 +446,7 @@ f(ω) = 1/(e^{ωβ}-1)
 - `ω`: frequency
 - `β`: the inverse temperature 
 """
-@inline function boseEinstein(ω::T, β = T(1)) where {T<:AbstractFloat}
+@inline function boseEinstein(ω::T, β::T) where {T<:AbstractFloat}
     # if -eps(T)<ω<eps(T)
     #     return 0.0
     # end

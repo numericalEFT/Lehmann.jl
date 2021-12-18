@@ -263,4 +263,6 @@ function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = no
     return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
 
-# function convolution(dlrGrid, )
+# function convolution(dlrGrid, green1, green2; axis = 1)
+
+# end
