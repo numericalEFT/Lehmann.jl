@@ -98,9 +98,9 @@ struct DLRGrid
 
         dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [])
         if rebuild
-            build!(dlr, folder, filename, algorithm)
+            _build!(dlr, folder, filename, algorithm)
         else
-            load!(dlr, folder, filename)
+            _load!(dlr, folder, filename)
         end
         return dlr
     end
@@ -117,7 +117,7 @@ Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
-function load!(dlrGrid::DLRGrid, folder, filename)
+function _load!(dlrGrid::DLRGrid, folder, filename)
     searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
     function finddlr(folder, filename)
         for dir in folder
@@ -153,7 +153,7 @@ function load!(dlrGrid::DLRGrid, folder, filename)
     end
 end
 
-function build!(dlrGrid::DLRGrid, folder, filename, algorithm)
+function _build!(dlrGrid::DLRGrid, folder, filename, algorithm)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
     if algorithm == :discrete || dlrGrid.symmetry == :none

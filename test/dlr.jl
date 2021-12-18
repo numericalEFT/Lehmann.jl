@@ -13,6 +13,16 @@ function compare(case, a, b, eps, requiredratio, para = "")
     @test rtol(a, b) .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
 end
 
+function compare_atol(case, a, b, atol, para = "")
+    err = rtol(a, b)
+    err = isfinite(err) ? round(err, sigdigits = 3) : 0
+    if err > 100 * atol
+        printstyled("$case, $para err: ", color = :white)
+        printstyled("$err = $(Int(round(err/atol))) x atol\n", color = :blue)
+    end
+    @test rtol(a, b) .< 5000 * atol # dlr should represent the Green's function up to accuracy of the order eps
+end
+
 @testset "Correlator Representation" begin
 
     function test(case, isFermi, symmetry, Euv, β, eps)
@@ -44,10 +54,6 @@ end
         # end
 
         compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, 1000, para)
-
-        noise = eps * rand(eltype(Gsample), length(Gsample))
-        GNoisy = Gsample .+ noise
-        compare("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error = abs.(noise)), Gdlr, eps, 1000, para)
         #=========================================================================================#
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
@@ -69,10 +75,6 @@ end
         compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
         compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, 1000, para)
 
-        noise = eps * rand(eltype(Gnsample), length(Gnsample))
-        GnNoisy = Gnsample .+ noise
-        compare("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error = abs.(noise)), Gndlr, eps, 1000, para)
-
         #=========================================================================================#
         #                            Fourier Transform Test                                     #
         #=========================================================================================#
@@ -89,9 +91,18 @@ end
         # end
 
         #=========================================================================================#
-        #                            Fit DLR from generic grid                                    #
+        #                            Noisey data Test                                             #
         #=========================================================================================#
 
+        # err = 10 * eps
+        atol = eps
+        noise = atol * rand(eltype(Gsample), length(Gsample))
+        GNoisy = Gsample .+ noise
+        compare_atol("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error = abs.(noise)), Gdlr, atol, para)
+
+        noise = atol * rand(eltype(Gnsample), length(Gnsample))
+        GnNoisy = Gnsample .+ noise
+        compare_atol("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error = abs.(noise)), Gndlr, atol, para)
     end
 
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6

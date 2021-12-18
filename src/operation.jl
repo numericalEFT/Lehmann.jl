@@ -94,8 +94,6 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
-    # kernel, ipiv, info = LAPACK.getrf!(Float64.(kernel)) # LU factorization
-    # kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
 
     g, partialsize = _tensor2matrix(green, axis)
 
@@ -104,21 +102,6 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
         error, psize = _tensor2matrix(error, axis)
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
-
-    # ker = deepcopy(kernel)
-    # gt = deepcopy(g)
-    # coeffnew = weightedLeastSqureFit(deepcopy(g), weight, deepcopy(kernel))
-
-    # kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
-    # coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
-
-    # # println(maximum(abs.(coeff .- coeffnew)))
-    # println(maximum(abs.(ker * coeffnew .- gt)))
-
-    # coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
-    # coeff = kernel \ g #solve green=kernel*coeff
-    # println("coeff: ", maximum(abs.(coeff)))
-
     return _matrix2tensor(coeff, partialsize, axis)
 end
 
@@ -171,7 +154,6 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
-    # kernel, ipiv, info = LAPACK.getrf!(Complex{Float64}.(kernel)) # LU factorization
 
     g, partialsize = _tensor2matrix(green, axis)
 
@@ -180,12 +162,6 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
         error, psize = _tensor2matrix(error, axis)
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
-
-    # kernel, ipiv, info = LAPACK.getrf!(kernel) # LU factorization
-    # coeff = LAPACK.getrs!('N', kernel, ipiv, g) # LU linear solvor for green=kernel*coeff
-    # coeff = kernel \ g # solve green=kernel*coeff
-    # coeff/=dlrGrid.Euv
-
     return _matrix2tensor(coeff, partialsize, axis)
 end
 
@@ -286,3 +262,5 @@ function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = no
     coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis)
     return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
 end
+
+# function convolution(dlrGrid, )
