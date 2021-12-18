@@ -5,3 +5,76 @@
 [![Build Status](https://github.com/kunyuan/Lehmann.jl/workflows/CI/badge.svg)](https://github.com/numericaleft/Lehmann.jl/actions)
 [![codecov](https://codecov.io/gh/numericaleft/Lehmann.jl/branch/main/graph/badge.svg?token=Uia7j4DnR9)](https://codecov.io/gh/numericaleft/Lehmann.jl)
 <!-- [![Coverage](https://codecov.io/gh/kunyuan/Lehmann.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kunyuan/Lehmann.jl) -->
+
+This package provides subroutines to represent and manuipulate Green's functions in the imaginary-time or in the Matsubara-frequency domain. 
+
+Imaginary-time Green's functions encode the thermodynamic properites of quantum many-body systems. At low temperature, they are typically very singular and hard to deal with in numerical calculations. 
+
+## Features
+We provide the following components to ease the numerical manipulation of the Green's functions:
+
+- Algorithms to generate the discrete Lehamnn representation (DLR), which is a generic and  compact representation of Green's functions proposed in the Ref. [1]. In general, DLR only requres ~ log(1/T)log(1/ϵ) numbers to represent a Green's function at a temperature T up to a given accuracy ϵ. In this package, two algorithms are provided: one algorithm is based on conventional QR algorithm, another is based on a functional QR algorithm. The latter extends DLR to extremely low temperature.
+
+- Dedicated DLR for Green's functions with the particle-hole symmetry (e.g. phonon propagator) or with the particle-hole antisymmetry (e.g. superconductor gap function).
+
+- Fast and accurate Fourier transform between the imaginary-time domain and the Matsubara-frequency domain with a cost O(log(1/T)log(1/ϵ)) and an accuracy ~100ϵ.
+
+- Fast and accurate Green's function interpolation with a cost O(log(1/T)log(1/ϵ)) and an accuracy ~100ϵ.
+
+## Installation
+
+This package has been registered. So, simply type `import Pkg; Pkg.add("Lehmann")` in the Julia REPL to install.
+
+## Basis Usage
+```julia
+using Lehmann
+β = 100.0 # inverse temperature
+Euv = 1.0 # ultraviolt energy cutoff of the Green's function
+rtol = 1e-8 # accuracy of the representation
+isFermi = true
+symmetry = :ph # :ph if particle-hole symmetric, :pha is antisymmetric, :none if there is no symmetry
+
+dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters and basis
+# A set of most representative grid points are generated:
+# dlr.ω gives the real-frequency grids
+# dlr.τ gives the imaginary-time grids
+# dlr.ωn and dlr.n gives the Matsubara-frequency grids. The latter is the integer version.
+
+# generate an example of Green's function on the dlr.τ grid
+Nτ = 10000
+τgrid = collect(LinRange(0.0, β / 2, Nτ))  # create a τ grid
+println("Prepare the Green's function sample ...")
+Gτ = Sample.SemiCircle(Euv, β, isFermi, symmetry, τgrid, :τ)
+
+spectral = tau2dlr(dlr, Gτ, τgrid) # compact representation of Gτ with only ~20 coefficients!
+
+println("Benchmark the interpolation ...")
+τ = collect(LinRange(0.0, β / 2, Nτ * 2))  # create a dense τ grid to interpolate
+Gexact = Sample.SemiCircle(Euv, β, isFermi, symmetry, τ, :τ)
+Ginterp = dlr2tau(dlr, spectral, τ) # τ → τ interpolation
+println("Interpolation accuracy: ", maximum(abs.(Gexact - Ginterp)))
+
+println("Benchmark the fourier transform ...")
+n = collect(0:1000)  # create a set of Matsubara-frequency points
+Gexact = Sample.SemiCircle(Euv, β, isFermi, symmetry, n, :ωn)
+Gfourier = dlr2matfreq(dlr, spectral, n) # τ → n fourier transform
+println("Fourier transform accuracy: ", maximum(abs.(Gexact - Gfourier)))
+```
+
+## Build DLR basis file
+ A set of basis files have been precalcualted and stored in the folder [basis](basis/). They cover most of the use cases. For edge case, you may generate your own basis file use this [script](build.jl).
+
+ In the above script, user can choose the folder to store the generated basis file. To use the new basis file, simply pass the folder as an argument when create ``DLRGrid`` struct. More information can be found in the [documentation](https://numericaleft.github.io/Lehmann.jl/dev/lib/dlr/)
+
+## Citation
+
+If this library helps you to create software or publications, please let
+us know, and cite
+
+[1] ["Discrete Lehmann representation of imaginary time Green's functions", Jason Kaye, Kun Chen, and Olivier Parcollet, arXiv:2107.13094](https://arxiv.org/abs/2107.13094)
+
+[2] ["libdlr: Efficient imaginary time calculations using the discrete Lehmann representation", Jason Kaye and Hugo U.R. Strand, arXiv:2110.06765](https://arxiv.org/abs/2110.06765)
+
+## Questions and Contributions
+
+Contributions are very welcome, as are feature requests and suggestions. Please open an issue if you encounter any problems.

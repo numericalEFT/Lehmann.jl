@@ -368,7 +368,6 @@ Compute the Matsubara-frequency kernel for a anormalous fermionic correlator wit
 K(iω_n) = -\\frac{2iω_n}{ω^2+ω_n^2}(1-e^{-ωβ}),
 ```
 where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Many-particle Systems" by J. Negele and H. Orland, Page 95
-
 # Arguments
 - `n`: index of the fermionic Matsubara frequency
 - `ω`: energy 

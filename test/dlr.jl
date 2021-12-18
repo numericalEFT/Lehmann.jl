@@ -1,7 +1,14 @@
 using FastGaussQuadrature, Printf
-include("case.jl")
 
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
+
+SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, dlr.symmetry, grid, type, dlr.rtol, 24)
+
+function MultiPole(dlr, grid, type)
+    Euv = dlr.Euv
+    poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
+    return Sample.MultiPole(dlr.β, dlr.isFermi, dlr.symmetry, grid, type, poles)
+end
 
 function compare(case, a, b, eps, requiredratio, para = "")
     err = rtol(a, b)
@@ -30,20 +37,17 @@ end
 
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
 
-        dlr = DLRGrid(Euv, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
-        dlr10 = DLRGrid(10Euv, β, eps, isFermi; symmetry = symmetry) #construct denser dlr basis for benchmark purpose
+        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry) #construct dlr basis
+        dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
 
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
         #=========================================================================================#
-        ################### get imaginary-time Green's function ##########################
-        Gdlr, error = case(isFermi, symmetry, dlr.τ, β, Euv)
-        @assert maximum(error) < eps
-
-        ############# get imaginary-time Green's function for τ sample ###################
+        # get imaginary-time Green's function 
+        Gdlr = case(dlr, dlr.τ, :τ)
+        # get imaginary-time Green's function for τ sample 
         τSample = dlr10.τ
-        Gsample, error = case(isFermi, symmetry, τSample, β, Euv)
-        @assert maximum(error) < eps
+        Gsample = case(dlr, τSample, :τ)
 
         ########################## imaginary-time to dlr #######################################
         coeff = tau2dlr(dlr, Gdlr)
@@ -58,12 +62,9 @@ end
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
         # #get Matsubara-frequency Green's function
-        Gndlr, error = case(isFermi, symmetry, dlr.n, β, Euv, IsMatFreq = true)
-        @assert maximum(error) < eps
-
+        Gndlr = case(dlr, dlr.n, :ωn)
         nSample = dlr10.n
-        Gnsample, error = case(isFermi, symmetry, nSample, β, Euv, IsMatFreq = true)
-        @assert maximum(error) < eps
+        Gnsample = case(dlr, nSample, :ωn)
 
         # #Matsubara frequency to dlr
         coeffn = matfreq2dlr(dlr, Gndlr)
@@ -153,12 +154,10 @@ end
     isFermi = true
     symmetry = :none
     para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
-    dlr = DLRGrid(Euv, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
+    dlr = DLRGrid(Euv, β, eps, isFermi, symmetry) #construct dlr basis
 
-    Gτ, error = SemiCircle(isFermi, symmetry, dlr.τ, β, Euv, IsMatFreq = false)
-    @assert maximum(error) < eps
-    Gn, error = SemiCircle(isFermi, symmetry, dlr.n, β, Euv, IsMatFreq = true)
-    @assert maximum(error) < eps
+    Gτ = SemiCircle(dlr, dlr.τ, :τ)
+    Gn = SemiCircle(dlr, dlr.n, :ωn)
 
     n1, n2 = 3, 4
     a = rand(n1, n2)

@@ -6,6 +6,9 @@ using Printf
 include("spectral.jl")
 export Spectral
 
+include("sample/sample.jl")
+export Sample
+
 include("discrete/builder.jl")
 include("functional/builder.jl")
 

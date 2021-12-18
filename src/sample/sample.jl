@@ -1,6 +1,32 @@
-function SemiCircle(isFermi, symmetry, Grid, β, Euv; IsMatFreq = false)
+module Sample
+using FastGaussQuadrature
+using ..Spectral
+"""
+function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24)
+
+Generate Green's function from a semicircle spectral density. 
+Return the function on Grid and the systematic error.
+
+#Arguments
+- `Euv` : ultraviolet energy cutoff
+- `β` : inverse temperature
+- `isFermi`: is fermionic or bosonic
+- `symmetry`: particle-hole symmetric :ph, particle-hole antisymmetric :pha, or :none
+- `Grid`: grid to evalute on
+- `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
+- `rtol`: accuracy to achieve
+- `degree`: polynomial degree for integral
+"""
+function SemiCircle(Euv, β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, rtol = nothing, degree = 24)
     # calculate Green's function defined by the spectral density
     # S(ω) = sqrt(1 - (ω / Euv)^2) / Euv # semicircle -1<ω<1
+    if type == :τ
+        IsMatFreq = false
+    elseif type == :ωn
+        IsMatFreq = true
+    else
+        error("not implemented!")
+    end
 
     ##### Panels endpoints for composite quadrature rule ###
     npo = Int(ceil(log(β * Euv) / log(2.0)))
@@ -52,18 +78,41 @@ function SemiCircle(isFermi, symmetry, Grid, β, Euv; IsMatFreq = false)
         return G
     end
 
-    g1 = Green(24, IsMatFreq)
-    g2 = Green(48, IsMatFreq)
-    err = abs.(g1 - g2)
-
-    # println("Semi-circle case integration error = ", maximum(err))
-    return g2, err
+    g1 = Green(degree, IsMatFreq)
+    if isnothing(rtol) == false
+        g2 = Green(degree * 2, IsMatFreq)
+        err = abs.(g1 - g2)
+        @assert maximum(err) < rtol "Systematic error $(maximum(err)) is larger than $rtol, increase degree for the integral!"
+    end
+    return g1
 end
 
-function MultiPole(isFermi, symmetry, Grid, β, Euv; IsMatFreq = false)
-    poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
+"""
+function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles)
+
+Generate Green's function from a spectral density with delta peaks specified by the argument ``poles``. 
+Return the function on Grid and the systematic error.
+
+#Arguments
+- `β` : inverse temperature
+- `isFermi`: is fermionic or bosonic
+- `symmetry`: particle-hole symmetric :ph, particle-hole antisymmetric :pha, or :none
+- `Grid`: grid to evalute on
+- `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
+- `poles`: a list of frequencies for the delta functions
+"""
+function MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles)
+    # poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # poles=[0.8Euv, 1.0Euv]
     # poles = [0.0]
+    if type == :τ
+        IsMatFreq = false
+    elseif type == :ωn
+        IsMatFreq = true
+    else
+        error("not implemented!")
+    end
+
     g = IsMatFreq ? zeros(ComplexF64, length(Grid)) : zeros(Float64, length(Grid))
     for (τi, τ) in enumerate(Grid)
         for ω in poles
@@ -80,5 +129,7 @@ function MultiPole(isFermi, symmetry, Grid, β, Euv; IsMatFreq = false)
             end
         end
     end
-    return g, zeros(Float64, length(Grid))
+    return g
+end
+
 end
