@@ -28,7 +28,7 @@ We provide the following components to ease the numerical manipulation of the Gr
 
 This package has been registered. So, simply type `import Pkg; Pkg.add("Lehmann")` in the Julia REPL to install.
 
-## Basis Usage
+## Basic Usage
 
 In the following [demo](example/demo.jl), we will show how to compress a Green's function of ~10000 data point into ~20 DLR coefficients, and perform fast interpolation and fourier transform up to the accuracy ~1e-10.
 
