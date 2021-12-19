@@ -9,7 +9,6 @@ using Quadmath
 # using ProfileView
 # using InteractiveUtils
 
-include("../utility/chebyshev.jl")
 using ..Discrete
 
 # const Float = Float64
@@ -17,8 +16,6 @@ using ..Discrete
 const Float = Float128
 
 include("kernel.jl")
-include("matfreq.jl")
-include("tau.jl")
 include("findmax.jl")
 
 
@@ -226,13 +223,13 @@ function testOrthgonal(basis)
 end
 
 """
+function build(dlrGrid, print::Bool = true)
+    Construct discrete Lehmann representation
+
 #Arguments:
-- `isFermi`: is fermionic or bosonic
-- `symmetry`: particle-hole symmetric for :ph, asymmetric for :pha, or nothing for :none
-- `type`: type of kernel, :fermi, :boson
-- `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
-- `rtol`: tolerance absolute error
-- `verbose`: 0 to suppress all output, any positive integer to print the internal information
+- `dlrGrid`: struct that contains the information to construct the DLR grid. The following entries are required:
+   Λ: the dimensionless scale β*Euv, rtol: the required relative accuracy, isFermi: fermionic or bosonic, symmetry: particle-hole symmetry/antisymmetry or none
+- `print`: print the internal information or not
 """
 function build(dlrGrid, print::Bool = true)
     print && println("Using the functional algorithm to build DLR ...")
@@ -244,21 +241,11 @@ function build(dlrGrid, print::Bool = true)
         ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
         ωGrid = ωBasis.grid
         rank = ωBasis.N
-        # print && println("Building τ grid ... ")
-        # τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :corr)
-        # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
-        # println("Building n grid ... ")
-        # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
     elseif symmetry == :pha
         print && println("Building ω grid ... ")
         ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),])
         ωGrid = ωBasis.grid
         rank = ωBasis.N
-        # println("Building τ grid ... ")
-        # τBasis = tauGrid(ωBasis.grid, ωBasis.N, Λ, rtol, :acorr)
-        # # τBasis = QR(Λ / 2, rtol / 10, projPHA_τ, Float(0), N=ωBasis.N)
-        # println("Building n grid ... ")
-        # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
     else
         error("Functional algorithm for the symmetry $symmetry has not yet been implemented!")
         # elseif type == :fermi

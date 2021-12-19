@@ -2,6 +2,7 @@ module Discrete
 using Printf
 using LinearAlgebra
 using ..Spectral
+using ..Interp
 include("kernel.jl")
 
 function ωQR(kernel, rtol, print::Bool = true)

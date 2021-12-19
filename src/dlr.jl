@@ -56,7 +56,7 @@ struct DLRGrid
     - `folder` : the folder to load the DLR file if rebuild = false, or the folder to save the DLR file if rebuild = true
     - `algorithm` : if rebuild = true, then set :functional to use the functional algorithm to generate the DLR basis, or set :discrete to use the matrix algorithm.
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; rebuild = false, folder = nothing, algorithm = :functional)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
@@ -83,11 +83,11 @@ struct DLRGrid
         end
 
         if symmetry == :none
-            if isFermi
-                filename = "universal_$(Λ)_1e$(rtolpower).dlr"
-            else
-                error("Generic bosonic dlr has not yet been implemented!")
-            end
+            # if isFermi
+            filename = "universal_$(Λ)_1e$(rtolpower).dlr"
+            # else
+            #     error("Generic bosonic dlr has not yet been implemented!")
+            # end
         elseif symmetry == :ph
             filename = "ph_$(Λ)_1e$(rtolpower).dlr"
         elseif symmetry == :pha
@@ -98,9 +98,9 @@ struct DLRGrid
 
         dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [])
         if rebuild
-            build!(dlr, folder, filename, algorithm)
+            _build!(dlr, folder, filename, algorithm)
         else
-            load!(dlr, folder, filename)
+            _load!(dlr, folder, filename)
         end
         return dlr
     end
@@ -117,7 +117,7 @@ Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
-function load!(dlrGrid::DLRGrid, folder, filename)
+function _load!(dlrGrid::DLRGrid, folder, filename)
     searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
     function finddlr(folder, filename)
         for dir in folder
@@ -153,7 +153,7 @@ function load!(dlrGrid::DLRGrid, folder, filename)
     end
 end
 
-function build!(dlrGrid::DLRGrid, folder, filename, algorithm)
+function _build!(dlrGrid::DLRGrid, folder, filename, algorithm)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
     if algorithm == :discrete || dlrGrid.symmetry == :none

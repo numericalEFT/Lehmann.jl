@@ -1,30 +1,37 @@
 using Lehmann
 using Documenter
 
-DocMeta.setdocmeta!(Lehmann, :DocTestSetup, :(using Lehmann); recursive=true)
+DocMeta.setdocmeta!(Lehmann, :DocTestSetup, :(using Lehmann); recursive = true)
 
 makedocs(;
-    modules=[Lehmann],
-    authors="Kun Chen, Tao Wang, Xiansheng Cai",
-    repo="https://github.com/kunyuan/Lehmann.jl/blob/{commit}{path}#{line}",
-    sitename="Lehmann.jl",
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://kunyuan.github.io/Lehmann.jl",
-        assets=String[],
+    modules = [Lehmann],
+    authors = "Kun Chen, Tao Wang, Xiansheng Cai",
+    repo = "https://github.com/numericalEFT/Lehmann.jl/blob/{commit}{path}#{line}",
+    sitename = "Lehmann.jl",
+    format = Documenter.HTML(;
+        prettyurls = get(ENV, "CI", "false") == "true",
+        canonical = "https://numericaleft.github.io/Lehmann.jl",
+        assets = String[]
     ),
-    pages=[
+    pages = [
         "Home" => "index.md",
-        "Manual" => Any[
+        "Manual" => [
+            "manual/kernel.md"
         ],
-        "Library" => Any[
-                map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
-                # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+        "API reference" => Any[
+            "lib/dlr.md",
+            "lib/spectral.md",
+            "lib/discrete.md",
+            "lib/functional.md",
+            "lib/sample.md",
+            "lib/utility.md",
+            # map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
+            # "Internals" => map(s -> "lib/$(s)", sort(readdir(joinpath(@__DIR__, "src/lib"))))
         ]
-    ],
+    ]
 )
 
 deploydocs(;
-    repo="github.com/kunyuan/Lehmann.jl.git",
-    devbranch="main"
+    repo = "github.com/numericaleft/Lehmann.jl.git",
+    devbranch = "main"
 )

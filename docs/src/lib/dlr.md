@@ -1,5 +1,5 @@
-# Discrete Lehmann Representation
+# Main Module
 
 ```@autodocs
-Modules = [Lehmann.DLR]
+Modules = [Lehmann]
 ```

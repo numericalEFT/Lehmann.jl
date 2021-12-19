@@ -1,6 +1,3 @@
-include("../utility/chebyshev.jl")
-# using Interp
-
 struct CompositeChebyshevGrid
     degree::Int # Chebyshev degree
     x::Vector{Float64} # Chebyshev nodes
@@ -101,15 +98,16 @@ function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
     kernel = zeros(Float64, (length(τGrid), length(ωGrid)))
     symmetry = dlrGrid.symmetry
 
+
     if symmetry == :none && (τ isa CompositeChebyshevGrid) && (ω isa CompositeChebyshevGrid)
         #symmetrize K(τ, ω)=K(β-τ, -ω) for τ>0 
         @assert isodd(τ.np) #symmetrization is only possible for odd τ panels
         halfτ = ((τ.np - 1) ÷ 2) * τ.degree
-        kernel[1:halfτ, :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid, 1.0)
-        kernel[end:-1:(halfτ+1), :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid[end:-1:1], 1.0)
+        kernel[1:halfτ, :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid, 1.0, true)
+        kernel[end:-1:(halfτ+1), :] = Spectral.kernelT(true, symmetry, τ.grid[1:halfτ], ω.grid[end:-1:1], 1.0, true)
         # use the fermionic kernel for both the fermionic and bosonic propagators
     else
-        kernel = Spectral.kernelT(dlrGrid.isFermi, symmetry, τGrid, ωGrid, 1.0)
+        kernel = Spectral.kernelT(dlrGrid.isFermi, symmetry, τGrid, ωGrid, 1.0, true)
     end
 
     # print && println("=====  Kernel Discretization =====")
@@ -193,8 +191,8 @@ function preciseKernelΩn(dlrGrid, ω, print::Bool = true)
     symmetry = dlrGrid.symmetry
     n = nGrid(dlrGrid.isFermi, symmetry, dlrGrid.Λ)
 
-    nkernelFermi = Spectral.kernelΩ(true, symmetry, n, Float64.(ωGrid), 1.0)
-    nkernelBose = Spectral.kernelΩ(false, symmetry, n, Float64.(ωGrid), 1.0)
+    nkernelFermi = Spectral.kernelΩ(true, symmetry, n, Float64.(ωGrid), 1.0, true)
+    nkernelBose = Spectral.kernelΩ(false, symmetry, n, Float64.(ωGrid), 1.0, true)
 
     return n, nkernelFermi, nkernelBose
 end
