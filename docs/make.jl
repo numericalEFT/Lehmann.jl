@@ -32,6 +32,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo = "github.com/numericalEFT/Lehmann.jl"
-    # devbranch = "main"
+    repo = "github.com/numericalEFT/Lehmann.jl",
+    devbranch = "main"
 )
