@@ -8,7 +8,7 @@ symmetry = :none # :ph if particle-hole symmetric, :pha is antisymmetric, :none 
 diff(a, b) = maximum(abs.(a - b)) # return the maximum deviation between a and b
 
 # Use semicircle spectral density to generate the sample Green's function
-sample(grid, type) = Sample.SemiCircle(Euv, β, isFermi, symmetry, grid, type, rtol, 24, true)
+sample(grid, type) = Sample.SemiCircle(Euv, β, isFermi, grid, type, symmetry)
 
 dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters and basis
 # A set of most representative grid points are generated:
