@@ -113,7 +113,7 @@ Return the function on Grid and the systematic error.
 - `poles`: a list of frequencies for the delta functions
 - `regularized`: use regularized bosonic kernel if symmetry = :none
 """
-function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles; symmetry::Symbol = :none, regularized::Bool = true)
+function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbol = :none; regularized::Bool = true)
     # poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # poles=[0.8Euv, 1.0Euv]
     # poles = [0.0]
