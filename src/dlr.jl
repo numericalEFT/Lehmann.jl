@@ -58,7 +58,7 @@ struct DLRGrid
     - `algorithm` : if rebuild = true, then set :functional to use the functional algorithm to generate the DLR basis, or set :discrete to use the matrix algorithm.
     - `verbose`   : 0 not to print DLRGrid to terminal, >0 to print
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; rebuild = false, folder = nothing, algorithm = :functional, verbose = 0)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
@@ -106,7 +106,7 @@ struct DLRGrid
         end
         return dlr
     end
-    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-10, rebuild = false, folder = nothing, algorithm = :functional, verbose = 0)
+    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
         return DLRGrid(Euv, β, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose)
     end
 end
@@ -133,7 +133,7 @@ Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
-function _load!(dlrGrid::DLRGrid, folder, filename, algorithm = :functional, verbose = 0)
+function _load!(dlrGrid::DLRGrid, folder, filename, algorithm = :functional, verbose = false)
     searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
 
     function finddlr(folder, filename)
@@ -176,16 +176,16 @@ function _load!(dlrGrid::DLRGrid, folder, filename, algorithm = :functional, ver
         push!(dlrGrid.n, n[r])
         push!(dlrGrid.ωn, ωn[r])
     end
-    println(dlrGrid)
+    verbose && println(dlrGrid)
 end
 
-function _build!(dlrGrid::DLRGrid, folder, filename, algorithm, verbose = 0)
+function _build!(dlrGrid::DLRGrid, folder, filename, algorithm, verbose = false)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
     if algorithm == :discrete || dlrGrid.symmetry == :none
-        ω, τ, nF, nB = Discrete.build(dlrGrid, verbose > 0)
+        ω, τ, nF, nB = Discrete.build(dlrGrid, verbose)
     elseif algorithm == :functional && (dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha)
-        ω, τ, nF, nB = Functional.build(dlrGrid, verbose > 0)
+        ω, τ, nF, nB = Functional.build(dlrGrid, verbose)
     else
         error("$algorithm has not yet been implemented!")
     end
