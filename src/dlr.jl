@@ -106,6 +106,17 @@ struct DLRGrid
     end
 end
 
+function Base.getproperty(obj::DLRGrid, sym::Symbol)
+    # if sym === :hasTau
+    #     return obj.totalTauNum > 0
+    if sym == :size
+        return size(obj)
+    else # fallback to getfield
+        return getfield(obj, sym)
+    end
+end
+
+
 """
 Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
@@ -179,4 +190,15 @@ function _build!(dlrGrid::DLRGrid, folder, filename, algorithm)
         push!(dlrGrid.n, n)
         push!(dlrGrid.ωn, isFermi ? (2n + 1.0) * π / β : 2n * π / β)
     end
+end
+
+
+function Base.show(io::IO, dlr::DLRGrid)
+    title = dlr.isFermi ? "ferminoic" : "bosonic"
+    println(io, "rank = $(dlr.size) $title DLR with $(dlr.symmetry) symmetry: Euv = $(dlr.Euv), β = $(dlr.β), rtol = $(dlr.rtol)")
+    @printf(io, "# %5s  %28s  %28s  %28s      %20s\n", "index", "freq", "tau", "ωn", "n")
+    for r = 1:dlr.size
+        @printf(io, "%5i  %32.17g  %32.17g  %32.17g  %16i\n", r, dlr.ω[r], dlr.τ[r], dlr.ωn[r], dlr.n[r])
+    end
+
 end
