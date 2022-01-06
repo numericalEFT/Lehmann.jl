@@ -47,7 +47,7 @@ function syk_sigma_dlr(d, G_x, J = 1.0)
     return Sigma_x
 end
 
-function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 5, G_x = zeros(ComplexF64, length(d)))
+function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.1, maxiter = 1000, G_x = zeros(ComplexF64, length(d)))
 
     for iter in 1:maxiter
 
@@ -77,7 +77,7 @@ function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 
 end
 
 d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-10, symmetry = :ph) # Initialize DLR object
-G_q = solve_syk_with_fixpoint_iter(d, 0.0)
+G_q = solve_syk_with_fixpoint_iter(d, 0.00)
 # G_q = solve_syk_with_fixpoint_iter(d, 0.15, G_x = G_q)
 # G_q = solve_syk_with_fixpoint_iter(d, 0.12, G_x = G_q)
 # G_q = solve_syk_with_fixpoint_iter(d, 0.11, G_x = G_q)
