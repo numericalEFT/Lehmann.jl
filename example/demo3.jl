@@ -62,7 +62,7 @@ function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 
         G_q_new = -1 ./ (d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x))
         +1 ./ (-d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x)) # Solve Dyson
 
-        G_x_new = (matfreq2tau(d, G_q_new))
+        G_x_new = matfreq2tau(d, G_q_new)
 
         println("imag", maximum(abs.(imag.(G_x_new))))
 
