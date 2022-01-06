@@ -2,12 +2,14 @@ using FastGaussQuadrature, Printf
 
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
-SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
+# SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
+SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree = 24, regularized = true)
 
 function MultiPole(dlr, grid, type)
     Euv = dlr.Euv
     poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
-    return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+    # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+    return Sample.MultiPole(dlr, type, poles, grid; regularized = true)
 end
 
 function compare(case, a, b, eps, requiredratio, para = "")
@@ -62,9 +64,9 @@ end
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
         # #get Matsubara-frequency Green's function
-        Gndlr = case(dlr, dlr.n, :ωn)
+        Gndlr = case(dlr, dlr.n, :n)
         nSample = dlr10.n
-        Gnsample = case(dlr, nSample, :ωn)
+        Gnsample = case(dlr, nSample, :n)
 
         # #Matsubara frequency to dlr
         coeffn = matfreq2dlr(dlr, Gndlr)
@@ -158,7 +160,7 @@ end
     dlr = DLRGrid(Euv, β, eps, isFermi, symmetry) #construct dlr basis
 
     Gτ = SemiCircle(dlr, dlr.τ, :τ)
-    Gn = SemiCircle(dlr, dlr.n, :ωn)
+    Gn = SemiCircle(dlr, dlr.n, :n)
 
     n1, n2 = 3, 4
     a = rand(n1, n2)

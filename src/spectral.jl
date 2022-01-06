@@ -31,7 +31,7 @@ Compute the imaginary-time kernel of different type.
         return isFermi ? kernelFermiT_PHA(τ, ω, β) : kernelBoseT_PHA(τ, ω, β)
     else
         @error "Symmetry $symmetry is not implemented!"
-        return 0.0
+        return T(0)
     end
 end
 """
@@ -259,7 +259,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
         return isFermi ? kernelFermiΩ_PHA(n, ω, β) : kernelBoseΩ_PHA(n, ω, β)
     else
         @error "Symmetry $symmetry  is not implemented!"
-        return 0.0
+        return T(0)
     end
 end
 

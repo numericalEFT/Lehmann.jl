@@ -52,14 +52,16 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         C = Gτ
     else
         @assert size(error) == size(Gτ)
-        for i = 1:size(error)[1]
-            error[i, :] /= sum(error[i, :]) / length(error[i, :])
+        w = 1.0 ./ (error .+ 1e-16)
+
+        for i = 1:size(w)[1]
+            w[i, :] /= sum(w[i, :]) / length(w[i, :])
         end
 
         # W = Diagonal(weight)
         # B = transpose(kernel) * W * kernel
         # C = transpose(kernel) * W * Gτ
-        w = 1.0 ./ error
+        # w = 1.0 ./ (error .+ 1e-16)
         B = w .* kernel
         # B = Diagonal(w) * kernel
         C = w .* Gτ
@@ -99,6 +101,11 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
         error, psize = _tensor2matrix(error, axis)
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
+
+    if all(abs.(coeff) .< 1e16) == false
+        @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
+    end
+
     return _matrix2tensor(coeff, partialsize, axis)
 end
 
@@ -159,6 +166,9 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
         error, psize = _tensor2matrix(error, axis)
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
+    if all(abs.(coeff) .< 1e16) == false
+        @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
+    end
     return _matrix2tensor(coeff, partialsize, axis)
 end
 

@@ -33,6 +33,7 @@ This package has been registered. So, simply type `import Pkg; Pkg.add("Lehmann"
 In the following [demo](example/demo.jl), we will show how to compress a Green's function of ~10000 data point into ~20 DLR coefficients, and perform fast interpolation and fourier transform up to the accuracy ~1e-10.
 
 ```julia
+using Lehmann
 β = 100.0 # inverse temperature
 Euv = 1.0 # ultraviolt energy cutoff of the Green's function
 rtol = 1e-8 # accuracy of the representation
@@ -40,9 +41,6 @@ isFermi = false
 symmetry = :none # :ph if particle-hole symmetric, :pha is antisymmetric, :none if there is no symmetry
 
 diff(a, b) = maximum(abs.(a - b)) # return the maximum deviation between a and b
-
-# Use semicircle spectral density to generate the sample Green's function
-sample(grid, type) = Sample.SemiCircle(Euv, β, isFermi, grid, type, symmetry)
 
 dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters and basis
 # A set of most representative grid points are generated:
@@ -53,9 +51,9 @@ dlr = DLRGrid(Euv, β, rtol, isFermi, symmetry) #initialize the DLR parameters a
 println("Prepare the Green's function sample ...")
 Nτ, Nωn = 10000, 10000 # many τ and n points are needed because Gτ is quite singular near the boundary
 τgrid = collect(LinRange(0.0, β, Nτ))  # create a τ grid
-Gτ = sample(τgrid, :τ)
+Gτ = Sample.SemiCircle(dlr, :τ, τgrid) # Use semicircle spectral density to generate the sample Green's function in τ
 ngrid = collect(-Nωn:Nωn)  # create a set of Matsubara-frequency points
-Gn = sample(ngrid, :ωn)
+Gn = Sample.SemiCircle(dlr, :n, ngrid) # Use semicircle spectral density to generate the sample Green's function in ωn
 
 println("Compress Green's function into ~20 coefficients ...")
 spectral_from_Gτ = tau2dlr(dlr, Gτ, τgrid)
@@ -64,9 +62,9 @@ spectral_from_Gω = matfreq2dlr(dlr, Gn, ngrid)
 
 println("Prepare the target Green's functions to benchmark with ...")
 τ = collect(LinRange(0.0, β, Nτ * 2))  # create a dense τ grid to interpolate
-Gτ_target = sample(τ, :τ)
+Gτ_target = Sample.SemiCircle(dlr, :τ, τ)
 n = collect(-2Nωn:2Nωn)  # create a set of Matsubara-frequency points
-Gn_target = sample(n, :ωn)
+Gn_target = Sample.SemiCircle(dlr, :n, n)
 
 println("Interpolation benchmark ...")
 Gτ_interp = dlr2tau(dlr, spectral_from_Gτ, τ)

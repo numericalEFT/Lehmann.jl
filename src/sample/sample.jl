@@ -3,16 +3,18 @@ using FastGaussQuadrature
 using ..Spectral
 """
     SemiCircle(Euv, β, isFermi::Bool, Grid, type::Symbol, symmetry::Symbol = :none; rtol = nothing, degree = 24, regularized::Bool = true)
+    SemiCircle(dlr, type::Symbol, Grid = dlrGrid(dlr, type); degree = 24, regularized::Bool = true)
 
 Generate Green's function from a semicircle spectral density. 
 Return the function on Grid and the systematic error.
 
 #Arguments
+- `dlr`: dlrGrid struct
 - `Euv` : ultraviolet energy cutoff
 - `β` : inverse temperature
 - `isFermi`: is fermionic or bosonic
 - `Grid`: grid to evalute on
-- `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
+- `type`: imaginary-time with :τ, or Matsubara-frequency with :n
 - `symmetry`: particle-hole symmetric :ph, particle-hole antisymmetric :pha, or :none
 - `rtol`: accuracy to achieve
 - `degree`: polynomial degree for integral
@@ -23,10 +25,10 @@ function SemiCircle(Euv, β, isFermi::Bool, Grid, type::Symbol, symmetry::Symbol
     # S(ω) = sqrt(1 - (ω / Euv)^2) / Euv # semicircle -1<ω<1
     if type == :τ
         IsMatFreq = false
-    elseif type == :ωn
+    elseif type == :n
         IsMatFreq = true
     else
-        error("not implemented!")
+        error("$type is not implemented!")
     end
 
     ##### Panels endpoints for composite quadrature rule ###
@@ -48,6 +50,20 @@ function SemiCircle(Euv, β, isFermi::Bool, Grid, type::Symbol, symmetry::Symbol
     end
     return g1
 end
+function SemiCircle(dlr, type::Symbol, Grid = dlrGrid(dlr, type); degree = 24, regularized::Bool = true)
+    return SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, Grid, type, dlr.symmetry; rtol = dlr.rtol, degree = degree, regularized = regularized)
+end
+
+function dlrGrid(dlr, type::Symbol)
+    if type == :τ
+        return dlr.τ
+    elseif type == :n
+        return dlr.n
+    else
+        error("$type not implemented!")
+    end
+end
+
 
 # function getG(::Val{true}, Grid)
 #     return zeros(ComplexF64, length(Grid))
@@ -100,16 +116,18 @@ end
 
 """
     MultiPole(β, isFermi::Bool, symmetry::Symbol, Grid, type::Symbol, poles, regularized::Bool = true)
+    MultiPole(dlr, type::Symbol, poles, Grid = dlrGrid(dlr, type); regularized::Bool = true)
 
 Generate Green's function from a spectral density with delta peaks specified by the argument ``poles``. 
 Return the function on Grid and the systematic error.
 
 #Arguments
+- `dlr`: dlrGrid struct
 - `β` : inverse temperature
 - `isFermi`: is fermionic or bosonic
 - `symmetry`: particle-hole symmetric :ph, particle-hole antisymmetric :pha, or :none
 - `Grid`: grid to evalute on
-- `type`: imaginary-time with :τ, or Matsubara-frequency with :ωn
+- `type`: imaginary-time with :τ, or Matsubara-frequency with :n
 - `poles`: a list of frequencies for the delta functions
 - `regularized`: use regularized bosonic kernel if symmetry = :none
 """
@@ -119,10 +137,10 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
     # poles = [0.0]
     if type == :τ
         IsMatFreq = false
-    elseif type == :ωn
+    elseif type == :n
         IsMatFreq = true
     else
-        error("not implemented!")
+        error("$type is not implemented!")
     end
 
     g = IsMatFreq ? zeros(ComplexF64, length(Grid)) : zeros(Float64, length(Grid))
@@ -142,6 +160,9 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
         end
     end
     return g
+end
+function MultiPole(dlr, type::Symbol, poles, Grid = dlrGrid(dlr, type); regularized::Bool = true)
+    return MultiPole(dlr.β, dlr.isFermi, Grid, type, poles, dlr.symmetry; regularized = regularized)
 end
 
 end

@@ -10,7 +10,7 @@ d = DLRGrid(Euv = 1.0, β = 1000.0, isFermi = false) # Initialize DLR object
 tau_i = collect(LinRange(0, d.β, 100))
 
 println("Prepare the Green's function sample ...")
-G_i = Sample.SemiCircle(d.Euv, d.β, d.isFermi, tau_i, :τ)  # Evaluate known G at tau_k
+G_i = Sample.SemiCircle(d, :τ, tau_i)  # Evaluate known G at tau_k
 # G_i = true_G_tau(tau_i, beta)
 
 G_i_noisy = G_i .+ eta .* (rand(length(G_i)) .- 0.5)
