@@ -55,6 +55,7 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         for i = 1:size(error)[1]
             error[i, :] /= sum(error[i, :]) / length(error[i, :])
         end
+
         # W = Diagonal(weight)
         # B = transpose(kernel) * W * kernel
         # C = transpose(kernel) * W * Gτ

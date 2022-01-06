@@ -1,4 +1,4 @@
-# DLR Kernels
+# Convention
 
 The kernel in the Lehammn representation is a function that only depends on the statistics of the quantum particles, and the symmetry of the Green's function. It is universal in the sense that it doesn't depend on the microscopic details of the quantum many-body system. 
 
