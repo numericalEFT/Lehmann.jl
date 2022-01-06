@@ -34,20 +34,9 @@ function syk_sigma_dlr(d, G_x, J = 1.0)
     tau_k = d.τ # DLR imaginary time nodes
     tau_k_rev = d.β .- tau_k # Reversed imaginary time nodes
 
-    G_k = dlr2tau(d, G_x) # G at tau_k
-    G_k_rev = dlr2tau(d, G_x, tau_k_rev) # G at beta - tau_k
+    G_x_rev = tau2tau(d, G_x, tau_k_rev) # G at beta - tau_k
 
-    # for i in 1:length(G_k)
-    #     println("$(d.τ[i])    $(real(G_k[i]))     $(imag(G_k[i]))")
-    # end
-
-    # for i = 1:length(tau_k)
-    #     G_k[i] = conformal_tau(tau_k[i], d.β)
-    #     G_k_rev[i] = conformal_tau(tau_k_rev[i], d.β)
-    # end
-
-    Sigma_k = J .^ 2 .* G_k .^ 2 .* G_k_rev # SYK self-energy in imaginary time
-    # Sigma_x = tau2dlr(d, Sigma_k) # DLR coeffs of self-energy
+    Sigma_x = J .^ 2 .* G_x .^ 2 .* G_x_rev # SYK self-energy in imaginary time
 
     # println("sigma diff: ", diff(Sigma_k, dlr2tau(d, Sigma_x)))
     # for i in 1:length(Sigma_x)
@@ -55,40 +44,26 @@ function syk_sigma_dlr(d, G_x, J = 1.0)
     # end
     # exit(0)
     # return real.(Sigma_k)
-    return Sigma_k
+    return Sigma_x
 end
 
-function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 100, G_x = zeros(ComplexF64, length(d)))
-
-    Sigma_q = zeros(Float64, length(d)) # Initial guess
+function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 50, G_x = zeros(ComplexF64, length(d)))
 
     for iter in 1:maxiter
 
-        # println(tau2matfreq(d, Sigma_q))
-        # mu = mu / 1.5
-
-
-        # G_q = matfreq2tau(d, G_q)
-        # for i in 1:length(G_q)
-        #     println("$(d.τ[i])    $(real(G_q[i]))     $(imag(G_q[i]))")
-        # end
-        # G_q = tau2matfreq(d, G_q)
-
-        # G_x = matfreq2dlr(d, G_q) # Get DLR coeffs
         # println("G diff: ", diff(G_q, dlr2matfreq(d, G_x)))
         Sigma_x = syk_sigma_dlr(d, G_x)
-        # Sigma_q_new = dlr2matfreq(d, Sigma_x_new)
-        # Sigma_q_new = real.(dlr2tau(d, Sigma_x_new))
-        # println("Sigma imag: ", maximum(abs.(imag.(Sigma_x_new))))
 
         # for i in 1:d.size
         #     println("$(d.τ[i])    $(real(Sigma_x_new[i]))     $(imag(Sigma_x_new[i]))")
         # end
         # println(typeof(Sigma_x_new))
 
-        G_q_new = -1 ./ (d.ωn * 1im .- mu .- tau2matfreq(d, Sigma_x)) # Solve Dyson
+        G_q_new = -1 ./ (d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x)) # Solve Dyson
 
         G_x_new = matfreq2tau(d, G_q_new)
+
+        println("imag", maximum(abs.(imag.(G_x_new))))
 
         println(diff(G_x_new, G_x))
         if maximum(abs.(G_x_new .- G_x)) < tol && iter > 5
@@ -100,23 +75,11 @@ function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.3, maxiter = 
     return G_x
 end
 
-# sigma_x = sigma_x_syk(d.dlr_from_tau(g_l), J, d, beta)
-# g_l_old = g_l
-# g_x_new = d.dyson_dlr(np.array([[mu]]), sigma_x, beta)
-# g_l_new = d.tau_from_dlr(g_x_new)
-
-# g_l = mixing * g_l_new + (1 - mixing) * g_l_old
-
-# diff = np.max(np.abs(g_l_new - g_l_old))
-# if verbose: print(f'iter = {iter}, diff = {diff}')
-# if diff < tol: break
-
-
-d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-10) # Initialize DLR object
-G_q = solve_syk_with_fixpoint_iter(d, 0.2)
-# G_q = solve_syk_with_fixpoint_iter(d, 0.15, G_q = tau2matfreq(d, G_q))
-# G_q = solve_syk_with_fixpoint_iter(d, 0.12, G_q = tau2matfreq(d, G_q))
-# G_q = solve_syk_with_fixpoint_iter(d, 0.11, G_q = tau2matfreq(d, G_q))
+d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-14) # Initialize DLR object
+G_q = solve_syk_with_fixpoint_iter(d, 0.0)
+# G_q = solve_syk_with_fixpoint_iter(d, 0.15, G_x = G_q)
+# G_q = solve_syk_with_fixpoint_iter(d, 0.12, G_x = G_q)
+# G_q = solve_syk_with_fixpoint_iter(d, 0.11, G_x = G_q)
 # println(G_q)
 for i in 1:length(G_q)
     println("$(d.τ[i])    $(real(G_q[i]))     $(imag(G_q[i]))")
