@@ -12,8 +12,8 @@ using Quadmath
 using ..Discrete
 
 # const Float = Float64
-# const Float = BigFloat
-const Float = Float128
+const Float = BigFloat
+# const Float = Float128
 
 include("kernel.jl")
 include("findmax.jl")

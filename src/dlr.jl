@@ -65,8 +65,8 @@ struct DLRGrid
         @assert Λ > 0 "Energy scale $Λ must be positive!"
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
 
-        if Λ > 1e8
-            @warn("Current implementation may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
+        if Λ > 1e8 && symmetry == :none
+            @warn("Current DLR without symmetry may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
         end
 
         if rtol >= 1e-6
