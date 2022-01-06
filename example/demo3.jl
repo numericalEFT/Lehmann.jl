@@ -47,7 +47,7 @@ function syk_sigma_dlr(d, G_x, J = 1.0)
     return Sigma_x
 end
 
-function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.1, maxiter = 1000, G_x = zeros(ComplexF64, length(d)))
+function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.2, maxiter = 1000, G_x = zeros(ComplexF64, length(d)))
 
     for iter in 1:maxiter
 
@@ -59,8 +59,9 @@ function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.1, maxiter = 
         # end
         # println(typeof(Sigma_x_new))
 
-        G_q_new = -1 ./ (d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x))
-        +1 ./ (-d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x)) # Solve Dyson
+        # G_q_new = -1 ./ (d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x))
+        # +1 ./ (-d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x)) # Solve Dyson
+        G_q_new = -1 ./ (d.ωn * 1im .- mu .+ tau2matfreq(d, Sigma_x)) # Solve Dyson
 
         G_x_new = matfreq2tau(d, G_q_new)
 
@@ -76,7 +77,7 @@ function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol; mix = 0.1, maxiter = 
     return G_x
 end
 
-d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-10, symmetry = :ph) # Initialize DLR object
+d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-7, symmetry = :ph) # Initialize DLR object
 G_q = solve_syk_with_fixpoint_iter(d, 0.00)
 # G_q = solve_syk_with_fixpoint_iter(d, 0.15, G_x = G_q)
 # G_q = solve_syk_with_fixpoint_iter(d, 0.12, G_x = G_q)
