@@ -85,13 +85,13 @@ end
 
 printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
 mix = 0.1
-dsym = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-6, symmetry = :ph) # Initialize DLR object
+dsym = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-8, symmetry = :ph) # Initialize DLR object
 G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix)
 printG(dsym, G_x_ph)
 
 printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
-mix = 0.01
-dnone = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-6, symmetry = :none) # Initialize DLR object
+mix = 0.02
+dnone = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-8, symmetry = :none) # Initialize DLR object
 G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix)
 printG(dnone, G_x_none)
 
