@@ -3,7 +3,7 @@ A SYK model solver based on a forward fixed-point iteration method.
 
  The self-energy of the SYK model is given by,
 
-    Σ(τ) = J^2 * G(τ) * G(τ) * G(β-τ),
+    Σ(τ) = J² * G(τ) * G(τ) * G(β-τ),
     
  where Green's function of the SYK model is given by the Dyson equation,
 
@@ -85,14 +85,24 @@ end
 
 printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
 mix = 0.1
-d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-6, symmetry = :ph) # Initialize DLR object
-G_x = solve_syk_with_fixpoint_iter(d, 0.00, mix = mix)
-printG(d, G_x)
+dsym = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-8, symmetry = :ph) # Initialize DLR object
+G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix)
+printG(dsym, G_x_ph)
 
 printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
-mix = 0.01
-d = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-6, symmetry = :none) # Initialize DLR object
-G_x = solve_syk_with_fixpoint_iter(d, 0.00, mix = mix)
-printG(d, G_x)
+mix = 0.02
+dnone = DLRGrid(Euv = 5.0, β = 1000.0, isFermi = true, rtol = 1e-8, symmetry = :none) # Initialize DLR object
+G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix)
+printG(dnone, G_x_none)
+
+printstyled("=====     Unsymmetrized versus Symmetrized DLR solver    =======\n", color = :yellow)
+@printf("%15s%40s%40s%40s\n", "τ", "sym DLR (interpolated)", "unsym DLR", "difference")
+G_x_interp = tau2tau(dsym, G_x_ph, dnone.τ)
+for i in 1:dnone.size
+    if dnone.τ[i] <= dnone.β / 2
+        @printf("%15.8f%40.15f%40.15f%40.15f\n", dnone.τ[i], real(G_x_interp[i]), real(G_x_none[i]), abs(real(G_x_interp[i] - G_x_none[i])))
+    end
+end
+println("maximumal difference: ", diff(G_x_interp, G_x_none))
 
 
