@@ -3,7 +3,7 @@ A SYK model solver based on a forward fixed-point iteration method.
 
  The self-energy of the SYK model is given by,
 
-    Σ(τ) = J^2 * G(τ) * G(τ) * G(β-τ),
+    Σ(τ) = J² * G(τ) * G(τ) * G(β-τ),
     
  where Green's function of the SYK model is given by the Dyson equation,
 
