@@ -42,7 +42,7 @@ end
 function dyson(d, sigma_q, mu)
     if d.symmetry == :ph #symmetrized G
         @assert mu ≈ 0.0 "Only the case μ=0 enjoys the particle-hole symmetry."
-        return 1im * imag.(1 ./ (d.ωn * 1im .+ mu .- sigma_q))
+        return 1im * imag.(-1 ./ (d.ωn * 1im .- mu .+ sigma_q))
     elseif d.symmetry == :none
         return -1 ./ (d.ωn * 1im .- mu .+ sigma_q)
     else

@@ -246,7 +246,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelΩ(isFermi::Bool, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
