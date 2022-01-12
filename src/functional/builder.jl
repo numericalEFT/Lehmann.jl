@@ -107,13 +107,13 @@ function printCandidate(basis, idx)
     @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, basis.grid[idx], lower, upper, basis.residual[idx])
 end
 
-function QR(Λ, rtol, proj, g0; N = nothing)
+function QR(Λ, rtol, proj, g0; N = nothing, verbose = false)
     basis = Basis(Λ, rtol)
     # println(g0)
     for g in g0
         idx = addBasis!(basis, proj, Float(g))
         # @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", 1, g, 0, Λ, basis.residual[idx])
-        printCandidate(basis, idx)
+        verbose && printCandidate(basis, idx)
     end
 
     # @code_warntype Residual(basis, proj, Float(1.0))
@@ -125,7 +125,7 @@ function QR(Λ, rtol, proj, g0; N = nothing)
 
         newω = basis.candidate[ωi]
         idx = addBasis!(basis, proj, newω)
-        printCandidate(basis, idx)
+        verbose && printCandidate(basis, idx)
         # println(length(basis.grid))
         # println(idx)
         # lower = (idx == 1) ? 0 : basis.grid[idx - 1]
@@ -136,9 +136,9 @@ function QR(Λ, rtol, proj, g0; N = nothing)
         # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
         maxResidual, ωi = findmax(basis.candidateResidual)
     end
-    testOrthgonal(basis)
+    testOrthgonal(basis, verbose)
     # @printf("residual = %.10e, Fnorm/F0 = %.10e\n", residual, residualF(freq, Q, Λ))
-    @printf("residual = %.10e\n", maximum(basis.candidateResidual))
+    verbose && @printf("residual = %.10e\n", maximum(basis.candidateResidual))
     # plotResidual(basis, proj, Float(0), Float(100), basis.candidate, basis.candidateResidual)
     return basis
 end
@@ -215,11 +215,11 @@ function Residual(basis, proj, g::Float)
 end
 
 
-function testOrthgonal(basis)
-    println("testing orthognalization...")
+function testOrthgonal(basis, verbose)
+    # println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
     maxerr = maximum(abs.(II - I))
-    println("Max Orthognalization Error: ", maxerr)
+    verbose && println("Max Orthognalization Error: ", maxerr)
 end
 
 """

@@ -17,7 +17,7 @@ A SYK model solver based on a forward fixed-point iteration method.
 
  The SYK Green's function has particle-hole symmetry when μ=0. 
  You may enforce such symmetry by setting `symmetry = :ph` when initialize the DLR grids.
- A symmetrized solver tends to be more robust than the unsymmetrized counterpart.
+ A symmetrized solver tends to be more robust than a unsymmetrized one.
 """
 
 using Lehmann
@@ -87,29 +87,48 @@ end
 
 verbose = false
 
+printstyled("=====    Prepare the expected Green's function of the SYK model     =======\n", color = :yellow)
+dsym_correct = DLRGrid(Euv = 5.0, β = 10000.0, isFermi = true, rtol = 1e-14, symmetry = :ph) # Initialize DLR object
+G_x_correct = solve_syk_with_fixpoint_iter(dsym_correct, 0.00, mix = 0.1, verbose = false)
+printG(dsym_correct, G_x_correct)
+
+printstyled("=====    Test Symmetrized and Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
+
+@printf("%30s%30s%30s%15s\n", "Euv", "symmetrized solver error", "unsymmetrized solver error", "good or bad")
 for Euv in LinRange(5.0, 10.0, 50)
 
+    rtol = 1e-10
+    β = 10000.0
     # printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
-    mix = 0.1
-    dsym = DLRGrid(Euv = Euv, β = 10000.0, isFermi = true, rtol = 1e-10, symmetry = :ph) # Initialize DLR object
+    mix = 0.01
+    dsym = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :ph, rebuild = true, verbose = false) # Initialize DLR object
     G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
     # printG(dsym, G_x_ph)
 
     # printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
-    dnone = DLRGrid(Euv = Euv, β = 10000.0, isFermi = true, rtol = 1e-10, symmetry = :none, rebuild = true, verbose = false) # Initialize DLR object
+    dnone = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :none, rebuild = true, verbose = false) # Initialize DLR object
     G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, verbose = verbose)
     # printG(dnone, G_x_none)
 
     # printstyled("=====     Unsymmetrized versus Symmetrized DLR solver    =======\n", color = :yellow)
     # @printf("%15s%40s%40s%40s\n", "τ", "sym DLR (interpolated)", "unsym DLR", "difference")
-    G_x_interp = tau2tau(dsym, G_x_ph, dnone.τ)
+    # G_x_interp = tau2tau(dsym_correct, G_x_correct, dnone.τ)
     # for i in 1:dnone.size
     #     if dnone.τ[i] <= dnone.β / 2
     #         @printf("%15.8f%40.15f%40.15f%40.15f\n", dnone.τ[i], real(G_x_interp[i]), real(G_x_none[i]), abs(real(G_x_interp[i] - G_x_none[i])))
     #     end
     # end
-    println("Euv = $Euv maximumal difference: ", diff(G_x_interp, G_x_none))
+
+    G_x_interp_ph = tau2tau(dsym_correct, G_x_correct, dsym.τ)
+    G_x_interp_none = tau2tau(dsym_correct, G_x_correct, dnone.τ)
+    d_ph = diff(G_x_interp_ph, G_x_ph)
+    d_none = diff(G_x_interp_none, G_x_none)
+    flag = (d_ph < 100rtol) && (d_none < 100rtol) ? "good" : "bad"
+
+    @printf("%30.15f%30.15e%30.15e%20s\n", Euv, d_ph, d_none, flag)
+    # println("symmetric Euv = $Euv maximumal difference: ", diff(G_x_interp, G_x_ph))
+    # println("non symmetric Euv = $Euv maximumal difference: ", diff(G_x_interp, G_x_none))
 
 end
 

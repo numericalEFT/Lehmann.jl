@@ -93,7 +93,7 @@ struct DLRGrid
         end
 
         function filename(lambda, errpower)
-            lambda = Int(lambda)
+            lambda = Int(floor(lambda))
             errstr = "1e$errpower"
 
             if symmetry == :none
@@ -118,7 +118,7 @@ struct DLRGrid
                 dlrfile = finddlr(folderList, file)
 
                 if isnothing(dlrfile) == false
-                    dlr = new(isFermi, symmetry, Euv, β, Λint, 10.0^(float(rtolpower)), [], [], [], [])
+                    dlr = new(isFermi, symmetry, Euv, β, Λfloor, 10.0^(float(rtolpower)), [], [], [], [])
                     _load!(dlr, dlrfile, verbose)
                     return dlr
                 else
