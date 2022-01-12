@@ -89,7 +89,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, dlrGrid.β, true)
+    kernel = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, dlrGrid.β, true)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -127,7 +127,7 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelT(dlrGrid.isFermi, dlrGrid.symmetry, τGrid, ωGrid, β, true)
+    kernel = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, β, true)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -154,7 +154,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β, true)
+    kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
     typ = promote_type(eltype(kernel), eltype(green))
     kernel = convert.(typ, kernel)
     green = convert.(typ, green)
@@ -189,7 +189,7 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    kernel = Spectral.kernelΩ(dlrGrid.isFermi, dlrGrid.symmetry, nGrid, ωGrid, dlrGrid.β, true)
+    kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 

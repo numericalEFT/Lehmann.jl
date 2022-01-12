@@ -6,7 +6,7 @@ export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type.
 
@@ -18,7 +18,7 @@ Compute the imaginary-time kernel of different type.
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat,isFermi,symmetry}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT_regular(τ, ω, β)
@@ -30,16 +30,15 @@ Compute the imaginary-time kernel of different type.
     elseif symmetry == :pha
         return isFermi ? kernelFermiT_PHA(τ, ω, β) : kernelBoseT_PHA(τ, ω, β)
     else
-        @error "Symmetry $symmetry is not implemented!"
-        return T(0)
+        error("Symmetry $symmetry is not implemented!")
     end
 end
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute kernel with given τ and ω grids.
 """
-function kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     kernel = zeros(T, (length(τGrid), length(ωGrid)))
     for (τi, τ) in enumerate(τGrid)
         for (ωi, ω) in enumerate(ωGrid)
@@ -234,7 +233,7 @@ end
 
 
 """
-    kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
@@ -246,7 +245,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat,isFermi,symmetry}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
@@ -258,17 +257,16 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
     elseif symmetry == :pha
         return isFermi ? kernelFermiΩ_PHA(n, ω, β) : kernelBoseΩ_PHA(n, ω, β)
     else
-        @error "Symmetry $symmetry  is not implemented!"
-        return T(0)
+        error("Symmetry $symmetry  is not implemented!")
     end
 end
 
 """
-    kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
+    kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
-function kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
     for (ni, n) in enumerate(nGrid)
         for (ωi, ω) in enumerate(ωGrid)
