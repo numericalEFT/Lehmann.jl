@@ -246,7 +246,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelΩ(isFermi::Bool, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
@@ -378,7 +378,7 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
         throw(DomainError("real frequency should be positive!"))
     end
     ω_n = (2n + 1) * π / β
-    K = -2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
+    K = 2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
     if !isfinite(K)
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
     end
@@ -466,14 +466,14 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
     x = ω * β
     ω_n = 2n * π / β
     # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
-    K = -2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
+    K = 2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
 
     if n == 0
         K = T(0)
     else
         ω_n = 2n * π / β
         # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
-        K = -2ω_n / (ω^2 + ω_n^2) * (-expm1(-x))
+        K = 2ω_n / (ω^2 + ω_n^2) * (-expm1(-x))
     end
     if !isfinite(K)
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))

@@ -23,11 +23,11 @@ We use the following conventions:
 - Fourier transform follows the convention in the book "Quantum Many-particle Systems" by J. Negele and H. Orland, Page 95,
 
 ```math
-G(\tau) = \frac{1}{\beta} \sum_n G(i\omega_n) \text{e}^{i\omega_n \tau}
+G(\tau) = \frac{1}{\beta} \sum_n G(i\omega_n) \text{e}^{-i\omega_n \tau}
 ```
 
 ```math
-G(i\omega_n) = \int_0^\beta G(\tau) \text{e}^{-i\omega_n \tau} d\tau
+G(i\omega_n) = \int_0^\beta G(\tau) \text{e}^{i\omega_n \tau} d\tau
 ```
 
 # Fermion without Symmetry 
@@ -65,7 +65,7 @@ K(τ, ω) = e^{-ω|τ|}+e^{-ω(β-|τ|)}
 ```
 - Matusbara frequency
 ```math
-K(iω_n, ω) = -\frac{2iω_n}{ω^2+ω_n^2}(1+e^{-ωβ}),
+K(iω_n, ω) = \frac{2iω_n}{ω^2+ω_n^2}(1+e^{-ωβ}),
 ```
 
 # Boson with the Particle-hole Symmetry 
@@ -104,5 +104,5 @@ K(τ, ω) = e^{-ω|τ|}-e^{-ω(β-|τ|)}
 ```
 - Matusbara frequency
 ```math
-K(iω_n, ω) = -\frac{2iω_n}{ω^2+ω_n^2}(1-e^{-ωβ}),
+K(iω_n, ω) = \frac{2iω_n}{ω^2+ω_n^2}(1-e^{-ωβ}),
 ```
