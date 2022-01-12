@@ -74,6 +74,11 @@ struct DLRGrid
             @warn("Current implementation may cause ~ 3-4 digits loss for rtol ≥ 1e-6!")
         end
 
+        rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n
+        if abs(rtolpower) < 4
+            rtolpower = -4
+        end
+        rtol = 10.0^float(rtolpower)
 
         function finddlr(folder, filename)
             searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
@@ -87,9 +92,9 @@ struct DLRGrid
             return nothing
         end
 
-        function filename(lambda, err, errinpower = true)
-
-            errstr = errinpower ? "1e$err" : "$err"
+        function filename(lambda, errpower)
+            lambda = Int(lambda)
+            errstr = "1e$errpower"
 
             if symmetry == :none
                 return "universal_$(lambda)_$(errstr).dlr"
@@ -105,15 +110,10 @@ struct DLRGrid
 
         if rebuild == false
             if isnothing(folder)
-                Λint = Λ < 100 ? Int(100) : 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
-
-                rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n
-                if abs(rtolpower) < 4
-                    rtolpower = -4
-                end
+                Λfloor = Λ < 100 ? Int(100) : 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
 
                 folderList = [string(@__DIR__, "/../basis/"),]
-                file = filename(Λint, rtolpower, true)
+                file = filename(Λfloor, rtolpower)
 
                 dlrfile = finddlr(folderList, file)
 
@@ -125,7 +125,7 @@ struct DLRGrid
                     @warn("No DLR is found in the folder $folder, try to rebuild instead.")
                 end
             else
-                file = filename(Euv * β, rtol, false)
+                file = filename(Euv * β, rtolpower)
                 folderList = [folder,]
 
                 dlrfile = finddlr(folderList, file)
@@ -143,7 +143,7 @@ struct DLRGrid
 
         # try to rebuild the dlrGrid
         dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [])
-        file2save = filename(Euv * β, rtol, false)
+        file2save = filename(Euv * β, rtolpower)
         _build!(dlr, folder, file2save, algorithm, verbose)
         return dlr
     end
