@@ -42,8 +42,8 @@ struct DLRGrid
     τ::Vector{Float64}
 
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional, verbose = 0)
-    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-8, rebuild = false, folder = nothing, algorithm = :functional, verbose = 0)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
+    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-8, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
 
     Create DLR grids
 
@@ -54,9 +54,10 @@ struct DLRGrid
     - `symmetry`  : particle-hole symmetric :ph, or particle-hole asymmetric :pha, or :none
     - `rtol`      : tolerance absolute error
     - `rebuild`   : set false to load DLR basis from the file, set true to recalculate the DLR basis on the fly
-    - `folder`    : the folder to load the DLR file if rebuild = false, or the folder to save the DLR file if rebuild = true
+    - `folder`    : if rebuild is true and folder is set, then dlrGrid will be rebuilt and saved to the specified folder
+                    if rebuild is false and folder is set, then dlrGrid will be loaded from the specified folder
     - `algorithm` : if rebuild = true, then set :functional to use the functional algorithm to generate the DLR basis, or set :discrete to use the matrix algorithm.
-    - `verbose`   : 0 not to print DLRGrid to terminal, >0 to print
+    - `verbose`   : false not to print DLRGrid to terminal, or true to print
     """
     function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
         Λ = Euv * β # dlr only depends on this dimensionless scale
@@ -73,39 +74,80 @@ struct DLRGrid
             @warn("Current implementation may cause ~ 3-4 digits loss for rtol ≥ 1e-6!")
         end
 
-        if Λ < 100
-            Λ = Int(100)
-        else
-            Λ = 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
-        end
-
         rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n
         if abs(rtolpower) < 4
             rtolpower = -4
         end
+        rtol = 10.0^float(rtolpower)
 
-        if symmetry == :none
-            # if isFermi
-            filename = "universal_$(Λ)_1e$(rtolpower).dlr"
-            # else
-            #     error("Generic bosonic dlr has not yet been implemented!")
-            # end
-        elseif symmetry == :ph
-            filename = "ph_$(Λ)_1e$(rtolpower).dlr"
-        elseif symmetry == :pha
-            filename = "pha_$(Λ)_1e$(rtolpower).dlr"
-        else
-            error("$symmetry is not implemented!")
+        function finddlr(folder, filename)
+            searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
+            for dir in folder
+                if length(searchdir(dir, filename)) > 0
+                    #dlr file found
+                    return joinpath(dir, filename)
+                end
+            end
+            @warn("Cann't find the DLR file $filename in the folders $folder. Regenerating DLR...")
+            return nothing
         end
 
-        dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [])
-        if rebuild
-            _build!(dlr, folder, filename, algorithm, verbose)
-        else
-            _load!(dlr, folder, filename, algorithm, verbose)
+        function filename(lambda, errpower)
+            lambda = Int(floor(lambda))
+            errstr = "1e$errpower"
+
+            if symmetry == :none
+                return "universal_$(lambda)_$(errstr).dlr"
+            elseif symmetry == :ph
+                return "ph_$(lambda)_$(errstr).dlr"
+            elseif symmetry == :pha
+                return "pha_$(lambda)_$(errstr).dlr"
+            else
+                error("$symmetry is not implemented!")
+            end
         end
+
+
+        if rebuild == false
+            if isnothing(folder)
+                Λfloor = Λ < 100 ? Int(100) : 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
+
+                folderList = [string(@__DIR__, "/../basis/"),]
+                file = filename(Λfloor, rtolpower)
+
+                dlrfile = finddlr(folderList, file)
+
+                if isnothing(dlrfile) == false
+                    dlr = new(isFermi, symmetry, Euv, β, Λfloor, 10.0^(float(rtolpower)), [], [], [], [])
+                    _load!(dlr, dlrfile, verbose)
+                    return dlr
+                else
+                    @warn("No DLR is found in the folder $folder, try to rebuild instead.")
+                end
+            else
+                file = filename(Euv * β, rtolpower)
+                folderList = [folder,]
+
+                dlrfile = finddlr(folderList, file)
+
+                if isnothing(dlrfile) == false
+                    dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [])
+                    _load!(dlr, dlrfile, verbose)
+                    return dlr
+                else
+                    @warn("No DLR is found in the folder $folder, try to rebuild instead.")
+                end
+            end
+
+        end
+
+        # try to rebuild the dlrGrid
+        dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [])
+        file2save = filename(Euv * β, rtolpower)
+        _build!(dlr, folder, file2save, algorithm, verbose)
         return dlr
     end
+
     function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
         return DLRGrid(Euv, β, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose)
     end
@@ -133,29 +175,7 @@ Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
-function _load!(dlrGrid::DLRGrid, folder, filename, algorithm = :functional, verbose = false)
-    searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
-
-    function finddlr(folder, filename)
-        for dir in folder
-            if length(searchdir(dir, filename)) > 0
-                #dlr file found
-                return joinpath(dir, filename)
-            end
-        end
-        @warn("Cann't find the DLR file $filename in the folders $folder. Regenerating DLR...")
-        return nothing
-    end
-
-    folder = isnothing(folder) ? [] : collect(folder)
-    push!(folder, string(@__DIR__, "/../basis/"))
-
-    dlrfile = finddlr(folder, filename)
-
-    if isnothing(dlrfile)
-        _build!(dlrGrid, nothing, nothing, algorithm)
-        return
-    end
+function _load!(dlrGrid::DLRGrid, dlrfile, verbose = false)
 
     grid = readdlm(dlrfile, comments = true, comment_char = '#')
     # println("reading $filename")
@@ -205,6 +225,7 @@ function _build!(dlrGrid::DLRGrid, folder, filename, algorithm, verbose = false)
         push!(dlrGrid.n, n)
         push!(dlrGrid.ωn, isFermi ? (2n + 1.0) * π / β : 2n * π / β)
     end
+    # println(rank)
 end
 
 
