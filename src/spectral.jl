@@ -6,19 +6,19 @@ export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type.
 
 # Arguments
-- `isFermi`: fermionic or bosonic
-- `symmetry`: :ph, :pha, or :none
+- `isFermi`: fermionic or bosonic. It should be wrapped as `Val(isFermi)`.
+- `symmetry`: :ph, :pha, or :none. It should be wrapped as `Val(symmetry)`.
 - `τ`: the imaginary time, must be (-β, β]
 - `ω`: energy 
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelT(isFermi::Bool, symmetry::Symbol, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat,isFermi,symmetry}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT_regular(τ, ω, β)
@@ -30,17 +30,16 @@ Compute the imaginary-time kernel of different type.
     elseif symmetry == :pha
         return isFermi ? kernelFermiT_PHA(τ, ω, β) : kernelBoseT_PHA(τ, ω, β)
     else
-        @error "Symmetry $symmetry is not implemented!"
-        return T(0)
+        error("Symmetry $symmetry is not implemented!")
     end
 end
 """
-    kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
 
 Compute kernel with given τ and ω grids.
 """
-function kernelT(isFermi::Bool, symmetry::Symbol, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
-    kernel = zeros(T, (length(τGrid), length(ωGrid)))
+function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
+    kernel = zeros(type, (length(τGrid), length(ωGrid)))
     for (τi, τ) in enumerate(τGrid)
         for (ωi, ω) in enumerate(ωGrid)
             kernel[τi, ωi] = kernelT(isFermi, symmetry, τ, ω, β, regularized)
@@ -234,19 +233,19 @@ end
 
 
 """
-    kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
 # Arguments
-- `isFermi`: fermionic or bosonic
-- `symmetry`: :ph, :pha, or :none
+- `isFermi`: fermionic or bosonic. It should be wrapped as `Val(isFermi)`.
+- `symmetry`: :ph, :pha, or :none. It should be wrapped as `Val(symmetry)`.
 - `n`: index of the Matsubara frequency
 - `ω`: energy 
 - `β`: the inverse temperature 
 - `regularized`: use regularized kernel or not
 """
-@inline function kernelΩ(isFermi::Bool, symmetry::Symbol, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+@inline function kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat,isFermi,symmetry}
     if symmetry == :none
         if regularized
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
@@ -258,18 +257,18 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
     elseif symmetry == :pha
         return isFermi ? kernelFermiΩ_PHA(n, ω, β) : kernelBoseΩ_PHA(n, ω, β)
     else
-        @error "Symmetry $symmetry  is not implemented!"
-        return T(0)
+        error("Symmetry $symmetry  is not implemented!")
     end
 end
 
 """
-    kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
+    kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
-function kernelΩ(isFermi::Bool, symmetry::Symbol, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
-    kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
+function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
+    # println(type)
+    kernel = zeros(type, (length(nGrid), length(ωGrid)))
     for (ni, n) in enumerate(nGrid)
         for (ωi, ω) in enumerate(ωGrid)
             kernel[ni, ωi] = kernelΩ(isFermi, symmetry, n, ω, β, regularized)
@@ -378,7 +377,7 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
         throw(DomainError("real frequency should be positive!"))
     end
     ω_n = (2n + 1) * π / β
-    K = -2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
+    K = 2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
     if !isfinite(K)
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
     end
@@ -466,14 +465,14 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
     x = ω * β
     ω_n = 2n * π / β
     # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
-    K = -2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
+    K = 2ω_n / (ω^2 + ω_n^2) * (1 + exp(-ω * β))
 
     if n == 0
         K = T(0)
     else
         ω_n = 2n * π / β
         # expm1(x)=exp(x)-1 fixes the accuracy for x-->0^+
-        K = -2ω_n / (ω^2 + ω_n^2) * (-expm1(-x))
+        K = 2ω_n / (ω^2 + ω_n^2) * (-expm1(-x))
     end
     if !isfinite(K)
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))

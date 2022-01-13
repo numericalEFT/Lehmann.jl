@@ -42,7 +42,7 @@ end
 function dyson(d, sigma_q, mu)
     if d.symmetry == :ph #symmetrized G
         @assert mu ≈ 0.0 "Only the case μ=0 enjoys the particle-hole symmetry."
-        return 1im * imag.(1 ./ (d.ωn * 1im .+ mu .- sigma_q))
+        return 1im * imag.(-1 ./ (d.ωn * 1im .- mu .+ sigma_q))
     elseif d.symmetry == :none
         return -1 ./ (d.ωn * 1im .- mu .+ sigma_q)
     else
@@ -102,13 +102,13 @@ for Euv in LinRange(5.0, 10.0, 50)
     # printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
     dsym = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :ph, rebuild = true, verbose = false) # Initialize DLR object
-    G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
+    @time G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
     # printG(dsym, G_x_ph)
 
     # printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
     dnone = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :none, rebuild = true, verbose = false) # Initialize DLR object
-    G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, verbose = verbose)
+    @time G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, verbose = verbose)
     # printG(dnone, G_x_none)
 
     # printstyled("=====     Unsymmetrized versus Symmetrized DLR solver    =======\n", color = :yellow)

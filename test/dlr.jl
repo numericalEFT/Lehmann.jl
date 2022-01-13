@@ -186,18 +186,34 @@ end
     @test coeff ≈ [3.5, 1.4]
 end
 
-# @testset "DLR from generic grids" begin
-#     Euv, β = 1000.0, 10.0
-#     eps = 1e-10
-#     isFermi = true
-#     symmetry = :none
-#     para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
-#     dlr = DLRGrid(Euv, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
-#     dlr10 = DLRGrid(Euv * 10, β, eps, isFermi; symmetry = symmetry) #construct dlr basis
+@testset "DLR io" begin
+    function finddlr(folder, filename)
+        searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
+        file = searchdir(folder, filename)
+        if length(file) == 1
+            #dlr file found
+            println("find dlr file: ", file[1])
+            return joinpath(folder, file[1])
+        end
+        return nothing
+    end
 
-#     Gτ, error = SemiCircle(isFermi, symmetry, dlr10.τ, β, Euv, IsMatFreq = false)
-#     @assert maximum(error) < eps
-#     Gn, error = SemiCircle(isFermi, symmetry, dlr10.n, β, Euv, IsMatFreq = true)
-#     @assert maximum(error) < eps
+    folder = "./"
+    Euv, β, rtol = 1.5, 110.0, 4.3e-8
 
-# end
+    #save dlr to a local file
+    dlr = Lehmann.DLRGrid(Euv, β, rtol, true; rebuild = true, folder = folder, verbose = false)
+    file = finddlr(folder, ".dlr")
+    @test isnothing(file) == false
+    #load dlr from the local file
+    dlr_load = Lehmann.DLRGrid(Euv, β, rtol, true; rebuild = false, folder = folder, verbose = false)
+    @test dlr_load.τ ≈ dlr.τ
+    @test dlr_load.n ≈ dlr.n
+    @test dlr_load.ω ≈ dlr.ω
+    @test dlr_load.ωn ≈ dlr.ωn
+    @test dlr_load.Euv ≈ dlr.Euv
+    @test dlr_load.β ≈ dlr.β
+    @test dlr_load.rtol ≈ dlr.rtol
+    @test dlr_load.Λ ≈ dlr.Λ
+    rm(file)
+end
