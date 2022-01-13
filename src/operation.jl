@@ -112,7 +112,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
 
-    if all(abs.(coeff) .< 1e16) == false
+    if all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
     end
 
@@ -191,7 +191,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
         error, psize = _tensor2matrix(error, axis)
     end
     coeff = _weightedLeastSqureFit(g, error, kernel)
-    if all(abs.(coeff) .< 1e16) == false
+    if all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
     end
     return _matrix2tensor(coeff, partialsize, axis)

@@ -89,7 +89,9 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
                     #spectral density is defined for positivie frequency only for correlation functions
                     continue
                 end
-                ker = IsMatFreq ? Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) : Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+                ker = IsMatFreq ?
+                      Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
+                      Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
                 G[τi] += (b - a) / 2 * wl[jj] * ker * sqrt(1 - x^2)
             end
         end
@@ -97,7 +99,9 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
         a, b = 1.0 / 2, 1.0
         for jj = 1:n
             x = (a + b) / 2 + (b - a) / 2 * xj[jj]
-            ker = IsMatFreq ? Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) : Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+            ker = IsMatFreq ?
+                  Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
+                  Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
             G[τi] += ((b - a) / 2)^1.5 * wj[jj] * ker * sqrt(1 + x)
         end
 
@@ -106,7 +110,9 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
             a, b = -1.0, -1.0 / 2
             for jj = 1:n
                 x = (a + b) / 2 + (b - a) / 2 * (-xj[n-jj+1])
-                ker = IsMatFreq ? Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) : Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+                ker = IsMatFreq ?
+                      Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
+                      Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
                 G[τi] += ((b - a) / 2)^1.5 * wj[n-jj+1] * ker * sqrt(1 - x)
             end
         end
