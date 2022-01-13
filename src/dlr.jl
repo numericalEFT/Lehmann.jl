@@ -26,7 +26,7 @@ struct DLRGrid
 - `ωn` : (2n+1)π/β
 - `τ` : selected representative imaginary-time grid
 """
-struct DLRGrid
+mutable struct DLRGrid
     isFermi::Bool
     symmetry::Symbol
     Euv::Float64
@@ -40,6 +40,9 @@ struct DLRGrid
     n::Vector{Int} # integers, (2n+1)π/β gives the Matsubara frequency
     ωn::Vector{Float64} # (2n+1)π/β
     τ::Vector{Float64}
+
+    kernel_τ::Any
+    kernel_n::Any
 
     """
     function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
@@ -110,41 +113,34 @@ struct DLRGrid
 
         if rebuild == false
             if isnothing(folder)
-                Λfloor = Λ < 100 ? Int(100) : 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
-
+                Λ = Λ < 100 ? Int(100) : 10^(Int(ceil(log10(Λ)))) # get smallest n so that Λ<10^n
                 folderList = [string(@__DIR__, "/../basis/"),]
-                file = filename(Λfloor, rtolpower)
-
-                dlrfile = finddlr(folderList, file)
-
-                if isnothing(dlrfile) == false
-                    dlr = new(isFermi, symmetry, Euv, β, Λfloor, 10.0^(float(rtolpower)), [], [], [], [])
-                    _load!(dlr, dlrfile, verbose)
-                    return dlr
-                else
-                    @warn("No DLR is found in the folder $folder, try to rebuild instead.")
-                end
             else
-                file = filename(Euv * β, rtolpower)
                 folderList = [folder,]
+            end
 
-                dlrfile = finddlr(folderList, file)
+            file = filename(Λ, rtolpower)
+            dlrfile = finddlr(folderList, file)
 
-                if isnothing(dlrfile) == false
-                    dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [])
-                    _load!(dlr, dlrfile, verbose)
-                    return dlr
-                else
-                    @warn("No DLR is found in the folder $folder, try to rebuild instead.")
-                end
+            if isnothing(dlrfile) == false
+                dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [], nothing, nothing)
+                _load!(dlr, dlrfile, verbose)
+                dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
+                dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
+                return dlr
+            else
+                @warn("No DLR is found in the folder $folder, try to rebuild instead.")
             end
 
         end
 
         # try to rebuild the dlrGrid
-        dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [])
+        dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [], nothing, nothing)
         file2save = filename(Euv * β, rtolpower)
         _build!(dlr, folder, file2save, algorithm, verbose)
+
+        dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
+        dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
         return dlr
     end
 

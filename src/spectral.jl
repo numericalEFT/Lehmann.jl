@@ -38,8 +38,8 @@ end
 
 Compute kernel with given τ and ω grids.
 """
-function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
-    kernel = zeros(T, (length(τGrid), length(ωGrid)))
+function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
+    kernel = zeros(type, (length(τGrid), length(ωGrid)))
     for (τi, τ) in enumerate(τGrid)
         for (ωi, ω) in enumerate(ωGrid)
             kernel[τi, ωi] = kernelT(isFermi, symmetry, τ, ω, β, regularized)
@@ -266,8 +266,9 @@ end
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
-function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
-    kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
+function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
+    # println(type)
+    kernel = zeros(type, (length(nGrid), length(ωGrid)))
     for (ni, n) in enumerate(nGrid)
         for (ωi, ω) in enumerate(ωGrid)
             kernel[ni, ωi] = kernelΩ(isFermi, symmetry, n, ω, β, regularized)

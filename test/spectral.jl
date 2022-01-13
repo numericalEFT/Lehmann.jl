@@ -3,17 +3,17 @@
         println("Testing $symmetry  for β=$β, τ=$τ, ε=$ε")
         n(ε, β) = 1.0 / (exp(ε * β) - sign * 1.0)
         @test Spectral.density(isFermi, ε, β) ≈ n(ε, β)
-        @test Spectral.kernelT(isFermi, symmetry, eps(0.0), ε, β) ≈ 1.0 + sign * n(ε, β)
+        @test Spectral.kernelT(Val(isFermi), Val(symmetry), eps(0.0), ε, β) ≈ 1.0 + sign * n(ε, β)
 
         # @test Spectral.kernelT(type, 0.0, ε, β) ≈ sign * n(ε, β) # τ=0.0 should be treated as the 0⁻
-        @test Spectral.kernelT(isFermi, symmetry, -eps(0.0), ε, β) ≈ sign * n(ε, β)
+        @test Spectral.kernelT(Val(isFermi), Val(symmetry), -eps(0.0), ε, β) ≈ sign * n(ε, β)
 
-        @test Spectral.kernelT(isFermi, symmetry, -τ, ε, β) ≈ sign * Spectral.kernelT(isFermi, symmetry, β - τ, ε, β)
-        @test Spectral.kernelT(isFermi, symmetry, -eps(0.0), 1000.0, 1.0) ≈ 0.0
-        @test Spectral.kernelT(isFermi, symmetry, -eps(0.0), -1000.0, 1.0) ≈ -1.0
+        @test Spectral.kernelT(Val(isFermi), Val(symmetry), -τ, ε, β) ≈ sign * Spectral.kernelT(Val(isFermi), Val(symmetry), β - τ, ε, β)
+        @test Spectral.kernelT(Val(isFermi), Val(symmetry), -eps(0.0), 1000.0, 1.0) ≈ 0.0
+        @test Spectral.kernelT(Val(isFermi), Val(symmetry), -eps(0.0), -1000.0, 1.0) ≈ -1.0
         if isFermi
             # ω can not be zero for boson
-            @test Spectral.kernelT(true, :none, τ, 0.0, β) ≈ n(0.0, β)
+            @test Spectral.kernelT(Val(true), Val(:none), τ, 0.0, β) ≈ n(0.0, β)
         end
     end
 
@@ -31,8 +31,8 @@
         τ0, ω0, macheps = 0.0, 0.0, 0.0
         for (τi, τ) in enumerate(τGrid)
             for (ωi, ω) in enumerate(ωGrid)
-                ker1 = Spectral.kernelT(isFermi, symmetry, τ, ω, β)
-                ker2 = Spectral.kernelT(isFermi, symmetry, BigFloat(τ), BigFloat(ω), BigFloat(β))
+                ker1 = Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β)
+                ker2 = Spectral.kernelT(Val(isFermi), Val(symmetry), BigFloat(τ), BigFloat(ω), BigFloat(β))
                 if abs(ker1 - ker2) > maxErr
                     maxErr = abs(ker1 - ker2)
                     τ0, ω0, macheps = τ, ω, eps(ker1) # get the machine accuracy for the float number ker1
