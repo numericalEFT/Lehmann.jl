@@ -11,8 +11,8 @@ export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseE
 Compute the imaginary-time kernel of different type.
 
 # Arguments
-- `isFermi`: fermionic or bosonic
-- `symmetry`: :ph, :pha, or :none
+- `isFermi`: fermionic or bosonic. It should be wrapped as `Val(isFermi)`.
+- `symmetry`: :ph, :pha, or :none. It should be wrapped as `Val(symmetry)`.
 - `τ`: the imaginary time, must be (-β, β]
 - `ω`: energy 
 - `β`: the inverse temperature 
@@ -34,7 +34,7 @@ Compute the imaginary-time kernel of different type.
     end
 end
 """
-    kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
 
 Compute kernel with given τ and ω grids.
 """
@@ -238,8 +238,8 @@ end
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
 # Arguments
-- `isFermi`: fermionic or bosonic
-- `symmetry`: :ph, :pha, or :none
+- `isFermi`: fermionic or bosonic. It should be wrapped as `Val(isFermi)`.
+- `symmetry`: :ph, :pha, or :none. It should be wrapped as `Val(symmetry)`.
 - `n`: index of the Matsubara frequency
 - `ω`: energy 
 - `β`: the inverse temperature 
@@ -262,7 +262,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 end
 
 """
-    kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T) where {T<:AbstractFloat}
+    kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
