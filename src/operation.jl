@@ -40,38 +40,100 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
-function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
-    # Gτ: (Nτ, N), kernel: (Nτ, Nω)
-    # error: (Nτ, N), sumrule: (N, 1)
+# function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
+#     # Gτ: (Nτ, N), kernel: (Nτ, Nω)
+#     # error: (Nτ, N), sumrule: (N, 1)
+#     Nτ, Nω = size(kernel)
+#     @assert size(Gτ)[1] == Nτ
+#     N = size(Gτ)[2]
+#     if isnothing(sumrule) == false
+#         @assert dlr.symmetry == :none && dlr.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
+#         # println(size(Gτ))
+#         # M = Int(floor(dlr.size / 2))
+#         M = dlr.size
+
+#         # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+#         kernelN = kernel[:, M]
+
+#         # sign = dlr.isFermi ? -1 : 1
+#         # ker0 = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [0.0,], dlr.ω, dlr.β, true)
+#         # kerβ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [dlr.β,], dlr.ω, dlr.β, true)
+
+#         # ker = ker0[1:end] .- sign .* kerβ[1:end]
+#         # ker = vcat(ker[1:M-1], ker[M+1:end])
+#         # kerN = ker[M]
+
+#         for i in 1:Nτ
+#             # Gτ[i, :] .-= kernelN[i] * sumrule / kerN
+#             Gτ[i, :] .-= kernelN[i] * sumrule
+#         end
+
+#         # for i = 1:Nω-1
+#         #     kernel[:, i] .-= kernelN * ker[i] / kerN
+#         # end
+#         kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
+#     end
+
+#     if isnothing(error)
+#         B = kernel
+#         C = Gτ
+#     else
+#         @assert size(error) == size(Gτ)
+#         w = 1.0 ./ (error .+ 1e-16)
+
+#         for i = 1:Nτ
+#             w[i, :] /= sum(w[i, :]) / length(w[i, :])
+#         end
+#         B = w .* kernel
+#         C = w .* Gτ
+#     end
+#     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
+#     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
+#     coeff = B \ C #solve C = B * coeff
+
+#     # println("size", size(coeff), ", rank,", dlr.size, "...,", size(kernel))
+
+#     if isnothing(sumrule) == false
+#         #make sure Gτ doesn't get modified after the linear fitting
+#         for i in 1:Nτ
+#             # Gτ[i, :] .+= kernelN[i] * sumrule / kerN
+#             Gτ[i, :] .+= kernelN[i] * sumrule
+#         end
+#         #add back the coeff that are fixed by the sum rule
+#         coeffmore = sumrule' .- sum(coeff, dims = 1)
+#         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
+#         cnew[1:M-1, :] = coeff[1:M-1, :]
+#         cnew[M+1:end, :] = coeff[M:end, :]
+#         cnew[M, :] = coeffmore
+#         # for j in 1:N
+#         #     cnew[:, j] = sumrule[j]
+#         # end
+#         # println(ker)
+#         # println(coeff)
+#         # println(dot(ker, coeff))
+#         # cnew[M, 1] = (sumrule - dot(ker, coeff)) / kerN
+#         return cnew
+#     else
+#         return coeff
+#     end
+# end
+
+function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
     @assert size(Gτ)[1] == Nτ
-    N = size(Gτ)[2]
     if isnothing(sumrule) == false
-        @assert dlr.symmetry == :none && dlr.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
-        # M = Int(floor(dlr.size / 2))
-        M = dlr.size
-
-        # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
-        kernelN = kernel[:, M]
-
-        # sign = dlr.isFermi ? -1 : 1
-        # ker0 = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [0.0,], dlr.ω, dlr.β, true)
-        # kerβ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [dlr.β,], dlr.ω, dlr.β, true)
-
-        # ker = ker0[1:end] .- sign .* kerβ[1:end]
-        # ker = vcat(ker[1:M-1], ker[M+1:end])
-        # kerN = ker[M]
+        kernel_m0 = kernel[:, end]
+        kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
 
         for i in 1:Nτ
-            # Gτ[i, :] .-= kernelN[i] * sumrule / kerN
-            Gτ[i, :] .-= kernelN[i] * sumrule
+            Gτ[i, :] .-= kernel_m0[i] * sumrule
         end
 
-        # for i = 1:Nω-1
-        #     kernel[:, i] .-= kernelN * ker[i] / kerN
-        # end
-        kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
+        for i = 1:Nω-1
+            kernel[:, i] .-= kernel_m0
+        end
+        # kernel = view(kernel, :, 1:Nω-1)
     end
 
     if isnothing(error)
@@ -91,27 +153,16 @@ function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
     coeff = B \ C #solve C = B * coeff
 
-    # println("size", size(coeff), ", rank,", dlr.size, "...,", size(kernel))
-
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
         for i in 1:Nτ
-            # Gτ[i, :] .+= kernelN[i] * sumrule / kerN
-            Gτ[i, :] .+= kernelN[i] * sumrule
+            Gτ[i, :] .+= kernel_m0[i] * sumrule
         end
         #add back the coeff that are fixed by the sum rule
         coeffmore = sumrule' .- sum(coeff, dims = 1)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-        cnew[1:M-1, :] = coeff[1:M-1, :]
-        cnew[M+1:end, :] = coeff[M:end, :]
-        cnew[M, :] = coeffmore
-        # for j in 1:N
-        #     cnew[:, j] = sumrule[j]
-        # end
-        # println(ker)
-        # println(coeff)
-        # println(dot(ker, coeff))
-        # cnew[M, 1] = (sumrule - dot(ker, coeff)) / kerN
+        cnew[1:end-1, :] = coeff
+        cnew[end, :] = coeffmore
         return cnew
     else
         return coeff
