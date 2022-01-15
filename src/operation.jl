@@ -40,13 +40,24 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
-function _weightedLeastSqureFit(Gτ, error, kernel)
-    """
-    the current algorithm with weight is only accurate up to 1e-9
-    """
-    # solve the linear equation: (Kᵀ⋅W⋅K) A = (Kᵀ⋅W) Gτ, where A is the spectral density to calculate, W=1/error^2
-    # assume Gτ: (Nτ, N), kernel: (Nω, Nτ), weight: (Nτ, N)
-    # B: (Nω, Nω),  C: (Nω, N)
+function _weightedLeastSqureFit(Gτ, error, kernel, sumrule)
+    Nτ, Nω = size(kernel)
+    @assert size(Gτ)[1] == Nτ
+    if isnothing(sumrule) == false
+        # println(size(Gτ))
+        kernel_m0 = kernel[:, end]
+        kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+
+        for i in 1:Nτ
+            Gτ[i, :] .-= kernel_m0[i] * sumrule
+        end
+
+        for i = 1:Nω-1
+            kernel[:, i] .-= kernel_m0
+        end
+        # kernel = view(kernel, :, 1:Nω-1)
+    end
+
     if isnothing(error)
         B = kernel
         C = Gτ
@@ -54,37 +65,47 @@ function _weightedLeastSqureFit(Gτ, error, kernel)
         @assert size(error) == size(Gτ)
         w = 1.0 ./ (error .+ 1e-16)
 
-        for i = 1:size(w)[1]
+        for i = 1:Nτ
             w[i, :] /= sum(w[i, :]) / length(w[i, :])
         end
-
-        # W = Diagonal(weight)
-        # B = transpose(kernel) * W * kernel
-        # C = transpose(kernel) * W * Gτ
-        # w = 1.0 ./ (error .+ 1e-16)
         B = w .* kernel
-        # B = Diagonal(w) * kernel
         C = w .* Gτ
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
     coeff = B \ C #solve C = B * coeff
-    return coeff
+
+    if isnothing(sumrule) == false
+        #make sure Gτ doesn't get modified after the linear fitting
+        for i in 1:Nτ
+            Gτ[i, :] .+= kernel_m0[i] * sumrule
+        end
+        #add back the coeff that are fixed by the sum rule
+        coeffmore = sumrule' .- sum(coeff, dims = 1)
+        cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
+        cnew[1:end-1, :] = coeff
+        cnew[end, :] = coeffmore
+        return cnew
+    else
+        return coeff
+    end
 end
 
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1)
+function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     imaginary-time domain to DLR representation
 
 #Members:
-- `dlrGrid`: DLRGrid struct.
-- `green` : green's function in imaginary-time domain.
-- `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: the imaginary-time axis in the data `green`.
+- `dlrGrid`  : DLRGrid struct.
+- `green`    : green's function in imaginary-time domain.
+- `τGrid`    : the imaginary-time grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : the imaginary-time axis in the data `green`.
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1)
+function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
@@ -106,31 +127,50 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
 
     g, partialsize = _tensor2matrix(green, axis)
 
+    if isnothing(sumrule) == false
+        if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
+            sumrule = sumrule ./ 2.0
+        end
+        if isempty(partialsize) == false
+            sumrule = reshape(sumrule, size(g)[2])
+        end
+    end
+
     if isnothing(error) == false
         @assert size(error) == size(green)
         error, psize = _tensor2matrix(error, axis)
     end
-    coeff = _weightedLeastSqureFit(g, error, kernel)
 
-    if all(x -> abs(x) < 1e16, coeff) == false
+    coeff = _weightedLeastSqureFit(g, error, kernel, sumrule)
+
+    if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
+    end
+
+    if isnothing(sumrule) == false
+        #check how exact is the sum rule
+        coeffsum = sum(coeff, dims = 1) .- sumrule
+        if verbose && all(x -> abs(x) < 10 * dlrGrid.rtol * maximum(abs.(green)), coeffsum) == false
+            @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
+        end
     end
 
     return _matrix2tensor(coeff, partialsize, axis)
 end
 
 """
-function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
+function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
 
     DLR representation to imaginary-time representation
 
 #Members:
-- `dlrGrid` : DLRGrid
+- `dlrGrid`  : DLRGrid
 - `dlrcoeff` : DLR coefficients
-- `τGrid` : expected fine imaginary-time grids 
-- `axis`: imaginary-time axis in the data `dlrcoeff`
+- `τGrid`    : expected fine imaginary-time grids 
+- `axis`     : imaginary-time axis in the data `dlrcoeff`
+- `verbose`  : true to print warning information
 """
-function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
+function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == size(dlrGrid)
 
@@ -151,18 +191,20 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1)
 end
 
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1)
+function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     Matsubara-frequency representation to DLR representation
 
 #Members:
-- `dlrGrid`: DLRGrid struct.
-- `green` : green's function in Matsubara-frequency domain
-- `nGrid` : the n grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: the Matsubara-frequency axis in the data `green`
+- `dlrGrid`  : DLRGrid struct.
+- `green`    : green's function in Matsubara-frequency domain
+- `nGrid`    : the n grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : the Matsubara-frequency axis in the data `green`
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1)
+function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(nGrid)
     @assert eltype(nGrid) <: Integer
@@ -186,29 +228,47 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 
     g, partialsize = _tensor2matrix(green, axis)
 
+    if isnothing(sumrule) == false
+        if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
+            sumrule = sumrule ./ 2.0
+        end
+        if isempty(partialsize) == false
+            sumrule = reshape(sumrule, size(g)[2])
+        end
+    end
+
     if isnothing(error) == false
         @assert size(error) == size(green)
         error, psize = _tensor2matrix(error, axis)
     end
-    coeff = _weightedLeastSqureFit(g, error, kernel)
-    if all(x -> abs(x) < 1e16, coeff) == false
+    coeff = _weightedLeastSqureFit(g, error, kernel, sumrule)
+    if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
+    end
+
+    if isnothing(sumrule) == false
+        #check how exact is the sum rule
+        coeffsum = sum(coeff, dims = 1) .- sumrule
+        if verbose && all(x -> abs(x) < 10 * dlrGrid.rtol * maximum(abs.(green)), coeffsum) == false
+            @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
+        end
     end
     return _matrix2tensor(coeff, partialsize, axis)
 end
 
 """
-function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
+function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
 
     DLR representation to Matsubara-frequency representation
 
 #Members:
-- `dlrGrid` : DLRGrid
+- `dlrGrid`  : DLRGrid
 - `dlrcoeff` : DLR coefficients
-- `nGrid` : expected fine Matsubara-freqeuncy grids (integer)
-- `axis`: Matsubara-frequency axis in the data `dlrcoeff`
+- `nGrid`    : expected fine Matsubara-freqeuncy grids (integer)
+- `axis`     : Matsubara-frequency axis in the data `dlrcoeff`
+- `verbose`  : true to print warning information
 """
-function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
+function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == size(dlrGrid)
     @assert eltype(nGrid) <: Integer
@@ -228,75 +288,83 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1)
 end
 
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
 
 #Members:
-- `dlrGrid` : DLRGrid
-- `green` : green's function in imaginary-time domain
+- `dlrGrid`  : DLRGrid
+- `green`    : green's function in imaginary-time domain
 - `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
-- `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: the imaginary-time axis in the data `green`
+- `τGrid`    : the imaginary-time grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : the imaginary-time axis in the data `green`
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1)
-    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis)
-    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
+function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis, verbose = verbose)
 end
 
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
-- `dlrGrid` : DLRGrid
-- `green` : green's function in Matsubara-freqeuncy repsentation
+- `dlrGrid`  : DLRGrid
+- `green`    : green's function in Matsubara-freqeuncy repsentation
 - `τNewGrid` : expected fine imaginary-time grids
-- `nGrid` : the n grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: Matsubara-frequency axis in the data `green`
+- `nGrid`    : the n grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : Matsubara-frequency axis in the data `green`
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis)
-    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
+function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis, verbose = verbose)
 end
 
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; weight = nothing, axis = 1)
+function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     Interpolation from the old imaginary-time grid to a new grid using the DLR representation
 
 #Members:
-- `dlrGrid` : DLRGrid
-- `green` : green's function in imaginary-time domain
+- `dlrGrid`  : DLRGrid
+- `green`    : green's function in imaginary-time domain
 - `τNewGrid` : expected fine imaginary-time grids
-- `τGrid` : the imaginary-time grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: the imaginary-time axis in the data `green`
+- `τGrid`    : the imaginary-time grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : the imaginary-time axis in the data `green`
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1)
-    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis)
-    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis)
+function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis, verbose = verbose)
 end
 
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1)
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
     Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
-- `dlrGrid` : DLRGrid
-- `green` : green's function in Matsubara-freqeuncy repsentation
+- `dlrGrid`  : DLRGrid
+- `green`    : green's function in Matsubara-freqeuncy repsentation
 - `nNewGrid` : expected fine Matsubara-freqeuncy grids (integer)
-- `nGrid` : the n grid that Green's function is defined on. 
-- `error` : error the Green's function. 
-- `axis`: Matsubara-frequency axis in the data `green`
+- `nGrid`    : the n grid that Green's function is defined on. 
+- `error`    : error the Green's function. 
+- `axis`     : Matsubara-frequency axis in the data `green`
+- `sumrule`  : enforce the sum rule 
+- `verbose`  : true to print warning information
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis)
-    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis)
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis, verbose = verbose)
 end
 
 # function convolution(dlrGrid, green1, green2; axis = 1)

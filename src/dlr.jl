@@ -46,8 +46,7 @@ mutable struct DLRGrid
 
     """
     function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
-    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-8, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
-    function DLRGrid(; Euv, beta, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-8, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
+    function DLRGrid(; isFermi::Bool, β = -1.0, beta = -1.0, Euv = 1.0, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
 
     Create DLR grids
 
@@ -69,6 +68,9 @@ mutable struct DLRGrid
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
         @assert Λ > 0 "Energy scale $Λ must be positive!"
         @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
+        @assert algorithm == :functional || algorithm == :discrete "Algorithm is either :functional or :discrete"
+        @assert β > 0.0 "Inverse temperature must be temperature."
+        @assert Euv > 0.0 "Energy cutoff must be positive."
 
         if Λ > 1e8 && symmetry == :none
             @warn("Current DLR without symmetry may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
@@ -145,11 +147,16 @@ mutable struct DLRGrid
         return dlr
     end
 
-    function DLRGrid(; Euv, β, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
+    function DLRGrid(; isFermi::Bool, β = -1.0, beta = -1.0, Euv = 1.0, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
+        if β <= 0.0 && beta > 0.0
+            β = beta
+        elseif β > 0.0 && beta <= 0.0
+            beta = β
+        elseif β < 0.0 && beta < 0.0
+            error("Either β or beta needs to be initialized with a positive value!")
+        end
+        @assert β ≈ beta
         return DLRGrid(Euv, β, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose)
-    end
-    function DLRGrid(; Euv, beta, isFermi::Bool, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
-        return DLRGrid(Euv, beta, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose)
     end
 end
 

@@ -152,29 +152,58 @@ end
 end
 
 @testset "Tensor DLR" begin
-    Euv, β = 1000.0, 10.0
+    Euv, β = 1.0, 1000.0
     eps = 1e-10
     isFermi = true
     symmetry = :none
+    # symmetry = :ph
+    weight = π / 2 * Euv
     para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
     dlr = DLRGrid(Euv, β, eps, isFermi, symmetry) #construct dlr basis
 
     Gτ = SemiCircle(dlr, dlr.τ, :τ)
     Gn = SemiCircle(dlr, dlr.n, :n)
+    Gτ_copy = deepcopy(Gτ)
+    Gn_copy = deepcopy(Gn)
 
-    n1, n2 = 3, 4
+    n1, n2 = 1, 1
     a = rand(n1, n2)
+    # a = ones(n1, n2)
+    sumrule_τ = zeros(n1, n2)
+    sumrule_n = zeros(n1, n2)
     tensorGτ = zeros(eltype(Gτ), (n1, n2, length(Gτ)))
     for (gi, g) in enumerate(Gτ)
         tensorGτ[:, :, gi] = a .* g
+        sumrule_τ = a * weight
     end
     tensorGn = zeros(eltype(Gn), (n1, n2, length(Gn)))
     for (gi, g) in enumerate(Gn)
         tensorGn[:, :, gi] = a .* g
+        sumrule_n = a * weight
     end
+    tensorGτ_copy = tensorGτ
+    tensorGn_copy = tensorGn
 
-    compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ; axis = 3), tensorGn, eps, 1000.0, para)
-    compare("τ ↔ iω tensor", matfreq2tau(dlr, tensorGn; axis = 3), tensorGτ, eps, 1000.0, para)
+    compare("τ ↔ iω tensor", tau2matfreq(dlr, Gτ_copy), Gn, eps, 1000.0, para)
+    @test Gτ ≈ Gτ_copy #make sure there is no side effect on G
+    compare("iω ↔ τ tensor", matfreq2tau(dlr, Gn_copy), Gτ, eps, 1000.0, para)
+    @test Gn ≈ Gn_copy #make sure there is no side effect on G
+
+    compare("τ ↔ iω tensor", tau2matfreq(dlr, Gτ_copy; sumrule = weight), Gn, eps, 1000.0, para)
+    @test Gτ ≈ Gτ_copy #make sure there is no side effect on G
+    compare("iω ↔ τ tensor", matfreq2tau(dlr, Gn_copy; sumrule = weight), Gτ, eps, 1000.0, para)
+    @test Gn ≈ Gn_copy #make sure there is no side effect on G
+
+    compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ_copy; axis = 3), tensorGn, eps, 1000.0, para)
+    @test tensorGτ ≈ tensorGτ_copy #make sure there is no side effect on G
+    compare("iω ↔ τ tensor", matfreq2tau(dlr, tensorGn_copy; axis = 3), tensorGτ, eps, 1000.0, para)
+    @test tensorGn ≈ tensorGn_copy #make sure there is no side effect on G
+
+    compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ_copy; axis = 3, sumrule = sumrule_τ), tensorGn, eps, 1000.0, para)
+    @test tensorGτ ≈ tensorGτ_copy #make sure there is no side effect on G
+    compare("iω ↔ τ tensor", matfreq2tau(dlr, tensorGn_copy; axis = 3, sumrule = sumrule_n), tensorGτ, eps, 1000.0, para)
+    @test tensorGn ≈ tensorGn_copy #make sure there is no side effect on G
+
 end
 
 @testset "Least square fitting" begin
@@ -182,7 +211,7 @@ end
     kernel = zeros(4, 2)
     kernel[:, 1] = [1.0, 1.0, 1.0, 1.0]
     kernel[:, 2] = [1.0, 2.0, 3.0, 4.0]
-    coeff = Lehmann._weightedLeastSqureFit(Gτ, nothing, kernel)
+    coeff = Lehmann._weightedLeastSqureFit(Gτ, nothing, kernel, nothing)
     @test coeff ≈ [3.5, 1.4]
 end
 

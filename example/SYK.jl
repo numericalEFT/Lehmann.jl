@@ -27,12 +27,12 @@ diff(a, b) = maximum(abs.(a - b)) # return the maximum deviation between a and b
 
 conformal_tau(τ, β) = π^(1 / 4) / sqrt(2β) * 1 / sqrt(sin(π * τ / β))
 
-function syk_sigma_dlr(d, G_x, J = 1.0)
+function syk_sigma_dlr(d, G_x, J = 1.0; sumrule = nothing)
 
     tau_k = d.τ # DLR imaginary time nodes
     tau_k_rev = d.β .- tau_k # Reversed imaginary time nodes
 
-    G_x_rev = tau2tau(d, G_x, tau_k_rev) # G at beta - tau_k
+    G_x_rev = tau2tau(d, G_x, tau_k_rev, sumrule = sumrule) # G at beta - tau_k
 
     Sigma_x = J .^ 2 .* G_x .^ 2 .* G_x_rev # SYK self-energy in imaginary time
 
@@ -50,15 +50,15 @@ function dyson(d, sigma_q, mu)
     end
 end
 
-function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol * 10; mix = 0.1, maxiter = 5000, G_x = zeros(ComplexF64, length(d)), verbose = true)
+function solve_syk_with_fixpoint_iter(d, mu, tol = d.rtol * 10; mix = 0.1, maxiter = 5000, G_x = zeros(ComplexF64, length(d)), sumrule = nothing, verbose = true)
 
     for iter in 1:maxiter
 
-        Sigma_x = syk_sigma_dlr(d, G_x)
+        Sigma_x = syk_sigma_dlr(d, G_x, sumrule = sumrule)
 
         G_q_new = dyson(d, tau2matfreq(d, Sigma_x), mu)
 
-        G_x_new = matfreq2tau(d, G_q_new)
+        G_x_new = matfreq2tau(d, G_q_new, sumrule = sumrule)
 
 
         if verbose
@@ -94,7 +94,7 @@ printG(dsym_correct, G_x_correct)
 
 printstyled("=====    Test Symmetrized and Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
 
-@printf("%30s%30s%30s%15s\n", "Euv", "symmetrized solver error", "unsymmetrized solver error", "good or bad")
+@printf("%30s%30s%30s%30s%20s\n", "Euv", "sym_solver", "unsym_solver", "unsym_solver+sum_rule", "good or bad")
 for Euv in LinRange(5.0, 10.0, 50)
 
     rtol = 1e-10
@@ -102,13 +102,16 @@ for Euv in LinRange(5.0, 10.0, 50)
     # printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
     dsym = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :ph, rebuild = true, verbose = false) # Initialize DLR object
-    @time G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
-    # printG(dsym, G_x_ph)
+    G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
 
     # printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
     dnone = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :none, rebuild = true, verbose = false) # Initialize DLR object
-    @time G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, verbose = verbose)
+    G_x_none = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, sumrule = nothing, verbose = verbose)
+
+    # printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
+    mix = 0.01
+    G_x_none_sumrule = solve_syk_with_fixpoint_iter(dnone, 0.00, mix = mix, sumrule = 1.0, verbose = verbose)
     # printG(dnone, G_x_none)
 
     # printstyled("=====     Unsymmetrized versus Symmetrized DLR solver    =======\n", color = :yellow)
@@ -122,11 +125,13 @@ for Euv in LinRange(5.0, 10.0, 50)
 
     G_x_interp_ph = tau2tau(dsym_correct, G_x_correct, dsym.τ)
     G_x_interp_none = tau2tau(dsym_correct, G_x_correct, dnone.τ)
+    G_x_interp_none_sumrule = tau2tau(dsym_correct, G_x_correct, dnone.τ)
     d_ph = diff(G_x_interp_ph, G_x_ph)
     d_none = diff(G_x_interp_none, G_x_none)
-    flag = (d_ph < 100rtol) && (d_none < 100rtol) ? "good" : "bad"
+    d_none_sumrule = diff(G_x_interp_none_sumrule, G_x_none_sumrule)
+    flag = (d_ph < 100rtol) && (d_none < 100rtol) && (d_none_sumrule < 100rtol) ? "good" : "bad"
 
-    @printf("%30.15f%30.15e%30.15e%20s\n", Euv, d_ph, d_none, flag)
+    @printf("%30.15f%30.15e%30.15e%30.15e%20s\n", Euv, d_ph, d_none, d_none_sumrule, flag)
     # println("symmetric Euv = $Euv maximumal difference: ", diff(G_x_interp, G_x_ph))
     # println("non symmetric Euv = $Euv maximumal difference: ", diff(G_x_interp, G_x_none))
 
