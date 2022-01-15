@@ -122,9 +122,14 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
     @assert size(Gτ)[1] == Nτ
     if isnothing(sumrule) == false
+        @assert dlrGrid.symmetry == :none && dlrGrid.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
-        kernel_m0 = kernel[:, end]
-        kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+        M = Int(floor(dlrGrid.size / 2))
+        # M = dlrGrid.size
+
+        kernel_m0 = kernel[:, M]
+        # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+        kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
 
         for i in 1:Nτ
             Gτ[i, :] .-= kernel_m0[i] * sumrule
@@ -161,8 +166,9 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
         #add back the coeff that are fixed by the sum rule
         coeffmore = sumrule' .- sum(coeff, dims = 1)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-        cnew[1:end-1, :] = coeff
-        cnew[end, :] = coeffmore
+        cnew[1:M-1, :] = coeff[1:M-1, :]
+        cnew[M+1:end, :] = coeff[M:end, :]
+        cnew[M, :] = coeffmore
         return cnew
     else
         return coeff
