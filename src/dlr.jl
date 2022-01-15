@@ -76,8 +76,8 @@ mutable struct DLRGrid
             @warn("Current DLR without symmetry may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
         end
 
-        if rtol >= 1e-6
-            @warn("Current implementation may cause ~ 3-4 digits loss for rtol ≥ 1e-6!")
+        if rtol > 1e-6
+            @warn("Current implementation may cause ~ 3-4 digits loss for rtol > 1e-6!")
         end
 
         rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n

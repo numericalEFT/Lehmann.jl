@@ -150,7 +150,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     if isnothing(sumrule) == false
         #check how exact is the sum rule
         coeffsum = sum(coeff, dims = 1) .- sumrule
-        if verbose && all(x -> abs(x) < 10 * dlrGrid.rtol * maximum(abs.(green)), coeffsum) == false
+        if verbose && all(x -> abs(x) < 100 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
     end
@@ -249,7 +249,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
     if isnothing(sumrule) == false
         #check how exact is the sum rule
         coeffsum = sum(coeff, dims = 1) .- sumrule
-        if verbose && all(x -> abs(x) < 10 * dlrGrid.rtol * maximum(abs.(green)), coeffsum) == false
+        if verbose && all(x -> abs(x) < 100 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
     end
