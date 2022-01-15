@@ -102,7 +102,7 @@ for Euv in LinRange(5.0, 10.0, 50)
     # printstyled("=====     Symmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01
     dsym = DLRGrid(Euv = Euv, β = β, isFermi = true, rtol = rtol, symmetry = :ph, rebuild = true, verbose = false) # Initialize DLR object
-    G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, verbose = verbose)
+    G_x_ph = solve_syk_with_fixpoint_iter(dsym, 0.00, mix = mix, sumrule = 1.0, verbose = verbose)
 
     # printstyled("=====     Unsymmetrized DLR solver for SYK model     =======\n", color = :yellow)
     mix = 0.01

@@ -40,22 +40,35 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
-function _weightedLeastSqureFit(Gτ, error, kernel, sumrule)
+function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
+    # Gτ: (Nτ, N), kernel: (Nτ, Nω)
+    # error: (Nτ, N), sumrule: (N, 1)
     Nτ, Nω = size(kernel)
     @assert size(Gτ)[1] == Nτ
+    N = size(Gτ)[2]
     if isnothing(sumrule) == false
         # println(size(Gτ))
-        kernel_m0 = kernel[:, end]
-        kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+        M = Int(floor(dlr.size / 2))
+
+        # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
+        kernelN = kernel[:, M]
+
+        sign = dlr.isFermi ? -1 : 1
+        ker0 = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [0.0,], dlr.ω, dlr.β, true)
+        kerβ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [dlr.β,], dlr.ω, dlr.β, true)
+
+        ker = ker0[1:end] .- sign .* kerβ[1:end]
+        ker = vcat(ker[1:M-1], ker[M+1:end])
+        kerN = ker[M]
 
         for i in 1:Nτ
-            Gτ[i, :] .-= kernel_m0[i] * sumrule
+            Gτ[i, :] .-= kernelN[i] * sumrule / kerN
         end
 
-        for i = 1:Nω-1
-            kernel[:, i] .-= kernel_m0
-        end
-        # kernel = view(kernel, :, 1:Nω-1)
+        # for i = 1:Nω-1
+        #     kernel[:, i] .-= kernelN * ker[i] / kerN
+        # end
+        kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
     end
 
     if isnothing(error)
@@ -75,16 +88,26 @@ function _weightedLeastSqureFit(Gτ, error, kernel, sumrule)
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
     coeff = B \ C #solve C = B * coeff
 
+    println("size", size(coeff), ", rank,", dlr.size, "...,", size(kernel))
+
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
         for i in 1:Nτ
-            Gτ[i, :] .+= kernel_m0[i] * sumrule
+            Gτ[i, :] .+= kernelN[i] * sumrule / kerN
         end
         #add back the coeff that are fixed by the sum rule
-        coeffmore = sumrule' .- sum(coeff, dims = 1)
+        # coeffmore = sumrule' .- sum(coeff, dims = 1)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-        cnew[1:end-1, :] = coeff
-        cnew[end, :] = coeffmore
+        cnew[1:M-1, :] = coeff[1:M-1, :]
+        cnew[M+1:end, :] = coeff[M:end, :]
+        # cnew[end, :] = coeffmore
+        # for j in 1:N
+        #     cnew[:, j] = sumrule[j]
+        # end
+        println(ker)
+        println(coeff)
+        println(dot(ker, coeff))
+        cnew[M, 1] = (sumrule - dot(ker, coeff)) / kerN
         return cnew
     else
         return coeff
@@ -128,9 +151,9 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
     g, partialsize = _tensor2matrix(green, axis)
 
     if isnothing(sumrule) == false
-        if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
-            sumrule = sumrule ./ 2.0
-        end
+        # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
+        #     sumrule = sumrule ./ 2.0
+        # end
         if isempty(partialsize) == false
             sumrule = reshape(sumrule, size(g)[2])
         end
@@ -141,7 +164,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
         error, psize = _tensor2matrix(error, axis)
     end
 
-    coeff = _weightedLeastSqureFit(g, error, kernel, sumrule)
+    coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
 
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
@@ -229,9 +252,9 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
     g, partialsize = _tensor2matrix(green, axis)
 
     if isnothing(sumrule) == false
-        if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
-            sumrule = sumrule ./ 2.0
-        end
+        # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
+        #     sumrule = sumrule ./ 2.0
+        # end
         if isempty(partialsize) == false
             sumrule = reshape(sumrule, size(g)[2])
         end
@@ -241,7 +264,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
         @assert size(error) == size(green)
         error, psize = _tensor2matrix(error, axis)
     end
-    coeff = _weightedLeastSqureFit(g, error, kernel, sumrule)
+    coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
     end

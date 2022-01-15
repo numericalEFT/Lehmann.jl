@@ -211,7 +211,8 @@ end
     kernel = zeros(4, 2)
     kernel[:, 1] = [1.0, 1.0, 1.0, 1.0]
     kernel[:, 2] = [1.0, 2.0, 3.0, 4.0]
-    coeff = Lehmann._weightedLeastSqureFit(Gτ, nothing, kernel, nothing)
+    dlrGrid = DLRGrid(β = 10.0, isFermi = true)
+    coeff = Lehmann._weightedLeastSqureFit(dlrGrid, Gτ, nothing, kernel, nothing)
     @test coeff ≈ [3.5, 1.4]
 end
 
