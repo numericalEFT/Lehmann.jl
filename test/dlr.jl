@@ -247,3 +247,18 @@ end
     @test dlr_load.Λ ≈ dlr.Λ
     rm(file)
 end
+
+@testset "JLD2 IO" begin
+    dlr = DLRGrid(isFermi = true, beta = 10.0)
+    save("test.jld2", Dict("dlr" => dlr), compress = true)
+    dlr_new = load("test.jld2")["dlr"]
+    println(dlr_new)
+    @test dlr.isFermi == dlr_new.isFermi
+    @test dlr.Euv ≈ dlr_new.Euv
+    @test dlr.β ≈ dlr_new.β
+    @test dlr.τ ≈ dlr_new.τ
+    @test dlr.n ≈ dlr_new.n
+    @test dlr.ωn ≈ dlr_new.ωn
+    @test dlr.symmetry == dlr_new.symmetry
+    rm("test.jld2")
+end
