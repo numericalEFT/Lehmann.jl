@@ -1,7 +1,7 @@
 name = "Lehmann"
 uuid = "95bf888a-8996-4655-9f35-1c0506bdfefe"
 authors = ["Kun Chen", "Tao Wang", "Xiansheng Cai"]
-version = "0.2.4"
+version = "0.2.3"
 
 [deps]
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
