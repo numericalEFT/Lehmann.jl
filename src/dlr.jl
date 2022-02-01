@@ -169,7 +169,7 @@ function Base.getproperty(obj::DLRGrid, sym::Symbol)
         return obj.τ
     elseif sym == :beta
         return obj.β
-    elseif sym == :omegan
+    elseif sym == :omegaN
         return obj.ωn
     elseif sym == :omega
         return obj.ω
