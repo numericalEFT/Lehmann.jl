@@ -17,14 +17,14 @@ struct DLRGrid
 - `isFermi`: bool is fermionic or bosonic
 - `symmetry`: particle-hole symmetric :ph, or particle-hole asymmetric :pha, or :none
 - `Euv` : the UV energy scale of the spectral density 
-- `β` : inverse temeprature
-- `Λ`: cutoff = UV Energy scale of the spectral density * inverse temperature
+- `β` or `beta` : inverse temeprature
+- `Λ` or `lambda`: cutoff = UV Energy scale of the spectral density * inverse temperature
 - `rtol`: tolerance absolute error
 - `size` : number of DLR basis
-- `ω` : selected representative real-frequency grid
+- `ω` or `omega` : selected representative real-frequency grid
 - `n` : selected representative Matsubara-frequency grid (integer)
-- `ωn` : (2n+1)π/β
-- `τ` : selected representative imaginary-time grid
+- `ωn` or `omegaN` : (2n+1)π/β
+- `τ` or `tau` : selected representative imaginary-time grid
 """
 mutable struct DLRGrid
     isFermi::Bool
@@ -165,6 +165,16 @@ function Base.getproperty(obj::DLRGrid, sym::Symbol)
     #     return obj.totalTauNum > 0
     if sym == :size
         return size(obj)
+    elseif sym == :tau
+        return obj.τ
+    elseif sym == :beta
+        return obj.β
+    elseif sym == :omegan
+        return obj.ωn
+    elseif sym == :omega
+        return obj.ω
+    elseif sym == :lambda
+        return obj.Λ
     else # fallback to getfield
         return getfield(obj, sym)
     end
