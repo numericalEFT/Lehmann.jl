@@ -35,7 +35,7 @@ function plotResidual(basis)
     z = Float64.(basis.residualFineGrid)
     z = reshape(z, (basis.Nfine, basis.Nfine))
     # contourf(z)
-    p = heatmap(basis.fineGrid, basis.fineGrid, z, xaxis=:log, yaxis=:log)
+    p = heatmap(basis.fineGrid, basis.fineGrid, z, xaxis = :log, yaxis = :log)
     # p = heatmap(z)
     x = [basis.grid[i, 1] for i in 1:basis.N]
     y = [basis.grid[i, 2] for i in 1:basis.N]
@@ -111,8 +111,8 @@ function unilog(Λ, rtol)
     N = Int(floor(log(Λ) / log(ratio) + 1))
     panel = [Λ / ratio^(N - i) for i in 1:N]
     grid = Vector{FloatL}(undef, 0)
-    for i in 1:length(panel) - 1
-        uniform = [panel[i] + (panel[i + 1] - panel[i]) / degree * j for j in 0:degree - 1]
+    for i in 1:length(panel)-1
+        uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
     append!(grid, Λ)
@@ -168,12 +168,12 @@ function addBasis!(basis, projector, coord)
         idx = 1
         basis.grid[1, :] .= g0
         basis.proj = projKernel(basis, projector)
-        basis.Q[1,1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
+        basis.Q[1, 1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
     else
-        basis.grid[1:end - 1, :] = _grid
+        basis.grid[1:end-1, :] = _grid
         basis.grid[end, :] .= g0
         basis.proj = projKernel(basis, projector)
-        basis.Q[1:end - 1, 1:end - 1] = _Q
+        basis.Q[1:end-1, 1:end-1] = _Q
         basis.Q[end, :] = GramSchmidt(basis, g0)
     end
 
@@ -223,7 +223,7 @@ function updateResidual!(basis, projector)
     end
 end
 
-function QR(dim, Λ, rtol, proj; c0=nothing, N=nothing)
+function QR(dim, Λ, rtol, proj; c0 = nothing, N = nothing)
     basis = Basis(dim, Λ, rtol, proj)
     if isnothing(c0) == false
         for c in c0
@@ -259,7 +259,7 @@ function QR(dim, Λ, rtol, proj; c0=nothing, N=nothing)
     testResidual(basis, proj)
     @printf("residual = %.16e\n", sqrt(maxResidual))
     plotResidual(basis)
-# plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
+    # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
 
@@ -274,26 +274,26 @@ projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
 
 """
 <K(g_i), K(g_j)>
-"""    
+"""
 function projKernel(basis, proj)
     K = zeros(Float, (basis.N, basis.N))
     for i in 1:basis.N
         for j in 1:basis.N
-            K[i,j] = proj(basis.Λ, basis.D, basis.grid[i, :], basis.grid[j, :])
+            K[i, j] = proj(basis.Λ, basis.D, basis.grid[i, :], basis.grid[j, :])
         end
     end
     return K
 end
-    
+
 """
 modified Gram-Schmidt process
 """
-    function mGramSchmidt(basis, g)
+function mGramSchmidt(basis, g)
     qnew = zeros(Float, basis.N)
     qnew[end] = 1
     # println(basis.proj)
-        
-    for qi in 1:basis.N - 1
+
+    for qi in 1:basis.N-1
         q = basis.Q[qi, :]
         qnew -= projqq(basis, q, qnew) .* q  # <q, qnew> q
         # println("q: ", q)
@@ -311,8 +311,8 @@ function GramSchmidt(basis, g)
     qnew[end] = 1
     q0 = copy(qnew)
     # println(basis.proj)
-        
-    for qi in 1:basis.N - 1
+
+    for qi in 1:basis.N-1
         q = basis.Q[qi, :]
         qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
     end
@@ -322,10 +322,10 @@ end
 
 within(g, g0, cutoff) = g0[1] < 5 || g0[2] < 5 || g[1] < 5 || g[2] < 5 || ((g[1] / cutoff <= g0[1] <= g[1] * cutoff) && (g[2] / cutoff <= g0[2] <= g[2] * cutoff))
 
-function Residual(basis, proj, g, cutoff=-1)
+function Residual(basis, proj, g, cutoff = -1)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
-    
+
     if cutoff < 0
         KK = [proj(basis.Λ, basis.D, basis.grid[j, :], g) for j in 1:basis.N]
         norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
@@ -336,7 +336,7 @@ function Residual(basis, proj, g, cutoff=-1)
         for i in 1:basis.N
             if within(basis.grid[i, :], g, cutoff)
                 pr = Float(0)
-                for j in 1:basis.N 
+                for j in 1:basis.N
                     gp = basis.grid[j, :]
                     pr += basis.Q[i, j] * proj(basis.Λ, basis.D, g, gp)
                 end
@@ -352,14 +352,14 @@ function Residual(basis, proj, g, cutoff=-1)
     # return norm2 < 0 ? Float(0) : sqrt(norm2) 
     # return norm2
 end
-        
+
 function testOrthgonal(basis)
     println("testing orthognalization...")
     II = basis.Q * basis.proj * basis.Q'
     maxerr = maximum(abs.(II - I))
-println("Max Orthognalization Error: ", maxerr)
-# display(II - I)
-# println()
+    println("Max Orthognalization Error: ", maxerr)
+    # display(II - I)
+    # println()
 end
 
 function testResidual(basis, proj)
@@ -367,7 +367,7 @@ function testResidual(basis, proj)
     # println("Max deviation from zero residual: ", maximum(abs.(residual)))
     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 end
-    
+
 """
 #Arguments:
 - `type`: type of kernel, :fermi, :boson
@@ -383,7 +383,7 @@ function dlr_functional(type, Λ, rtol)
     # # τBasis = QR(Λ / 2, rtol / 10, projPH_τ, Float(0), N=ωBasis.N)
     # println("Building n grid ... ")
     # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :corr)
-    
+
     rank = ωBasis.N
     ωGrid = ωBasis.grid
     # τGrid = τBasis / Λ
@@ -391,14 +391,14 @@ function dlr_functional(type, Λ, rtol)
     nGrid = nBasis
     ########### output  ############################
     @printf("%5s  %32s  %32s  %8s\n", "index", "real freq", "tau", "ωn")
-        for r in 1:rank
+    for r in 1:rank
         @printf("%5i  %32.17g  %32.17g  %16i\n", r, ωGrid[r], τGrid[r], nGrid[r])
     end
 
     dlr = Dict([(:ω, ωGrid), (:τ, τGrid), (:ωn, nGrid)])
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__    
+if abspath(PROGRAM_FILE) == @__FILE__
 
     # ########### initialized MPI #######################################
     # (MPI.Initialized() == false ) && MPI.Init()
@@ -410,8 +410,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(1000)
-    rtol = Float(1e-8)
+    Λ = Float(100)
+    rtol = Float(1e-9)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
     # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]

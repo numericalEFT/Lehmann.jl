@@ -37,7 +37,7 @@ plt.colorbar()
 
 
 tri = Delaunay(np.log(grid), qhull_options="QJ")
-plt.triplot(grid[:, 0], grid[:, 1], tri.simplices)
+# plt.triplot(grid[:, 0], grid[:, 1], tri.simplices)
 
 print(len(grid))
 print(len(tri.simplices))
@@ -54,15 +54,15 @@ for sim in tri.simplices:
     x0 = np.array([x, y])
     initial = np.array(initial)
     # print(initial.shape)
-    mimum = optimize.fmin(interplate, x0,
-                          xtol=0.05, ftol=1e-10, initial_simplex=initial)
-    coordx.append(mimum[0])
-    coordy.append(mimum[1])
+    # mimum = optimize.fmin(interplate, x0,
+    #                       xtol=0.05, ftol=1e-10, initial_simplex=initial)
+    # coordx.append(mimum[0])
+    # coordy.append(mimum[1])
     # print(initial)
 
 
-plt.scatter(grid[:, 0], grid[:, 1], c="yellow", alpha=0.5, s=6)
-plt.scatter(coordx, coordy, c="red", alpha=0.5, s=8)
+plt.scatter(grid[:, 0], grid[:, 1], c="red", alpha=0.5, s=6)
+plt.scatter(coordx, coordy, c="red", alpha=0.5, s=15)
 
 plt.xscale("log")
 plt.yscale("log")
