@@ -99,7 +99,7 @@ mutable struct DLRGrid
         end
 
         function filename(lambda, errpower)
-            lambda = Int(floor(lambda))
+            lambda = Int128(floor(lambda))
             errstr = "1e$errpower"
 
             if symmetry == :none

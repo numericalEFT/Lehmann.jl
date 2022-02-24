@@ -131,7 +131,7 @@ function QR(Λ, rtol, proj, g0; N = nothing, verbose = false)
         # lower = (idx == 1) ? 0 : basis.grid[idx - 1]
         # upper = (idx == basis.N) ? Λ : basis.grid[idx + 1]
 
-        # @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, lower, upper, basis.residual[idx])
+        # verbose && @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, newω, lower, upper, basis.residual[idx])
         # println("$(length(freq)) basis: ω=$(Float64(newω)) between ($(Float64(freq[idx - 1])), $(Float64(freq[idx + 1])))")
         # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
         maxResidual, ωi = findmax(basis.candidateResidual)
@@ -238,12 +238,12 @@ function build(dlrGrid, print::Bool = true)
     symmetry = dlrGrid.symmetry
     if symmetry == :ph
         print && println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)])
+        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)], verbose = print)
         ωGrid = ωBasis.grid
         rank = ωBasis.N
     elseif symmetry == :pha
         print && println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),])
+        ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),], verbose = print)
         ωGrid = ωBasis.grid
         rank = ωBasis.N
     else
