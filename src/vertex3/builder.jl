@@ -9,6 +9,8 @@ using InteractiveUtils
 using StaticArrays
 # using MPI
 
+println(Threads.nthreads())
+
 const Float = Float128
 # const Float = BigFloat
 # const Float = Float128
@@ -73,20 +75,19 @@ mutable struct Basis{D}
 
     function Basis{d}(Λ, rtol, projector) where {d}
         _Q = Matrix{Float}(undef, (0, 0))
-        _grid = []
 
         # initialize the residual on fineGrid with <g, g>
         _finegrid = Float.(unilog(Λ, rtol))
         Nfine = length(_finegrid)
         _residualFineGrid = zeros(Float, Nfine^d)
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
-            c = idx2coord(d, Nfine, gi)
-            if c[1] <= c[2]
-                _residualFineGrid[gi] = projector(Λ, dim, g, g)
+            c1, c2 = idx2coord(d, Nfine, gi)
+            if c1 <= c2
+                _residualFineGrid[gi] = projector(Λ, d, g, g)
             end
         end
 
-        return new{d}(d, Λ, rtol, 0, _grid, [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
+        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
     end
 end
 
@@ -101,11 +102,11 @@ function iterateFineGrid(dim, _finegrid)
 end
 
 function idx2coord(dim::Int, N::Int, idx::Int)
-    return (((idx - 1) ÷ N + 1, (idx - 1) % N + 1))
+    return (((idx - 1) % N + 1, (idx - 1) ÷ N + 1))
 end
 
 function coord2idx(dim::Int, N::Int, coord)
-    return Int((coord[1] - 1) * N + coord[2])
+    return Int((coord[2] - 1) * N + coord[1])
 end
 
 """
@@ -159,19 +160,15 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
     push!(basis.grid, g0)
     _Q = copy(basis.Q)
     basis.Q = zeros(Float, (basis.N, basis.N))
-
-    # basis.proj = projKernel(basis, projector)
+    basis.proj = projKernel(basis, projector)
 
     if basis.N == 1
-        basis.proj = projKernel(basis, projector)
         basis.Q[1, 1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
     else
-        basis.proj = projKernel(basis, projector)
         basis.Q[1:end-1, 1:end-1] = _Q
         basis.Q[end, :] = GramSchmidt(basis, g0)
     end
 
-    # @code_warntype updateResidual!(basis, projector)
     updateResidual!(basis, projector)
     append!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
     append!(basis.gridIdx, coord2idx(basis.D, basis.Nfine, coord))
@@ -179,32 +176,31 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
 end
 
 function updateResidual!(basis::Basis{D}, projector) where {D}
-    Λ = Float(basis.Λ)
-    N::Int, Nfine::Int = basis.N, basis.Nfine
-    rtol = Float(basis.rtol)
+    Λ, rtol = basis.Λ, basis.rtol
+    N, Nfine = basis.N, basis.Nfine
 
     q = basis.Q[end, :]
     fineGrid = basis.fineGrid
     grid = basis.grid
 
-    for idx in 1:Nfine^D
-        # println(Threads.threadid())
-        c = idx2coord(D, Nfine, idx)
-        if c[1] <= c[2]
-            g = (fineGrid[c[1]], fineGrid[c[2]])
-            KK = [projector(Λ, D, g, grid[j]) for j in 1:N]
-            basis.residualFineGrid[idx] -= (q' * KK)^2
+    Threads.@threads for idx in 1:Nfine^D
+        c1, c2 = idx2coord(D, Nfine, idx)
+        if c1 <= c2
+            g = (fineGrid[c1], fineGrid[c2])
+            p = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
+            basis.residualFineGrid[idx] -= p^2
 
-            if basis.residualFineGrid[idx] < Float(0)
-                if basis.residualFineGrid[idx] < Float(-rtol / 1000)
-                    println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
-                    # exit(0)
+            if basis.residualFineGrid[idx] <= Float(0)
+                if basis.residualFineGrid[idx] < -eps(Float(1) * 10)
+                    # @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
+                    @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g has $(basis.residualFineGrid[idx])")
                 end
                 basis.residualFineGrid[idx] = Float(0)
             end
 
         end
     end
+    # end
 end
 
 function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
@@ -238,7 +234,7 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
         maxResidual, idx = findmax(basis.residualFineGrid)
 
         # plotResidual(basis)
-        testOrthgonal(basis)
+        # testOrthgonal(basis)
     end
     testOrthgonal(basis)
     testResidual(basis, proj)
@@ -359,33 +355,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    # ########### initialized MPI #######################################
-    # (MPI.Initialized() == false ) && MPI.Init()
-    # comm = MPI.COMM_WORLD
-    # Nworker = MPI.Comm_size(comm)  # number of MPI workers
-    # rank = MPI.Comm_rank(comm)  # rank of current MPI worker
-    # root = 0 # rank of the root worker 
-    # ####################################################################
-
-    # freq, Q = findBasis(1.0e-3, Float(100))
-    # basis = QR(100, 1e-3)
-    Λ = Float(10)
+    Λ = Float(100)
     rtol = Float(1e-6)
     dim = 2
-    # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
-    # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
-    # println(unilog(Λ, rtol))
-    # Λ = 100
-    # @time ωBasis = QR(dim, Λ, rtol, projExp_τ, N=100)
-    # @time ωBasis = QR(dim, Λ, rtol / 10, projExp_τ)
-    @time basis = QR{dim}(Λ, rtol / 10, projExp_τ)
-    # @code_warntype QR(dim, Λ, rtol / 10, projExp_τ)
-    # @time τBasis = QR(Λ / 2, 1e-11, projPHA_τ, Float(0), N=ωBasis.N)
-    # nBasis = MatFreqGrid(ωBasis.grid, ωBasis.N, Λ, :acorr)
+    @time basis = QR{dim}(Λ, rtol, projExp_τ)
 
-    # @time basis = QR(100, 1e-10)
-    # readline()
-    # basis = QR(100, 1e-3)
     open("basis.dat", "w") do io
         for i in 1:basis.N
             println(io, basis.grid[i][1], "   ", basis.grid[i][2])
