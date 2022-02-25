@@ -29,13 +29,16 @@ include("./kernel.jl")
 # end
 
 using Plots
-gr()
+# gr()
 
 function plotResidual(basis)
     z = Float64.(basis.residualFineGrid)
     z = reshape(z, (basis.Nfine, basis.Nfine))
     # contourf(z)
-    p = heatmap(basis.fineGrid, basis.fineGrid, z, xaxis = :log, yaxis = :log)
+    # println(basis.fineGrid)
+    # println(basis.grid)
+    # p = heatmap(Float64.(basis.fineGrid), Float64.(basis.fineGrid), z, xaxis = :log, yaxis = :log)
+    p = heatmap(Float64.(basis.fineGrid), Float64.(basis.fineGrid), z)
     # p = heatmap(z)
     x = [basis.grid[i, 1] for i in 1:basis.N]
     y = [basis.grid[i, 2] for i in 1:basis.N]
@@ -254,6 +257,7 @@ function QR(dim, Λ, rtol, proj; c0 = nothing, N = nothing)
         maxResidual, idx = findmax(basis.residualFineGrid)
 
         # plotResidual(basis)
+        testOrthgonal(basis)
     end
     testOrthgonal(basis)
     testResidual(basis, proj)
@@ -270,7 +274,8 @@ return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
 # projqq(basis, q1::Vector{Float}, q2::Vector{Float}) = q1' * basis.proj * q2
 # projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
-projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
+# projqq(basis, q1, q2) = BigFloat.(q1)' * BigFloat.(basis.proj) * BigFloat.(q2)
+projqq(basis, q1, q2) = q1' * basis.proj * q2
 
 """
 <K(g_i), K(g_j)>
@@ -316,7 +321,9 @@ function GramSchmidt(basis, g)
         q = basis.Q[qi, :]
         qnew -= projqq(basis, q, q0) .* q  # <q, qnew> q
     end
-    qnorm = qnew / sqrt(abs(projqq(basis, qnew, qnew)))
+    normal = projqq(basis, qnew, qnew)
+    println(normal)
+    qnorm = qnew / sqrt(abs(normal))
     return qnorm
 end
 
@@ -410,8 +417,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     # freq, Q = findBasis(1.0e-3, Float(100))
     # basis = QR(100, 1e-3)
-    Λ = Float(100)
-    rtol = Float(1e-9)
+    Λ = Float(10)
+    rtol = Float(1e-6)
     dim = 2
     # g0 = [[Float(0), Float(0)], [Float(0), Λ], [Λ, Float(0)], [Λ, Λ]]
     # g0 = [[Λ, Λ], [Float(0), Λ], [Λ, Float(0)]]
