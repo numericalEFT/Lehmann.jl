@@ -49,12 +49,12 @@ function plotResidual(basis)
 end
 
 mutable struct Basis{D}
-    ############ fundamental parameters  ##################
+    ############    fundamental parameters  ##################
     D::Integer  # dimension
     Λ::Float  # UV energy cutoff * inverse temperature
     rtol::Float # error tolerance
 
-    ########### DLR grids    ###############################
+    ###############     DLR grids    ###############################
     N::Int # number of basis
     # grid::Matrix{Float} # grid for the basis
     grid::Vector{SVector{D,Float}} # grid for the basis
@@ -62,10 +62,13 @@ mutable struct Basis{D}
     Q::Matrix{Float} # K = Q*R
     proj::Matrix{Float} # the overlap of basis functions <K(g_i), K(g_j)>
 
-    ##### fine grids and the their residuals #################
+    ############ fine grids #################
     Nfine::Integer
     fineGrid::Vector{Float}
-    residualFineGrid::Vector{Float}
+
+    ########## residual defined on the fine grids #################
+    residualFineGrid::Vector{Float} #length = Nfine^D/D!
+    # compactIdx::Vector{Int}     # CartesianIndex to a more compact index (after some symmetry reduction)
     gridIdx::Vector{Int} # grid for the basis
 
     function Basis{d}(Λ, rtol, projector) where {d}
@@ -77,7 +80,10 @@ mutable struct Basis{D}
         Nfine = length(_finegrid)
         _residualFineGrid = zeros(Float, Nfine^d)
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
-            _residualFineGrid[gi] = projector(Λ, dim, g, g)
+            c = idx2coord(d, Nfine, gi)
+            if c[1] <= c[2]
+                _residualFineGrid[gi] = projector(Λ, dim, g, g)
+            end
         end
 
         return new{d}(d, Λ, rtol, 0, _grid, [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
@@ -106,10 +112,7 @@ end
 composite expoential grid
 """
 function unilog(Λ, rtol)
-    # N = 500
-    # grid = [i / N * Λ for i in 1:N]
-    # return grid
-
+    ############## use composite grid #############################################
     degree = 8
     ratio = Float(1.4)
     N = Int(floor(log(Λ) / log(ratio) + 1))
@@ -192,13 +195,6 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
             KK = [projector(Λ, D, g, grid[j]) for j in 1:N]
             basis.residualFineGrid[idx] -= (q' * KK)^2
 
-            # proj = Float(0)
-            # for j in 1:N
-            #     proj += q[j] * projector(Λ, D, g, grid[j, :])
-            # end
-
-            # basis.residualFineGrid[idx] -= proj^2
-
             if basis.residualFineGrid[idx] < Float(0)
                 if basis.residualFineGrid[idx] < Float(-rtol / 1000)
                     println("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
@@ -207,9 +203,6 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
                 basis.residualFineGrid[idx] = Float(0)
             end
 
-            ############  Mirror symmetry  #############################
-            idxp = coord2idx(basis.D, basis.Nfine, (c[2], c[1]))
-            basis.residualFineGrid[idxp] = basis.residualFineGrid[idx]
         end
     end
 end
@@ -404,8 +397,14 @@ if abspath(PROGRAM_FILE) == @__FILE__
         end
     end
     open("residual.dat", "w") do io
-        for i in 1:basis.Nfine^basis.D
-            println(io, basis.residualFineGrid[i])
+        for xi in 1:basis.Nfine
+            for yi in 1:basis.Nfine
+                if xi <= yi
+                    println(io, basis.residualFineGrid[coord2idx(2, basis.Nfine, (xi, yi))])
+                else
+                    println(io, basis.residualFineGrid[coord2idx(2, basis.Nfine, (yi, xi))])
+                end
+            end
         end
     end
 
