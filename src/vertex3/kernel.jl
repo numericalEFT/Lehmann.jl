@@ -58,6 +58,11 @@ function projPHA_τ(Λ::Float, t1::Float, t2::Float)
     return kernel(t1 + t2) + kernel(4 * Λ - t1 - t2) - kernel(2 * Λ - t1 + t2) - kernel(2 * Λ + t1 - t2)
 end
 
+"""
+inner product of exp(-g1[1]*x1-g1[2]*x2) and exp(-g2[1]*x1-g2[2]*x2),
+where x1 ∈ [0.0, 1.0], and x2 ∈ [0.0, x1]
+! we assume that x1 and x2 are discretized on a fine grid, with a separation ~ 1 between the grid points
+"""
 function projExp_τ(Λ::T, dim, g1, g2) where {T}
     # println(g1, ",  ", g2)
     tiny = T(1e-5)
