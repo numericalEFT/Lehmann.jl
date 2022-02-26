@@ -6,3 +6,4 @@ Manifest.toml
 /docs/build/
 *.DS_Store
 *.pb.gz
+*.pdf

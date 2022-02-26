@@ -18,7 +18,7 @@ particle-hole symmetric kernel: K(ω, τ)=e^{-ω*τ}+e^{-ω*(β-τ)}
 KK=int_0^{1/2} dτ K(ω1,τ)*K(ω2,τ)=(1-e^{ω1+ω2})/(ω1+ω2)+(e^{-ω2}-e^{-ω1})/(ω1-ω2)
 """
 function projPH_ω(Λ::Float, ω1::Float, ω2::Float)
-        if ω1 > ω2
+    if ω1 > ω2
         return kernel(ω1 + ω2) + exp(-ω2) * kernel(ω1 - ω2)
     else
         return kernel(ω1 + ω2) + exp(-ω1) * kernel(ω2 - ω1)
@@ -43,9 +43,9 @@ KK=int_0^{1/2} dτ K(ω1,τ)*K(ω2,τ)=(1-e^{ω1+ω2})/(ω1+ω2)-(e^{-ω2}-e^{-�
 """
 function projPHA_ω(Λ::Float, ω1::Float, ω2::Float)
     if ω1 > ω2
-    return kernel(ω1 + ω2) - exp(-ω2) * kernel(ω1 - ω2)
+        return kernel(ω1 + ω2) - exp(-ω2) * kernel(ω1 - ω2)
     else
-    return kernel(ω1 + ω2) - exp(-ω1) * kernel(ω2 - ω1)
+        return kernel(ω1 + ω2) - exp(-ω1) * kernel(ω2 - ω1)
     end
 end
 
@@ -56,18 +56,38 @@ KK=int_0^{Λ} dτ K(ω,t1)*K(ω2,t2)=(1-e^{t1+t2})/(t1+t2)+(1-e^{2β-t1-t2})/(2�
 """
 function projPHA_τ(Λ::Float, t1::Float, t2::Float)
     return kernel(t1 + t2) + kernel(4 * Λ - t1 - t2) - kernel(2 * Λ - t1 + t2) - kernel(2 * Λ + t1 - t2)
-    end
+end
 
-function projExp_τ(Λ::T, dim, g1, g2) where T
+function projExp_τ(Λ::T, dim, g1, g2) where {T}
     # println(g1, ",  ", g2)
-    tiny = T(1e-4)
+    tiny = T(1e-5)
     ω1, ω2 = g1[1] + g2[1], g1[2] + g2[2]
-    if ω1 < tiny || ω2 < tiny
-        return T(0.5)
+    if ω1 < tiny && ω2 < tiny
+        return T(1) / 2
+    elseif ω1 < tiny && ω2 > tiny
+        return (1 - ω2 - exp(-ω2)) / ω2 / (ω1 - ω2)
+    elseif ω1 > tiny && ω2 < tiny
+        return (1 - ω1 - exp(-ω1)) / ω1 / (ω2 - ω1)
     elseif abs(ω1 - ω2) < tiny
         ω = (ω1 + ω2) / 2
         return T((1 - exp(-ω) * (1 + ω)) / ω^2)
     else
         return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
     end
+    # if ω1 > tiny && ω2 > tiny
+    #     return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    # elseif ω1 > tiny && ω2 <= tiny
+    # elseif ω2 > tiny && ω1 <= tiny
+    # else
+    #     return T(0.5) - (ω1 + ω2) / 6 + (ω1^2 + ω1 * ω2 + ω2^2) / 24 - (ω1 + ω2) * (ω1^2 + ω2^2) / 120 + (ω1^4 + ω1^3 * ω2 + ω1^2 * ω2^2 + ω1 * ω2^3 + ω2^4) / 720
+    # end
+
+    # if ω1 < tiny || ω2 < tiny
+    #     return T(0.5)
+    # elseif abs(ω1 - ω2) < tiny
+    #     ω = (ω1 + ω2) / 2
+    #     return T((1 - exp(-ω) * (1 + ω)) / ω^2)
+    # else
+    #     return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    # end
 end

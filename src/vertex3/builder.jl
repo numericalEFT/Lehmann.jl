@@ -1,15 +1,7 @@
-# using Printf:Threads
-# using Quadmath:BigFloat
-# using LinearAlgebra:Matrix, zero, similar, Threads
 using LinearAlgebra, Printf
-# using Roots
 using Quadmath
-# using ProfileView
-using InteractiveUtils
 using StaticArrays
-# using MPI
-
-println(Threads.nthreads())
+using Lehmann
 
 const Float = Float128
 # const Float = BigFloat
@@ -84,8 +76,10 @@ mutable struct Basis{D}
             c1, c2 = idx2coord(d, Nfine, gi)
             if c1 <= c2
                 _residualFineGrid[gi] = projector(Λ, d, g, g)
+                # println("($c1, $c2) -> $g, ", _residualFineGrid[gi])
             end
         end
+        # exit(0)
 
         return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _residualFineGrid, [])
     end
@@ -114,17 +108,31 @@ composite expoential grid
 """
 function unilog(Λ, rtol)
     ############## use composite grid #############################################
-    degree = 8
-    ratio = Float(1.4)
-    N = Int(floor(log(Λ) / log(ratio) + 1))
-    panel = [Λ / ratio^(N - i) for i in 1:N]
+    # degree = 8
+    # ratio = Float(1.4)
+    # N = Int(floor(log(Λ) / log(ratio) + 1))
+    # panel = [Λ / ratio^(N - i) for i in 1:N]
+    # grid = Vector{Float}(undef, 0)
+    # for i in 1:length(panel)-1
+    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+    #     append!(grid, uniform)
+    # end
+    # append!(grid, Λ)
+    # println(grid)
+    # println("Composite expoential grid size: $(length(grid))")
+    # return grid
+
+    ############# DLR ##########################################
+    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph)
+    # println("fine basis number: $(dlr.size)\n", dlr.ω)
+    degree = 4
     grid = Vector{Float}(undef, 0)
+    panel = dlr.ω
     for i in 1:length(panel)-1
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
-    append!(grid, Λ)
-    println("Composite expoential grid size: $(length(grid))")
+    println("fine grid size: ", length(grid))
     return grid
 
     # filename = string(@__DIR__, "/../functional/basis/$(string(:corr))/dlr$(Int(Λ))_1e$(1e-6).dlr")
@@ -187,19 +195,25 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
         c1, c2 = idx2coord(D, Nfine, idx)
         if c1 <= c2
             g = (fineGrid[c1], fineGrid[c2])
+            # println(g, "($c1, $c2) before ", basis.residualFineGrid[idx])
             p = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
             basis.residualFineGrid[idx] -= p^2
+            # println(g, "($c1, $c2) after ", basis.residualFineGrid[idx])
+            # idx2 = coord2idx(D, Nfine, (c2, c1))
+            # println(g, "($c2, $c1) symmetry ", basis.residualFineGrid[idx2])
 
             if basis.residualFineGrid[idx] <= Float(0)
                 if basis.residualFineGrid[idx] < -eps(Float(1) * 10)
                     # @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) has $(basis.residualFineGrid[idx])")
                     @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g has $(basis.residualFineGrid[idx])")
+                    # exit(0)
                 end
                 basis.residualFineGrid[idx] = Float(0)
             end
 
         end
     end
+
     # end
 end
 
@@ -208,7 +222,7 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
     if isnothing(c0) == false
         for c in c0
             g = addBasis!(basis, proj, c)
-            @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", 1, g[1], g[2], basis.residual[end])
+            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.6g\n", 1, g[1], g[2], basis.residual[end])
         end
     end
     maxResidual, idx = findmax(basis.residualFineGrid)
@@ -222,12 +236,12 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
         # println("$c has diff: ", abs(residual - residualp) / residual, "  for $residual vs $residualp")
 
         g = addBasis!(basis, proj, c)
-        @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", basis.N, g[1], g[2], basis.residual[end])
+        @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g\n", basis.N, g[1], g[2], basis.residual[end])
         # testOrthgonal(basis)
 
         if c[1] != c[2]
             gp = addBasis!(basis, proj, (c[2], c[1]))
-            @printf("%3i : ω=(%24.8f, %24.8f) -> error=%24.16g\n", basis.N, gp[1], gp[2], basis.residual[end])
+            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g\n", basis.N, gp[1], gp[2], basis.residual[end])
             # testOrthgonal(basis)
         end
 
@@ -356,7 +370,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     Λ = Float(100)
-    rtol = Float(1e-6)
+    rtol = Float(1e-8)
     dim = 2
     @time basis = QR{dim}(Λ, rtol, projExp_τ)
 
