@@ -128,22 +128,7 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
     push!(basis.gridCoord, coord)
     # println(coord, "->", g0, " -> ", basis.gridIdx[end])
 
-    projKernel!(basis, projector)
-
-    _Q = zeros(Float, (basis.N, basis.N))
-    if basis.N == 1
-        _Q[1, 1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
-        basis.R = zeros(Float, (1, 1))
-        basis.R[1, 1] = sqrt(projector(basis.Λ, basis.D, g0, g0))
-    else
-        _Q[1:end-1, 1:end-1] = basis.Q
-        _R = zeros(Float, (basis.N, basis.N))
-        _R[1:end-1, 1:end-1] = basis.R
-        basis.R = _R
-        _Q[end, :] = GramSchmidt(basis, _Q, g0)
-    end
-    basis.Q = _Q
-
+    GramSchmidt!(basis, projector)
     updateResidual!(basis, projector)
     push!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
     return g0
@@ -192,11 +177,11 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
         c = idx2coord(basis.D, basis.Nfine, idx)
 
         g = addBasis!(basis, proj, c)
-        @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g\n", basis.N, g[1], g[2], basis.residual[end])
+        @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, g[1], g[2], basis.residual[end], basis.R[end, end])
 
         if c[1] != c[2]
             gp = addBasis!(basis, proj, (c[2], c[1]))
-            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g\n", basis.N, gp[1], gp[2], basis.residual[end])
+            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, gp[1], gp[2], basis.residual[end], basis.R[end, end])
         end
 
         maxResidual, idx = findmax(basis.residualFineGrid)
@@ -218,90 +203,59 @@ q1=sum_j c_j K_j
 q2=sum_k d_k K_k
 return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
-projqq(basis, q1, q2) = q1' * basis.proj * q2
+projqq(_proj, q1, q2) = q1' * _proj * q2
 # function projqq(basis, q1, q2)
 #     return dot(basis.L' * q1, basis.U * q2)
 # end
 
 """
-<K(g_i), K(g_j)>
+add the last grid point to the overlap matrix: 
+basis.proj = R'*R = <K(g_i), K(g_j)>
 """
-function projKernel!(basis, proj)
-    K = zeros(FloatL, (basis.N, basis.N))
-    K[1:end-1, 1:end-1] = basis.proj
-    coord = basis.gridCoord
+function overlap(basis, projector)
+    _proj = zeros(Float, (basis.N, basis.N))
+    _proj[1:end-1, 1:end-1] = basis.proj
     for i in 1:basis.N
-        p = proj(FloatL(basis.Λ), basis.D, basis.grid[end], basis.grid[i])
+        p = projector(FloatL(basis.Λ), basis.D, basis.grid[end], basis.grid[i])
         # pp = proj(basis.Λ, basis.D, basis.grid[end], basis.grid[i], coord[end], coord[i], basis.cache)
         # @assert abs(p - pp) < 1e-16 "$p vs $pp"
-        K[end, i] = p
-        K[i, end] = p
+        _proj[end, i] = p
+        _proj[i, end] = p
     end
-    basis.proj = K
-    # maxerr = maximum(abs.(A.L * A.U - K))
-    # println("error : ", maxerr)
+    return _proj
 end
 
 """
-modified Gram-Schmidt process
+Gram-Schmidt process to the last grid point in basis.grid
 """
-function mGramSchmidt(basis, g)
-    qnew = zeros(Float, basis.N)
-    qnew[end] = 1
-    # println(basis.proj)
+function GramSchmidt!(basis, projector)
+    _Q = zeros(Float, (basis.N, basis.N))
+    _Q[1:end-1, 1:end-1] = basis.Q
 
-    for qi in 1:basis.N-1
-        q = basis.Q[qi, :]
-        qnew -= projqq(basis, q, qnew) .* q  # <q, qnew> q
-    end
-    return qnew / sqrt(abs(projqq(basis, qnew, qnew)))
-end
+    _R = zeros(Float, (basis.N, basis.N))
+    _R[1:end-1, 1:end-1] = basis.R
 
-"""
-Gram-Schmidt process
-"""
-function GramSchmidt(basis, Q, g)
+    basis.proj = overlap(basis, projector)
+
     qnew = zeros(Float, basis.N)
     qnew[end] = 1
     q0 = copy(qnew)
-    # q0 = basis.U * qnew
 
     for qi in 1:basis.N-1
-        q = view(Q, qi, :)
-        # q = basis.U * Q[qi, :]
-        coeff = projqq(basis, q, q0)
-        basis.R[qi, end] = coeff
-        # coeff = q' * q0
-        qnew -= coeff * q  # <q, qnew> q
+        q = view(_Q, qi, :)
+        overlap = projqq(basis.proj, q, q0)
+        qnew -= overlap * q  # <q, qnew> q
+        _R[qi, end] = overlap
     end
-    normal = projqq(basis, qnew, qnew)
-    basis.R[end, end] = sqrt(abs(normal))
-    # normal = dot(qnew, qnew)
-    # println("normal", normal)
-    qnorm = qnew / sqrt(abs(normal))
-    return qnorm
+
+    normal = projqq(basis.proj, qnew, qnew)
+    _R[end, end] = sqrt(abs(normal))
+    _Q[end, :] = qnew / sqrt(abs(normal))
+
+    basis.Q = _Q
+    basis.R = _R
+    # basis.QR = _QR
 end
-
-# function GramSchmidt(basis, Q, g)
-#     qnew = zeros(Float, basis.N)
-#     qnew[end] = 1
-#     # q0 = copy(qnew)
-#     q0 = basis.U * qnew
-
-#     for qi in 1:basis.N-1
-#         # q = view(Q, qi, :)
-#         q = basis.U * Q[qi, :]
-#         # coeff = projqq(basis, q, q0)
-#         coeff = q' * q0
-#         qnew -= coeff * q  # <q, qnew> q
-#     end
-#     # normal = projqq(basis, qnew, qnew)
-#     # normal = dot(qnew, qnew)
-#     # println("normal", normal)
-#     # qnorm = qnew / sqrt(abs(normal))
-#     qnorm = qnew / norm(qnew)
-#     return qnorm
-# end
 
 function Residual(basis, proj, g)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
@@ -329,11 +283,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    Λ = Float(100)
-    rtol = Float(1e-6)
+    Λ = Float(1000)
+    rtol = Float(1e-7)
     dim = 2
     basis = QR{2}(Float(100), Float(1e-6), projExp_τ)
-    # @time basis = QR{dim}(Λ, rtol, projExp_τ)
+    @time basis = QR{dim}(Λ, rtol, projExp_τ)
 
     open("basis.dat", "w") do io
         for i in 1:basis.N
