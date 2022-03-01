@@ -109,7 +109,7 @@ function projExp_τ(Λ::T, dim, g1, g2, gidx1, gidx2, cache) where {T}
     elseif ω1 > tiny && ω2 < tiny
         return (1 - ω1 - expω1) / ω1 / (ω2 - ω1)
     elseif abs(ω1 - ω2) < tiny
-        @assert abs(ω1 - ω2) < eps(Float(1)) * 10
+        @assert abs(ω1 - ω2) < eps(Float(1)) * 100 "$ω1 - $ω2 = $(ω1-ω2)"
         return T((1 - expω1 * (1 + ω1)) / ω1^2)
     else
         return T((ω1 - ω2 + expω1 * ω2 - expω2 * ω1) / (ω1 * ω2 * (ω1 - ω2)))

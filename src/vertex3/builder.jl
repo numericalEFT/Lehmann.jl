@@ -1,6 +1,10 @@
 using LinearAlgebra, Printf
 using StaticArrays
+# using GenericLinearAlgebra
 using Lehmann
+
+const Float = Float64
+const FloatL = Float64
 
 ### a couple of more digits, but slower
 # using Quadmath
@@ -8,7 +12,8 @@ using Lehmann
 
 ### faster, a couple of less digits
 using DoubleFloats
-const Float = Double64
+# const FloatL = Double64
+# const Float = Double64
 # using Plots
 
 ### 64 digits by default, but a lot more slower
@@ -27,7 +32,9 @@ mutable struct Basis{D}
     grid::Vector{SVector{D,Float}} # grid for the basis
     residual::Vector{Float} # achieved error by each basis
     Q::Matrix{Float} # K = Q*R
-    proj::Matrix{Float} # the overlap of basis functions <K(g_i), K(g_j)>
+    proj::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
+    L::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
+    U::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
 
     ############ fine grids #################
     Nfine::Integer
@@ -38,6 +45,7 @@ mutable struct Basis{D}
     residualFineGrid::Vector{Float} #length = Nfine^D/D!
     gridIdx::Vector{Int} # grid for the basis
     gridCoord::Vector{SVector{D,Int}}
+    gridProj::Vector{Vector{Float}}
 
     function Basis{d}(Λ, rtol, projector) where {d}
         _Q = Matrix{Float}(undef, (0, 0))
@@ -57,7 +65,7 @@ mutable struct Basis{D}
                 _residualFineGrid[gi] = projector(Λ, d, g, g)
             end
         end
-        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [])
+        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), similar(_Q), similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [], [])
     end
 end
 
@@ -205,23 +213,32 @@ q1=sum_j c_j K_j
 q2=sum_k d_k K_k
 return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
-projqq(basis, q1, q2) = q1' * basis.proj * q2
+# projqq(basis, q1, q2) = q1' * basis.proj * q2
+function projqq(basis, q1, q2)
+    return dot(basis.L' * q1, basis.U * q2)
+end
 
 """
 <K(g_i), K(g_j)>
 """
 function projKernel!(basis, proj)
-    K = zeros(Float, (basis.N, basis.N))
+    FloatL = Double64
+    K = zeros(FloatL, (basis.N, basis.N))
     K[1:end-1, 1:end-1] = basis.proj
     coord = basis.gridCoord
     for i in 1:basis.N
-        # p = proj(basis.Λ, basis.D, basis.grid[end], basis.grid[i])
-        pp = proj(basis.Λ, basis.D, basis.grid[end], basis.grid[i], coord[end], coord[i], basis.cache)
+        p = proj(FloatL(basis.Λ), basis.D, basis.grid[end], basis.grid[i])
+        # pp = proj(basis.Λ, basis.D, basis.grid[end], basis.grid[i], coord[end], coord[i], basis.cache)
         # @assert abs(p - pp) < 1e-16 "$p vs $pp"
-        K[end, i] = pp
-        K[i, end] = pp
+        K[end, i] = p
+        K[i, end] = p
     end
     basis.proj = K
+    A = cholesky(FloatL.(K))
+    basis.L = A.L
+    basis.U = A.U
+    # maxerr = maximum(abs.(A.L * A.U - K))
+    # println("error : ", maxerr)
 end
 
 """
@@ -246,19 +263,42 @@ function GramSchmidt(basis, Q, g)
     qnew = zeros(Float, basis.N)
     qnew[end] = 1
     q0 = copy(qnew)
+    # q0 = basis.U * qnew
 
     for qi in 1:basis.N-1
         q = view(Q, qi, :)
+        # q = basis.U * Q[qi, :]
         coeff = projqq(basis, q, q0)
+        # coeff = q' * q0
         qnew -= coeff * q  # <q, qnew> q
     end
     normal = projqq(basis, qnew, qnew)
+    # normal = dot(qnew, qnew)
     # println("normal", normal)
     qnorm = qnew / sqrt(abs(normal))
     return qnorm
 end
 
-within(g, g0, cutoff) = g0[1] < 5 || g0[2] < 5 || g[1] < 5 || g[2] < 5 || ((g[1] / cutoff <= g0[1] <= g[1] * cutoff) && (g[2] / cutoff <= g0[2] <= g[2] * cutoff))
+# function GramSchmidt(basis, Q, g)
+#     qnew = zeros(Float, basis.N)
+#     qnew[end] = 1
+#     # q0 = copy(qnew)
+#     q0 = basis.U * qnew
+
+#     for qi in 1:basis.N-1
+#         # q = view(Q, qi, :)
+#         q = basis.U * Q[qi, :]
+#         # coeff = projqq(basis, q, q0)
+#         coeff = q' * q0
+#         qnew -= coeff * q  # <q, qnew> q
+#     end
+#     # normal = projqq(basis, qnew, qnew)
+#     # normal = dot(qnew, qnew)
+#     # println("normal", normal)
+#     # qnorm = qnew / sqrt(abs(normal))
+#     qnorm = qnew / norm(qnew)
+#     return qnorm
+# end
 
 function Residual(basis, proj, g)
     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
@@ -287,7 +327,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     Λ = Float(640)
-    rtol = Float(1e-8)
+    rtol = Float(1e-7)
     dim = 2
     basis = QR{2}(Float(100), Float(1e-4), projExp_τ)
     @time basis = QR{dim}(Λ, rtol, projExp_τ)
