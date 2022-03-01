@@ -11,7 +11,7 @@ const FloatL = Float64
 # const Float = Float128
 
 ### faster, a couple of less digits
-using DoubleFloats
+# using DoubleFloats
 # const FloatL = Double64
 # const Float = Double64
 # using Plots
@@ -241,16 +241,28 @@ function GramSchmidt!(basis, projector)
     qnew[end] = 1
     q0 = copy(qnew)
 
+    A = cholesky(basis.proj)
+
     for qi in 1:basis.N-1
         q = view(_Q, qi, :)
         overlap = projqq(basis.proj, q, q0)
+        # overlap = (A.U * q)' * A.U[:, end]
         qnew -= overlap * q  # <q, qnew> q
         _R[qi, end] = overlap
     end
 
-    normal = projqq(basis.proj, qnew, qnew)
-    _R[end, end] = sqrt(abs(normal))
-    _Q[end, :] = qnew / sqrt(abs(normal))
+    # normal = projqq(basis.proj, qnew, qnew)
+    # _R[end, end] = sqrt(abs(normal))
+    # _Q[end, :] = qnew / sqrt(abs(normal))
+
+    _norm = norm(A.U * qnew)
+    _R[end, end] = _norm
+    _Q[end, :] = qnew / _norm
+    # println("digit loss: ", projqq(basis.proj, _Q[end, :], _Q[end, :]))
+    # # println("norm digit loss: ", normal, " vs ", (_R[end, end])^2, "= ", normal - (_R[end, end])^2)
+
+    # println("norm: ", Float(sqrt(Double64(normal))), "vs", norm(A.U * qnew), "=", sqrt(normal) - norm(A.U * qnew))
+    # println("norm2: ", dot(A.U * qnew, A.U * qnew) - _norm^2, " versus ", dot(A.U * _Q[end, :], A.U * _Q[end, :]) - 1)
 
     basis.Q = _Q
     basis.R = _R
@@ -268,11 +280,19 @@ end
 
 function testOrthgonal(basis)
     println("testing orthognalization...")
+    # A = cholesky(basis.proj)
+    # QL = basis.Q * A.L
+    # UQ = A.U * basis.Q'
+    # II = QL * UQ
     II = basis.Q * basis.proj * basis.Q'
+    # println(diag(II) .- 1)
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
     # display(II - I)
     # println()
+    # for i = 1:basis.N
+    #     println(i, " -> ", dot(A.U * basis.Q[i, :], A.U * basis.Q[i, :]) - 1)
+    # end
 end
 
 function testResidual(basis, proj)
@@ -283,10 +303,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    Λ = Float(1000)
+    Λ = Float(10000)
     rtol = Float(1e-7)
     dim = 2
-    basis = QR{2}(Float(100), Float(1e-6), projExp_τ)
+    basis = QR{2}(Float(100), Float(1e-7), projExp_τ)
     @time basis = QR{dim}(Λ, rtol, projExp_τ)
 
     open("basis.dat", "w") do io
