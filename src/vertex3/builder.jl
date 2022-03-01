@@ -34,8 +34,6 @@ mutable struct Basis{D}
     Q::Matrix{Float} # K = Q*R
     R::Matrix{Float}
     proj::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
-    L::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
-    U::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
 
     ############ fine grids #################
     Nfine::Integer
@@ -66,7 +64,7 @@ mutable struct Basis{D}
                 _residualFineGrid[gi] = projector(Λ, d, g, g)
             end
         end
-        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), similar(_Q), similar(_Q), similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [], [])
+        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [], [])
     end
 end
 
@@ -220,16 +218,15 @@ q1=sum_j c_j K_j
 q2=sum_k d_k K_k
 return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
 """
-# projqq(basis, q1, q2) = q1' * basis.proj * q2
-function projqq(basis, q1, q2)
-    return dot(basis.L' * q1, basis.U * q2)
-end
+projqq(basis, q1, q2) = q1' * basis.proj * q2
+# function projqq(basis, q1, q2)
+#     return dot(basis.L' * q1, basis.U * q2)
+# end
 
 """
 <K(g_i), K(g_j)>
 """
 function projKernel!(basis, proj)
-    FloatL = Double64
     K = zeros(FloatL, (basis.N, basis.N))
     K[1:end-1, 1:end-1] = basis.proj
     coord = basis.gridCoord
@@ -241,9 +238,6 @@ function projKernel!(basis, proj)
         K[i, end] = p
     end
     basis.proj = K
-    A = cholesky(FloatL.(K))
-    basis.L = A.L
-    basis.U = A.U
     # maxerr = maximum(abs.(A.L * A.U - K))
     # println("error : ", maxerr)
 end
