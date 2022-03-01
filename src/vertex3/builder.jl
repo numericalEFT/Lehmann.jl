@@ -1,12 +1,18 @@
 using LinearAlgebra, Printf
-using Quadmath
 using StaticArrays
 using Lehmann
+
+### a couple of more digits, but slower
+# using Quadmath
+# const Float = Float128
+
+### faster, a couple of less digits
+using DoubleFloats
+const Float = Double64
 # using Plots
 
-const Float = Float128
+### 64 digits by default, but a lot more slower
 # const Float = BigFloat
-# const Float = Float128
 
 include("./kernel.jl")
 
@@ -93,7 +99,7 @@ function unilog(Λ, rtol)
     # return grid
 
     ############# DLR based fine grid ##########################################
-    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph)
+    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
     degree = 4
     grid = Vector{Float}(undef, 0)
@@ -102,7 +108,7 @@ function unilog(Λ, rtol)
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
-    println("fine grid size: ", length(grid))
+    println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
     return grid
 end
 
