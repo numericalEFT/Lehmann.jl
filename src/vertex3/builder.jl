@@ -32,6 +32,7 @@ mutable struct Basis{D}
     grid::Vector{SVector{D,Float}} # grid for the basis
     residual::Vector{Float} # achieved error by each basis
     Q::Matrix{Float} # K = Q*R
+    R::Matrix{Float}
     proj::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
     L::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
     U::Matrix{FloatL} # the overlap of basis functions <K(g_i), K(g_j)>
@@ -65,7 +66,7 @@ mutable struct Basis{D}
                 _residualFineGrid[gi] = projector(Λ, d, g, g)
             end
         end
-        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), similar(_Q), similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [], [])
+        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), similar(_Q), similar(_Q), similar(_Q), Nfine, _finegrid, _cache, _residualFineGrid, [], [], [])
     end
 end
 
@@ -134,8 +135,13 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
     _Q = zeros(Float, (basis.N, basis.N))
     if basis.N == 1
         _Q[1, 1] = 1 / sqrt(projector(basis.Λ, basis.D, g0, g0))
+        basis.R = zeros(Float, (1, 1))
+        basis.R[1, 1] = sqrt(projector(basis.Λ, basis.D, g0, g0))
     else
         _Q[1:end-1, 1:end-1] = basis.Q
+        _R = zeros(Float, (basis.N, basis.N))
+        _R[1:end-1, 1:end-1] = basis.R
+        basis.R = _R
         _Q[end, :] = GramSchmidt(basis, _Q, g0)
     end
     basis.Q = _Q
@@ -200,6 +206,7 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
         # plotResidual(basis)
         # testOrthgonal(basis)
     end
+    println("R matrix error:", maximum(abs.(basis.proj - basis.R' * basis.R)))
     testOrthgonal(basis)
     testResidual(basis, proj)
     @printf("residual = %.16e\n", sqrt(maxResidual))
@@ -269,10 +276,12 @@ function GramSchmidt(basis, Q, g)
         q = view(Q, qi, :)
         # q = basis.U * Q[qi, :]
         coeff = projqq(basis, q, q0)
+        basis.R[qi, end] = coeff
         # coeff = q' * q0
         qnew -= coeff * q  # <q, qnew> q
     end
     normal = projqq(basis, qnew, qnew)
+    basis.R[end, end] = sqrt(abs(normal))
     # normal = dot(qnew, qnew)
     # println("normal", normal)
     qnorm = qnew / sqrt(abs(normal))
@@ -326,11 +335,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    Λ = Float(640)
-    rtol = Float(1e-7)
+    Λ = Float(100)
+    rtol = Float(1e-6)
     dim = 2
-    basis = QR{2}(Float(100), Float(1e-4), projExp_τ)
-    @time basis = QR{dim}(Λ, rtol, projExp_τ)
+    basis = QR{2}(Float(100), Float(1e-6), projExp_τ)
+    # @time basis = QR{dim}(Λ, rtol, projExp_τ)
 
     open("basis.dat", "w") do io
         for i in 1:basis.N
