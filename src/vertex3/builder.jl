@@ -10,6 +10,11 @@ using DoubleFloats
 # const Float = Double64
 const Double = Double64
 
+# similar speed as DoubleFloats
+# using MultiFloats
+# const Float = Float64x2
+# const Double = Float64x2
+
 ### a couple of more digits, but slower
 # using Quadmath
 # const Float = Float128
