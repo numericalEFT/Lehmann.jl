@@ -35,7 +35,7 @@ mutable struct Basis{D}
     grid::Vector{SVector{D,Float}} # grid for the basis
     residual::Vector{Float} # achieved error by each basis
     # Q::Matrix{Float} # K = Q*R
-    Q::Matrix{Double} # K = Q*R
+    Q::Matrix{Double} # , Q' = R^{-1}, Q*R'= I
     R::Matrix{Double}
 
     ############ fine grids #################
@@ -44,7 +44,7 @@ mutable struct Basis{D}
     cache::Vector{Float}
 
     ########## residual defined on the fine grids #################
-    residualFineGrid::Vector{Float} #length = Nfine^D/D!
+    residualFineGrid::Vector{Double} #length = Nfine^D/D!
     selectedFineGrid::Vector{Bool}
     gridIdx::Vector{Int} # grid for the basis
     gridCoord::Vector{SVector{D,Int}}
@@ -66,7 +66,8 @@ mutable struct Basis{D}
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
             c1, c2 = idx2coord(d, Nfine, gi)
             if c1 <= c2
-                _residualFineGrid[gi] = sqrt(projector(Double(Λ), d, g, g))
+                # _residualFineGrid[gi] = sqrt(projector(Double(Λ), d, g, g))
+                _residualFineGrid[gi] = projector(Λ, d, g, g)
             end
         end
         return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _cache,
@@ -140,7 +141,7 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
     updateResidual!(basis, projector)
     basis.selectedFineGrid[idx] = true
     basis.residualFineGrid[idx] = 0
-    push!(basis.residual, maximum(basis.residualFineGrid)) # record error after the new grid is added
+    push!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
     return g0
 end
 
@@ -148,8 +149,8 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
     Λ, rtol = basis.Λ, basis.rtol
     N, Nfine = basis.N, basis.Nfine
 
-    q = Float.(basis.Q[end, :])
-    # q = basis.Q[end, :]
+    # q = Float.(basis.Q[end, :])
+    q = Double.(basis.Q[end, :])
     fineGrid = basis.fineGrid
     grid = basis.grid
 
@@ -161,19 +162,22 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
             g = (fineGrid[c[1]], fineGrid[c[2]])
             # pp = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
             pp = sum(q[j] * projector(Λ, D, g, grid[j], c, basis.gridCoord[j], basis.cache) for j in 1:N)
-            _norm = basis.residualFineGrid[idx]
+            _residual = basis.residualFineGrid[idx]
             # println("pp", pp)
             # println("norm ", _norm)
 
-            if abs(pp) > abs(_norm) || abs(_norm) < eps(Float(1)) * 10
-                # println(c, " grid: ", g, " = ", pp, " and ", _norm, " resudiual: ", basis.residualFineGrid[idx])
-                # if _norm^2 - pp^2 < -basis.rtol
-                #     @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g got $(_norm)^2 - $(pp)^2 = $(_norm^2-pp^2)")
-                # end
+            # if abs(pp) > abs(_norm) || abs(_norm) < eps(Float(1)) * 10
+            # if abs(pp) > abs(_norm)
+            if _residual - pp^2 < 0
+                # @warn(c, " grid: ", g, " = ", pp, " and ", _norm, " resudiual: ", Double(_norm)^2 - Double(pp)^2)
+                if _residual - pp^2 < -basis.rtol
+                    @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g got $_residual - $(pp)^2 = $(_residual-pp^2)")
+                end
                 basis.residualFineGrid[idx] = 0
             else
                 # basis.residualFineGrid[idx] = _norm * sqrt((1 - pp / _norm) * (1 + pp / _norm))
-                basis.residualFineGrid[idx] = sqrt(Double(_norm)^2 - Double(pp)^2)
+                # basis.residualFineGrid[idx] = sqrt(Double(_norm)^2 - Double(pp)^2)
+                basis.residualFineGrid[idx] = _residual - pp^2
             end
         end
     end
@@ -189,7 +193,7 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
     end
     maxResidual, idx = findmax(basis.residualFineGrid)
 
-    while isnothing(N) ? maxResidual > rtol : basis.N < N
+    while isnothing(N) ? sqrt(maxResidual) > rtol : basis.N < N
 
         c = idx2coord(basis.D, basis.Nfine, idx)
 
@@ -207,6 +211,14 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
         # testOrthgonal(basis)
     end
     # println(basis.R[:, end])
+    # qi = basis.N - 1
+    # println("Q", basis.Q[qi, :])
+    # overlap = sum(basis.Q[qi, j] * proj(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N-1)
+    # println("overlap: ", overlap, " versus ", basis.R[qi, end])
+    # println("QR: ", basis.Q[qi:qi, :] * basis.R')
+    # println("QR: ", basis.Q[2:2, :] * basis.R')
+    # println(basis.R[:, end-1]' * basis.R[:, end-1])
+    # println(proj(basis.Λ, basis.D, basis.grid[end], basis.grid[end]))
     # println("R matrix error:", maximum(abs.(basis.proj - basis.R' * basis.R)))
     testOrthgonal(basis)
     testResidual(basis, proj)
@@ -261,7 +273,8 @@ function GramSchmidt!(basis, projector)
     # A = cholesky(basis.proj)
 
     for qi in 1:basis.N-1
-        overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
+        # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
+        overlap = sum(_Q[qi, j] * projector(basis.Λ, basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
         _Q[end, :] -= overlap * _Q[qi, :]  # <q, qnew> q
         _R[qi, end] = overlap
     end
@@ -273,7 +286,8 @@ function GramSchmidt!(basis, projector)
     #     end
     #     _norm = _norm * sqrt(1 - (_R[i, end] / _norm)^2)
     # end
-    _norm = projector(Double(basis.Λ), basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
+    # _norm = projector(Double(basis.Λ), basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
+    _norm = projector(basis.Λ, basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
     # @assert _norm > 0.0 "$_norm is negative on the grid $(basis.grid[end])"
     # @assert _norm < -eps(Double(1)) * 10 "$_norm is negative on the grid $(basis.grid[end])"
     _norm = sqrt(abs(_norm))
@@ -282,7 +296,7 @@ function GramSchmidt!(basis, projector)
 
     c = basis.gridCoord[end]
     if c[1] <= c[2]
-        residual = basis.residualFineGrid[basis.gridIdx[end]]
+        residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
         @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
         if abs(_norm - residual) > basis.rtol * 10
             @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
@@ -329,7 +343,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     Λ = Float(1000)
-    rtol = Float(1e-8)
+    rtol = Float(1e-9)
     dim = 2
     basis = QR{2}(Float(10), Float(1e-7), projExp_τ)
     @time basis = QR{dim}(Λ, rtol, projExp_τ)
