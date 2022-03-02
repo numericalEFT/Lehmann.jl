@@ -66,7 +66,7 @@ where x1 ∈ [0.0, 1.0], and x2 ∈ [0.0, x1]
 function projExp_τ(Λ::T, dim, g1, g2) where {T}
     # println(g1, ",  ", g2)
     tiny = T(1e-5)
-    ω1, ω2 = g1[1] + g2[1], g1[2] + g2[2]
+    ω1, ω2 = T(g1[1]) + T(g2[1]), T(g1[2]) + T(g2[2])
     if ω1 < tiny && ω2 < tiny
         return T(1) / 2
     elseif ω1 < tiny && ω2 > tiny
@@ -74,8 +74,9 @@ function projExp_τ(Λ::T, dim, g1, g2) where {T}
     elseif ω1 > tiny && ω2 < tiny
         return (1 - ω1 - exp(-ω1)) / ω1 / (ω2 - ω1)
     elseif abs(ω1 - ω2) < tiny
-        ω = (ω1 + ω2) / 2
-        return T((1 - exp(-ω) * (1 + ω)) / ω^2)
+        # ω = (ω1 + ω2) / 2
+        # return T((1 - exp(-ω) * (1 + ω)) / ω^2)
+        return T((1 - exp(-ω1) * (1 + ω1)) / ω1^2)
     else
         return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
     end

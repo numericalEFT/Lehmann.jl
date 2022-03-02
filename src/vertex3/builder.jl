@@ -211,8 +211,7 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
     # println(basis.R[:, end-1]' * basis.R[:, end-1])
     # println(proj(basis.Λ, basis.D, basis.grid[end], basis.grid[end]))
     # println("R matrix error:", maximum(abs.(basis.proj - basis.R' * basis.R)))
-    testOrthgonal(basis)
-    testResidual(basis, proj)
+    testOrthgonal(basis, proj)
     @printf("residual = %.16e\n", maxResidual)
     # plotResidual(basis)
     # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
@@ -267,38 +266,39 @@ function GramSchmidt!(basis, projector)
     basis.R = _R
 end
 
-function Residual(basis, proj, g)
-    # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
-    # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
+# function Residual(basis, proj, g)
+#     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
+#     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
+#     KK = [proj(basis.Λ, basis.D, basis.grid[j], g) for j in 1:basis.N]
+#     norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
+#     return norm2
+# end
 
-    KK = [proj(basis.Λ, basis.D, basis.grid[j], g) for j in 1:basis.N]
-    norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
-    return norm2
-end
-
-function testOrthgonal(basis)
+function testOrthgonal(basis, projector)
     println("testing orthognalization...")
-    # A = cholesky(basis.proj)
-    # QL = basis.Q * A.L
-    # UQ = A.U * basis.Q'
-    # II = QL * UQ
-    RQ = Double.(basis.R) * Double.(basis.Q')
-    II = RQ' * RQ
-    # println(diag(II) .- 1)
+    KK = zeros(Double, (basis.N, basis.N))
+    for i in 1:basis.N
+        for j in 1:basis.N
+            KK[i, j] = projector(Double(basis.Λ), basis.D, basis.grid[i], basis.grid[j])
+        end
+    end
+    maxerr = maximum(abs.(KK - basis.R' * basis.R))
+    println("Max overlap matrix R'*R Error: ", maxerr)
+
+    maxerr = maximum(abs.(basis.R * basis.Q' - I))
+    println("Max R*R^{-1} Error: ", maxerr)
+
+    II = basis.Q * KK * basis.Q'
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
-    # display(II - I)
-    # println()
-    # for i = 1:basis.N
-    #     println(i, " -> ", dot(A.U * basis.Q[i, :], A.U * basis.Q[i, :]) - 1)
-    # end
+
 end
 
-function testResidual(basis, proj)
-    # residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
-    # println("Max deviation from zero residual: ", maximum(abs.(residual)))
-    println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
-end
+# function testResidual(basis, proj)
+#     # residual = [Residual(basis, proj, basis.grid[i, :]) for i in 1:basis.N]
+#     # println("Max deviation from zero residual: ", maximum(abs.(residual)))
+#     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
+# end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
