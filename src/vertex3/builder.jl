@@ -65,9 +65,9 @@ mutable struct Basis{D}
         _selectedFineGrid = zeros(Bool, Nfine^d)
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
             c1, c2 = idx2coord(d, Nfine, gi)
-            # if c1 <= c2
-            _residualFineGrid[gi] = projector(Λ, d, g, g)
-            # end
+            if c1 <= c2
+                _residualFineGrid[gi] = projector(Λ, d, g, g)
+            end
         end
         return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _cache,
             _residualFineGrid, _selectedFineGrid, [], [], [])
@@ -133,7 +133,6 @@ function addBasis!(basis::Basis{D}, projector, coord) where {D}
     push!(basis.grid, g0)
     push!(basis.gridIdx, idx)
     push!(basis.gridCoord, coord)
-    # println(coord, "->", g0, " -> ", basis.gridIdx[end])
 
     GramSchmidt!(basis, projector)
 
@@ -153,11 +152,11 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
     fineGrid = basis.fineGrid
     grid = basis.grid
 
-    # Threads.@threads for idx in 1:Nfine^D
-    for idx in 1:Nfine^D
+    Threads.@threads for idx in 1:Nfine^D
+        # for idx in 1:Nfine^D
         c = idx2coord(D, Nfine, idx)
-        # if c[1] <= c[2] && (basis.selectedFineGrid[idx] == false)
-        if (basis.selectedFineGrid[idx] == false)
+        if c[1] <= c[2] && (basis.selectedFineGrid[idx] == false)
+            # if (basis.selectedFineGrid[idx] == false)
             g = (fineGrid[c[1]], fineGrid[c[2]])
             # pp = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
             pp = sum(q[j] * projector(Λ, D, g, grid[j], c, basis.gridCoord[j], basis.cache) for j in 1:N)
@@ -221,33 +220,6 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
 end
 
 """
-q1=sum_j c_j K_j
-q2=sum_k d_k K_k
-return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
-"""
-# projqq(_proj, q1, q2) = q1' * _proj * q2
-# function projqq(basis, q1, q2)
-#     return dot(basis.L' * q1, basis.U * q2)
-# end
-
-"""
-add the last grid point to the overlap matrix: 
-basis.proj = R'*R = <K(g_i), K(g_j)>
-"""
-# function overlap(basis, projector)
-#     _proj = zeros(Float, (basis.N, basis.N))
-#     _proj[1:end-1, 1:end-1] = basis.proj
-#     for i in 1:basis.N
-#         p = projector(FloatL(basis.Λ), basis.D, basis.grid[end], basis.grid[i])
-#         # pp = proj(basis.Λ, basis.D, basis.grid[end], basis.grid[i], coord[end], coord[i], basis.cache)
-#         # @assert abs(p - pp) < 1e-16 "$p vs $pp"
-#         _proj[end, i] = p
-#         _proj[i, end] = p
-#     end
-#     return _proj
-# end
-
-"""
 Gram-Schmidt process to the last grid point in basis.grid
 """
 function GramSchmidt!(basis, projector)
@@ -259,8 +231,6 @@ function GramSchmidt!(basis, projector)
     _R[1:end-1, 1:end-1] = basis.R
 
     _Q[end, end] = 1
-    # qnew = zeros(Double, basis.N)
-    # qnew[end] = 1
 
     # A = cholesky(basis.proj)
 
@@ -280,20 +250,18 @@ function GramSchmidt!(basis, projector)
     # end
     # _norm = projector(Double(basis.Λ), basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
     _norm = projector(basis.Λ, basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
-    # @assert _norm > 0.0 "$_norm is negative on the grid $(basis.grid[end])"
-    # @assert _norm < -eps(Double(1)) * 10 "$_norm is negative on the grid $(basis.grid[end])"
     _norm = sqrt(abs(_norm))
     _R[end, end] = _norm
     _Q[end, :] /= _norm
 
     c = basis.gridCoord[end]
-    # if c[1] <= c[2]
-    residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
-    @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
-    if abs(_norm - residual) > basis.rtol * 10
-        @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
+    if c[1] <= c[2]
+        residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
+        @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
+        if abs(_norm - residual) > basis.rtol * 10
+            @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
+        end
     end
-    # end
 
     basis.Q = _Q
     basis.R = _R
