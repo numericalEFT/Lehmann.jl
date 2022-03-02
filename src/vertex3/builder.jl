@@ -65,10 +65,9 @@ mutable struct Basis{D}
         _selectedFineGrid = zeros(Bool, Nfine^d)
         for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
             c1, c2 = idx2coord(d, Nfine, gi)
-            if c1 <= c2
-                # _residualFineGrid[gi] = sqrt(projector(Double(Λ), d, g, g))
-                _residualFineGrid[gi] = projector(Λ, d, g, g)
-            end
+            # if c1 <= c2
+            _residualFineGrid[gi] = projector(Λ, d, g, g)
+            # end
         end
         return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _cache,
             _residualFineGrid, _selectedFineGrid, [], [], [])
@@ -149,35 +148,28 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
     Λ, rtol = basis.Λ, basis.rtol
     N, Nfine = basis.N, basis.Nfine
 
-    # q = Float.(basis.Q[end, :])
-    q = Double.(basis.Q[end, :])
+    q = Float.(basis.Q[end, :])
+    # q = Double.(basis.Q[end, :])
     fineGrid = basis.fineGrid
     grid = basis.grid
 
     # Threads.@threads for idx in 1:Nfine^D
     for idx in 1:Nfine^D
         c = idx2coord(D, Nfine, idx)
-        if c[1] <= c[2] && (basis.selectedFineGrid[idx] == false)
-            # if (basis.selectedFineGrid[idx] == false)
+        # if c[1] <= c[2] && (basis.selectedFineGrid[idx] == false)
+        if (basis.selectedFineGrid[idx] == false)
             g = (fineGrid[c[1]], fineGrid[c[2]])
             # pp = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
             pp = sum(q[j] * projector(Λ, D, g, grid[j], c, basis.gridCoord[j], basis.cache) for j in 1:N)
-            _residual = basis.residualFineGrid[idx]
-            # println("pp", pp)
-            # println("norm ", _norm)
-
-            # if abs(pp) > abs(_norm) || abs(_norm) < eps(Float(1)) * 10
-            # if abs(pp) > abs(_norm)
-            if _residual - pp^2 < 0
+            _residual = basis.residualFineGrid[idx] - pp * pp
+            if _residual < 0
                 # @warn(c, " grid: ", g, " = ", pp, " and ", _norm, " resudiual: ", Double(_norm)^2 - Double(pp)^2)
-                if _residual - pp^2 < -basis.rtol
-                    @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g got $_residual - $(pp)^2 = $(_residual-pp^2)")
+                if _residual < -basis.rtol
+                    @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g got $(basis.residualFineGrid[idx]) - $(pp)^2 = $_residual")
                 end
                 basis.residualFineGrid[idx] = 0
             else
-                # basis.residualFineGrid[idx] = _norm * sqrt((1 - pp / _norm) * (1 + pp / _norm))
-                # basis.residualFineGrid[idx] = sqrt(Double(_norm)^2 - Double(pp)^2)
-                basis.residualFineGrid[idx] = _residual - pp^2
+                basis.residualFineGrid[idx] = _residual
             end
         end
     end
@@ -295,13 +287,13 @@ function GramSchmidt!(basis, projector)
     _Q[end, :] /= _norm
 
     c = basis.gridCoord[end]
-    if c[1] <= c[2]
-        residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
-        @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
-        if abs(_norm - residual) > basis.rtol * 10
-            @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
-        end
+    # if c[1] <= c[2]
+    residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
+    @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
+    if abs(_norm - residual) > basis.rtol * 10
+        @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
     end
+    # end
 
     basis.Q = _Q
     basis.R = _R
@@ -343,7 +335,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     Λ = Float(1000)
-    rtol = Float(1e-9)
+    rtol = Float(1e-8)
     dim = 2
     basis = QR{2}(Float(10), Float(1e-7), projExp_τ)
     @time basis = QR{dim}(Λ, rtol, projExp_τ)
