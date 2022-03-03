@@ -23,6 +23,17 @@ const Double = Double64
 # const Float = BigFloat
 
 include("./kernel.jl")
+include("./finemesh.jl")
+
+struct GridPoint{D}
+    sector::Int                       # sector
+    vec::SVector{D,Float}             # actual location of the grid point   
+    idx::Int                          # index on the fine meshes
+    coord::SVector{D,Int}             # integer coordinate of the grid point on the fine meshes
+    rtol::Float                       # the relative error achieved by adding the current grid point 
+end
+
+# Base.show(io, grid::GridPoint{D}) =
 
 mutable struct Basis{D}
     ############    fundamental parameters  ##################
@@ -32,115 +43,41 @@ mutable struct Basis{D}
 
     ###############     DLR grids    ###############################
     N::Int # number of basis
-    grid::Vector{SVector{D,Float}} # grid for the basis
+    grid::Vector{GridPoint{D}} # grid for the basis
     residual::Vector{Float} # achieved error by each basis
-    # Q::Matrix{Float} # K = Q*R
+
+    ###############  linear coefficients for orthognalization #######
     Q::Matrix{Double} # , Q' = R^{-1}, Q*R'= I
     R::Matrix{Double}
 
     ############ fine grids #################
-    Nfine::Integer
-    fineGrid::Vector{Float}
-    cache::Vector{Float}
-
-    ########## residual defined on the fine grids #################
-    residualFineGrid::Vector{Double} #length = Nfine^D/D!
-    selectedFineGrid::Vector{Bool}
-    gridIdx::Vector{Int} # grid for the basis
-    gridCoord::Vector{SVector{D,Int}}
-    gridProj::Vector{Vector{Float}}
+    mesh::FineMesh{D}
 
     function Basis{d}(Λ, rtol, projector) where {d}
         _Q = Matrix{Float}(undef, (0, 0))
-
-        # initialize the residual on fineGrid with <g, g>
-        _finegrid = Float.(unilog(Λ, rtol))
-        Nfine = length(_finegrid)
-        _cache = zeros(Float, Nfine)
-        for (gi, g) in enumerate(_finegrid)
-            _cache[gi] = exp(-g)
-        end
-
-        _residualFineGrid = zeros(Float, Nfine^d)
-        _selectedFineGrid = zeros(Bool, Nfine^d)
-        for (gi, g) in enumerate(iterateFineGrid(d, _finegrid))
-            c1, c2 = idx2coord(d, Nfine, gi)
-            if c1 <= c2
-                _residualFineGrid[gi] = projector(Λ, d, g, g)
-            end
-        end
-        return new{d}(d, Λ, rtol, 0, [], [], _Q, similar(_Q), Nfine, _finegrid, _cache,
-            _residualFineGrid, _selectedFineGrid, [], [], [])
+        _R = similar(_Q)
+        return new{d}(d, Λ, rtol, 0, [], [], _Q, _R, FineMesh{d}(Λ, rtol, projector))
     end
 end
 
-function iterateFineGrid(dim, _finegrid)
-    if dim == 1
-        return _finegrid
-    elseif dim == 2
-        return Iterators.product(_finegrid, _finegrid)
-    else # d==3
-        return Iterators.product(_finegrid, _finegrid, _finegrid)
-    end
-end
-
-function idx2coord(dim::Int, N::Int, idx::Int)
-    return (((idx - 1) % N + 1, (idx - 1) ÷ N + 1))
-end
-
-function coord2idx(dim::Int, N::Int, coord)
-    return Int((coord[2] - 1) * N + coord[1])
-end
-
-"""
-composite expoential grid
-"""
-function unilog(Λ, rtol)
-    ############## use composite grid #############################################
-    # degree = 8
-    # ratio = Float(1.4)
-    # N = Int(floor(log(Λ) / log(ratio) + 1))
-    # panel = [Λ / ratio^(N - i) for i in 1:N]
-    # grid = Vector{Float}(undef, 0)
-    # for i in 1:length(panel)-1
-    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
-    #     append!(grid, uniform)
-    # end
-    # append!(grid, Λ)
-    # println(grid)
-    # println("Composite expoential grid size: $(length(grid))")
-    # return grid
-
-    ############# DLR based fine grid ##########################################
-    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
-    # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 4
-    grid = Vector{Float}(undef, 0)
-    panel = Float.(dlr.ω)
-    for i in 1:length(panel)-1
-        uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
-        append!(grid, uniform)
-    end
-    println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
-    return grid
-end
-
-function addBasis!(basis::Basis{D}, projector, coord) where {D}
+function addBasis!(basis::Basis{D}, projector, coord, sector = 1) where {D}
     basis.N += 1
-    g0 = SVector{D,Float}([basis.fineGrid[coord[1]], basis.fineGrid[coord[2]]])
-    idx = coord2idx(basis.D, basis.Nfine, coord)
+    g0 = coord2vec(basis.mesh, coord)
+    idx = coord2idx(basis.mesh, coord)
+    grid = GridPoint{D}(sector, g0, vec, idx, coord)
 
-    push!(basis.grid, g0)
-    push!(basis.gridIdx, idx)
-    push!(basis.gridCoord, coord)
+    push!(basis.grid, grid)
 
-    GramSchmidt!(basis, projector)
+    basis.Q, basis.R = GramSchmidt(basis, projector)
 
+    # update the residual on the fine mesh
     updateResidual!(basis, projector)
-    basis.selectedFineGrid[idx] = true
-    basis.residualFineGrid[idx] = 0
-    push!(basis.residual, sqrt(maximum(basis.residualFineGrid))) # record error after the new grid is added
-    return g0
+    basis.mesh.selected[idx] = true
+    basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
+
+    # the new rtol achieved by adding the new grid point
+    grid.rtol = sqrt(maximum(mesh.residual))
+    return grid
 end
 
 function updateResidual!(basis::Basis{D}, projector) where {D}
@@ -151,24 +88,24 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
     # q = Double.(basis.Q[end, :])
     fineGrid = basis.fineGrid
     grid = basis.grid
+    mesh = basis.mesh
 
     Threads.@threads for idx in 1:Nfine^D
         # for idx in 1:Nfine^D
-        c = idx2coord(D, Nfine, idx)
-        if c[1] <= c[2] && (basis.selectedFineGrid[idx] == false)
-            # if (basis.selectedFineGrid[idx] == false)
-            g = (fineGrid[c[1]], fineGrid[c[2]])
+        c = idx2coord(mesh, idx)
+        if (mesh.selected[idx] == false) && (reducible(D, c) == false)
+            g = coord2vec(mesh, c)
             # pp = sum(q[j] * projector(Λ, D, g, grid[j]) for j in 1:N)
-            pp = sum(q[j] * projector(Λ, D, g, grid[j], c, basis.gridCoord[j], basis.cache) for j in 1:N)
-            _residual = basis.residualFineGrid[idx] - pp * pp
+            pp = sum(q[j] * projector(Λ, D, g, grid[j].vec, c, grid[j].coord, basis.cache) for j in 1:N)
+            _residual = mesh.residual[idx] - pp * pp
             if _residual < 0
                 # @warn(c, " grid: ", g, " = ", pp, " and ", _norm, " resudiual: ", Double(_norm)^2 - Double(pp)^2)
                 if _residual < -basis.rtol
-                    @warn("warning: residual smaller than 0 at $(idx2coord(D, Nfine, idx)) => $g got $(basis.residualFineGrid[idx]) - $(pp)^2 = $_residual")
+                    @warn("warning: residual smaller than 0 at $(idx2coord(mesh, idx)) => $g got $(mesh.residual[idx]) - $(pp)^2 = $_residual")
                 end
-                basis.residualFineGrid[idx] = 0
+                mesh.residual[idx] = 0
             else
-                basis.residualFineGrid[idx] = _residual
+                mesh.residual[idx] = _residual
             end
         end
     end
@@ -179,24 +116,24 @@ function QR{dim}(Λ, rtol, proj; c0 = nothing, N = nothing) where {dim}
     if isnothing(c0) == false
         for c in c0
             g = addBasis!(basis, proj, c)
-            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.6g\n", 1, g[1], g[2], basis.residual[end])
+            @printf("%3i : ω=(%16.8f, %16.8f; %8i) -> error=%16.6g\n", 1, g.vec[1], g.vec[2], g.sector, g.rtol[end])
         end
     end
-    maxResidual, idx = findmax(basis.residualFineGrid)
+    maxResidual, idx = findmax(basis.mesh.residual)
 
     while isnothing(N) ? sqrt(maxResidual) > rtol : basis.N < N
 
-        c = idx2coord(basis.D, basis.Nfine, idx)
+        c = idx2coord(basis.mesh, idx)
 
         g = addBasis!(basis, proj, c)
-        @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, g[1], g[2], basis.residual[end], basis.R[end, end])
+        @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, g.vec[1], g.vec[2], g.rtol[end], basis.R[end, end])
 
-        if c[1] != c[2]
-            gp = addBasis!(basis, proj, (c[2], c[1]))
-            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, gp[1], gp[2], basis.residual[end], basis.R[end, end])
+        for c in mirror(dim, c)
+            gp = addBasis!(basis, proj, c)
+            @printf("%3i : ω=(%16.8f, %16.8f) -> error=%16.8g, Rmin=%16.8g\n", basis.N, g.vec[1], g.vec[2], g.rtol[end], basis.R[end, end])
         end
 
-        maxResidual, idx = findmax(basis.residualFineGrid)
+        maxResidual, idx = findmax(basis.mesh.residual)
 
         # plotResidual(basis)
         # testOrthgonal(basis)
@@ -221,8 +158,7 @@ end
 """
 Gram-Schmidt process to the last grid point in basis.grid
 """
-function GramSchmidt!(basis, projector)
-    # _Q = zeros(Float, (basis.N, basis.N))
+function GramSchmidt(basis::Basis{D}, projector) where {D}
     _Q = zeros(Double, (basis.N, basis.N))
     _Q[1:end-1, 1:end-1] = basis.Q
 
@@ -230,12 +166,11 @@ function GramSchmidt!(basis, projector)
     _R[1:end-1, 1:end-1] = basis.R
 
     _Q[end, end] = 1
-
-    # A = cholesky(basis.proj)
+    newgrid = basis.grid[end]
 
     for qi in 1:basis.N-1
         # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
-        overlap = sum(_Q[qi, j] * projector(basis.Λ, basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
+        overlap = sum(_Q[qi, j] * projector(basis.Λ, D, basis.grid[j].vec, newgrid.vec) for j in 1:basis.N)
         _Q[end, :] -= overlap * _Q[qi, :]  # <q, qnew> q
         _R[qi, end] = overlap
     end
@@ -248,38 +183,28 @@ function GramSchmidt!(basis, projector)
     #     _norm = _norm * sqrt(1 - (_R[i, end] / _norm)^2)
     # end
     # _norm = projector(Double(basis.Λ), basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
-    _norm = projector(basis.Λ, basis.D, basis.grid[end], basis.grid[end]) - _R[:, end]' * _R[:, end]
+    _norm = projector(basis.Λ, D, basis.grid[end].vec, newgrid.vec) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
     _R[end, end] = _norm
     _Q[end, :] /= _norm
 
-    c = basis.gridCoord[end]
-    if c[1] <= c[2]
-        residual = sqrt(basis.residualFineGrid[basis.gridIdx[end]])
-        @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
+    if reducible(D, newgrid.coord) == false
+        residual = sqrt(basis.mesh.residual[newgrid.idx])
+        @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(newgrid) $_norm - $residual = $(_norm-residual)"
         if abs(_norm - residual) > basis.rtol * 10
-            @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
+            @warn("inconsistent norm on the grid $(newgrid) $_norm - $residual = $(_norm-residual)")
         end
     end
 
-    basis.Q = _Q
-    basis.R = _R
+    return _Q, _R
 end
 
-# function Residual(basis, proj, g)
-#     # norm2 = proj(g, g) - \sum_i (<qi, K_g>)^2
-#     # qi=\sum_j Q_ij K_j ==> (<qi, K_g>)^2 = (\sum_j Q_ij <K_j, K_g>)^2 = \sum_jk Q_ij*Q_ik <K_j, K_g>*<K_k, Kg>
-#     KK = [proj(basis.Λ, basis.D, basis.grid[j], g) for j in 1:basis.N]
-#     norm2 = proj(basis.Λ, basis.D, g, g) - (norm(basis.Q * KK))^2
-#     return norm2
-# end
-
-function testOrthgonal(basis, projector)
+function testOrthgonal(basis::Basis{D}, projector) where {D}
     println("testing orthognalization...")
     KK = zeros(Double, (basis.N, basis.N))
     for i in 1:basis.N
         for j in 1:basis.N
-            KK[i, j] = projector(Double(basis.Λ), basis.D, basis.grid[i], basis.grid[j])
+            KK[i, j] = projector(Double(basis.Λ), D, basis.grid[i].vec, basis.grid[j].vec)
         end
     end
     maxerr = maximum(abs.(KK - basis.R' * basis.R))
@@ -302,7 +227,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    Λ = Float(1000)
+    Λ = Float(100)
     rtol = Float(1e-8)
     dim = 2
     basis = QR{2}(Float(10), Float(1e-7), projExp_τ)
@@ -310,21 +235,22 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     open("basis.dat", "w") do io
         for i in 1:basis.N
-            println(io, basis.grid[i][1], "   ", basis.grid[i][2])
+            println(io, basis.grid[i].vec[1], "   ", basis.grid[i].vec[2])
         end
     end
+    Nfine = basis.mesh.N
     open("finegrid.dat", "w") do io
-        for i in 1:basis.Nfine
-            println(io, basis.fineGrid[i])
+        for i in 1:Nfine
+            println(io, basis.mesh.fineGrid[i])
         end
     end
     open("residual.dat", "w") do io
-        for xi in 1:basis.Nfine
-            for yi in 1:basis.Nfine
+        for xi in 1:Nfine
+            for yi in 1:Nfine
                 if xi <= yi
-                    println(io, basis.residualFineGrid[coord2idx(2, basis.Nfine, (xi, yi))])
+                    println(io, basis.mesh.residual[coord2idx(mesh, (xi, yi))])
                 else
-                    println(io, basis.residualFineGrid[coord2idx(2, basis.Nfine, (yi, xi))])
+                    println(io, basis.mesh.residual[coord2idx(mesh, (yi, xi))])
                 end
             end
         end
