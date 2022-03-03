@@ -1,0 +1,221 @@
+struct FreqGrid{D} <: Grid
+    sector::Int                       # sector
+    omega::SVector{D,Float}             # actual location of the grid point   
+    coord::SVector{D,Int}         # integer coordinate of the grid point on the fine meshes
+end
+
+struct FreqFineMesh{D} <: FineMesh
+    symmetry::Int
+    N::Integer                      # number of fine grid for each dimension
+    candidates::Vector{FreqGrid{D}}       # vector of grid points
+    selected::Vector{Bool}
+    residual::Vector{Double}        
+
+    ## for frequency mesh only ###
+    fineGrid::Vector{Float}         # fine grid for each dimension
+    cacheF::Vector{Float}
+    cacheD::Vector{Double}
+
+
+    function FreqFineMesh{D}(Λ, rtol, projector, sym = 0) where {D}
+        # initialize the residual on fineGrid with <g, g>
+        _finegrid = Float.(fineGrid(Λ, rtol))
+        Nfine = length(_finegrid)
+
+        _cacheF = zeros(Float, Nfine)
+        _cacheD = zeros(Double, Nfine)
+        for (gi, g) in enumerate(_finegrid)
+            _cacheF[gi] = exp(-Float(g))
+            _cacheD[gi] = exp(-Double(g))
+        end
+
+        N = 1
+        _grids, _residual, _selected = [], [], []
+        for (gi, g) in enumerate(iterateFineGrid(D, _finegrid))
+            for sector in 1:D
+                coord = idx2coord(D, Nfine, gi)
+                if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
+                    N += 1
+                    push!(_grids, FreqGrid{D}(sector, g, coord))
+                    push!(_residual, projector(Λ, D, g, g))
+                    push!(_selected, false)
+                end
+            end
+        end
+        return new{D}(sym, N, _grids, _residual, _selected, _finegrid, _cacheF, _cacheD)
+    end
+end
+
+"""
+composite expoential grid
+"""
+function fineGrid(Λ, rtol)
+    ############## use composite grid #############################################
+    # degree = 8
+    # ratio = Float(1.4)
+    # N = Int(floor(log(Λ) / log(ratio) + 1))
+    # panel = [Λ / ratio^(N - i) for i in 1:N]
+    # grid = Vector{Float}(undef, 0)
+    # for i in 1:length(panel)-1
+    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+    #     append!(grid, uniform)
+    # end
+    # append!(grid, Λ)
+    # println(grid)
+    # println("Composite expoential grid size: $(length(grid))")
+    # return grid
+
+    ############# DLR based fine grid ##########################################
+    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
+    # println("fine basis number: $(dlr.size)\n", dlr.ω)
+    degree = 4
+    grid = Vector{Float}(undef, 0)
+    panel = Float.(dlr.ω)
+    for i in 1:length(panel)-1
+        uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+        append!(grid, uniform)
+    end
+    println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+    return grid
+end
+
+function iterateFineGrid(dim, _finegrid)
+    if dim == 1
+        return _finegrid
+    elseif dim == 2
+        return Iterators.product(_finegrid, _finegrid)
+    else # d==3
+        return Iterators.product(_finegrid, _finegrid, _finegrid)
+    end
+end
+
+# function idx2coord(dim, N, idx::Int)
+#     if dim == 2
+#         return (((idx - 1) % N + 1, (idx - 1) ÷ N + 1))
+#     else
+#         error("not implemented!")
+#     end
+# end
+
+# function coord2idx(dim, N, coord)
+#     if dim == 2
+#         return Int((coord[2] - 1) * N + coord[1])
+#     else
+#         error("not implemented!")
+#     end
+# end
+
+function coord2omega(mesh, coord) where {dim}
+    fineGrid = mesh.fineGrid
+    if dim == 2
+        return (fineGrid[coord[1]], fineGrid[coord[2]])
+    elseif dim == 3
+        return (fineGrid[coord[1]], fineGrid[coord[2]], fineGrid[coord[3]])
+    else
+        error("not implemented!")
+    end
+end
+
+function irreducible(D, sector, coord, symmetry)
+    # return false #turn off the reducibility check
+    if symmetry == 0
+        return true
+    else
+        if D == 2
+            return (coord[1] <= coord[2]) && (sector == 1)
+        elseif D == 3
+            return (coord[1] <= coord[2] <= coord[3]) && (sector == 1)
+        else
+            error("not implemented!")
+        end
+    end
+end
+
+function irreducible(grid::FreqGrid{D}) where {D}
+    return irreducible(D, grid.sector, grid.coord, mesh.symmetry)
+end
+
+function mirror(mesh::FreqFineMesh{D}, idx) where {D}
+    grid = mesh.candidates[idx]
+    coord, sector = grid.coord, grid.sector
+    if symmetry == false
+        return []
+    end
+    if D == 2
+        x, y = coord
+        coords = [(y, x),]
+    elseif D == 3
+        x, y, z = coord
+        coords = unique([(x, z, y), (y, x, z), (y, z, x), (z, x, y), (z, y, x)])
+    else
+        error("not implemented!")
+    end
+    return [FreqGrid{D}(s, coord2omega(mesh, c), c]) for c in coords for s in 1:D if s != sector]
+end
+
+# function save(mesh::FreqFineMesh{2}, grids::Vector{FreqGrid{2}})
+#     open("basis.dat", "w") do io
+#         for (i, grid) in enumerate(basis.grid)
+#             if grid.sector == 1
+#                 println(io, grid.vec[1], "   ", grid.vec[2])
+#             end
+#         end
+#     end
+#     Nfine = basis.mesh.N
+#     open("finegrid.dat", "w") do io
+#         for i in 1:Nfine
+#             println(io, basis.mesh.fineGrid[i])
+#         end
+#     end
+#     open("residual.dat", "w") do io
+#         for xi in 1:Nfine
+#             for yi in 1:Nfine
+#                 if xi <= yi
+#                     println(io, basis.mesh.residual[coord2idx(mesh, (xi, yi))])
+#                 else
+#                     println(io, basis.mesh.residual[coord2idx(mesh, (yi, xi))])
+#                 end
+#             end
+#         end
+#     end
+# end
+
+@inline function F(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
+end
+
+function dot(basis, g1::FreqGrid{D}, g2::FreqGrid{D}) where {D}
+    cache = basis.mesh.cacheF
+    T = Float
+    tiny = T(1e-5)
+    ω1, ω2 = g1.omega[1] + g2.omega[1], g1.omega[2] + g2.omega[2]
+    expω1 = cache[gidx1[1]] * cache[gidx2[1]]
+    expω2 = cache[gidx1[2]] * cache[gidx2[2]]
+    if ω1 < tiny && ω2 < tiny
+        return T(1) / 2
+    elseif ω1 < tiny && ω2 > tiny
+        return (1 - ω2 - expω2) / ω2 / (ω1 - ω2)
+    elseif ω1 > tiny && ω2 < tiny
+        return (1 - ω1 - expω1) / ω1 / (ω2 - ω1)
+    elseif abs(ω1 - ω2) < tiny
+        # @assert abs(ω1 - ω2) < eps(Float(1)) * 1000 "$ω1 - $ω2 = $(ω1-ω2)"
+        return T((1 - expω1 * (1 + ω1)) / ω1^2)
+    else
+        return T((ω1 - ω2 + expω1 * ω2 - expω2 * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    end
+    # if ω1 > tiny && ω2 > tiny
+    #     return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    # elseif ω1 > tiny && ω2 <= tiny
+    # elseif ω2 > tiny && ω1 <= tiny
+    # else
+    #     return T(0.5) - (ω1 + ω2) / 6 + (ω1^2 + ω1 * ω2 + ω2^2) / 24 - (ω1 + ω2) * (ω1^2 + ω2^2) / 120 + (ω1^4 + ω1^3 * ω2 + ω1^2 * ω2^2 + ω1 * ω2^3 + ω2^4) / 720
+    # end
+
+    # if ω1 < tiny || ω2 < tiny
+    #     return T(0.5)
+    # elseif abs(ω1 - ω2) < tiny
+    #     ω = (ω1 + ω2) / 2
+    #     return T((1 - exp(-ω) * (1 + ω)) / ω^2)
+    # else
+    #     return T((ω1 - ω2 + exp(-ω1) * ω2 - exp(-ω2) * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    # end
+end
