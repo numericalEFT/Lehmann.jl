@@ -38,7 +38,7 @@ mutable struct Basis{D,Grid,Mesh}
     error::Vector{Float}  # the relative error achieved by adding the current grid point 
 
     ###############  linear coefficients for orthognalization #######
-    Q::Matrix{Double} # , Q' = R^{-1}, Q*R'= I
+    Q::Matrix{Double} # , Q = R^{-1}, Q*R'= I
     R::Matrix{Double}
 
     ############ fine mesh #################
@@ -91,7 +91,7 @@ function updateResidual!(basis::Basis{D}) where {D}
     mesh = basis.mesh
 
     # q = Float.(basis.Q[end, :])
-    q = Double.(basis.Q[end, :])
+    q = Double.(basis.Q[:, end])
 
     Threads.@threads for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
@@ -125,19 +125,16 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
     newgrid = basis.grid[end]
 
     overlap = [dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N]
-    # _R[:, end] = _Q'*overlap
-    # _Q[end, :] -= _R[:, end]'*_Q'
 
     for qi in 1:basis.N-1
-    #     # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
-        _R[qi, end] = _Q[qi, :]' * overlap
-        _Q[end, :] -= _R[qi, end] * _Q[qi, :]  # <q, qnew> q
+        _R[qi, end] = _Q[:, qi]' * overlap
+        _Q[:, end] -= _R[qi, end] * _Q[:, qi]  # <q, qnew> q
     end
 
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
     _R[end, end] = _norm
-    _Q[end, :] /= _norm
+    _Q[:, end] /= _norm
 
     return _Q, _R
 end
@@ -154,10 +151,10 @@ function testOrthgonal(basis::Basis{D}) where {D}
     maxerr = maximum(abs.(KK - basis.R' * basis.R))
     println("Max overlap matrix R'*R Error: ", maxerr)
 
-    maxerr = maximum(abs.(basis.R * basis.Q' - I))
+    maxerr = maximum(abs.(basis.R * basis.Q - I))
     println("Max R*R^{-1} Error: ", maxerr)
 
-    II = basis.Q * KK * basis.Q'
+    II = basis.Q' * KK * basis.Q
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 
@@ -204,7 +201,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 2
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-6, sym = 1)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 1)
     QR!(basis, verbose = 1)
 
     basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(640, 1e-8, sym = 1)
