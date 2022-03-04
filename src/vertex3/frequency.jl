@@ -4,7 +4,7 @@ struct FreqGrid{D} <: Grid
     coord::SVector{D,Int}         # integer coordinate of the grid point on the fine meshes
 end
 
-Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%16.8f", grid.omega[1])), $(@sprintf("%16.8f", grid.omega[2]))")
+Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%12.4f", grid.omega[1])), $(@sprintf("%12.4f", grid.omega[2])))")
 
 struct FreqFineMesh{D} <: FineMesh
     color::Int                            # D+1 sectors
@@ -80,8 +80,8 @@ function fineGrid(Λ, rtol)
     dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
     degree = 4
-    grid = Vector{Float}(undef, 0)
-    panel = Float.(dlr.ω)
+    grid = Vector{Double}(undef, 0)
+    panel = Double.(dlr.ω)
     for i in 1:length(panel)-1
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
@@ -178,6 +178,7 @@ function save(mesh::FreqFineMesh{2}, grids::Vector{FreqGrid{2}})
                 end
             end
         end
+
         for i in 1:Nfine
             for j in 1:Nfine
                 println(io, residual[i, j])

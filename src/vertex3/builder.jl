@@ -166,31 +166,22 @@ end
 #     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 # end
 
-function QR!(basis::Basis{dim,G,M}; idx0 = [1,], N = 10000, verbose = 0) where {dim,G,M}
+function QR!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where {dim,G,M}
     #### add the grid in the idx vector first
     # println(basis.mesh.candidates[1:4])
     # println(basis.mesh.residual[1:4])
 
-    for i in idx0
+    for i in initial
         addBasisBlock!(basis, i, verbose)
         # println(basis.R)
         # println(basis.mesh.residual[1:4])
     end
 
     ####### add grids that has the maximum residual
-
     maxResidual, idx = findmax(basis.mesh.residual)
     while sqrt(maxResidual) > basis.rtol && basis.N < N
-
         addBasisBlock!(basis, idx, verbose)
-
-        # plotResidual(basis)
-        # testOrthgonal(basis)
         maxResidual, idx = findmax(basis.mesh.residual)
-
-        # println(basis.R)
-        # println(basis.mesh.residual[1:4])
-        # exit(0)
     end
     @printf("rtol = %.16e\n", sqrt(maxResidual))
     # plotResidual(basis)
@@ -201,10 +192,10 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 2
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 1)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 0)
     QR!(basis, verbose = 1)
 
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-8, sym = 1)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(100, 1e-8, sym = 0)
     @time QR!(basis, verbose = 1)
 
     save(basis.mesh, basis.grid)    

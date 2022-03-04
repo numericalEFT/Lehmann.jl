@@ -14,7 +14,7 @@ residual = np.sqrt(np.reshape(residual, (Nfine, Nfine)))
 
 xv, yv = np.meshgrid(finegrid+shift, finegrid+shift)
 # plt.imshow(xv, yv, residual)
-plt.contourf(xv, yv, residual, 16)
+plt.contourf(xv, yv, residual.transpose(), 16)
 plt.colorbar()
 
 plt.scatter(grid[:, 0]+shift, grid[:, 1]+shift, c="yellow", alpha=0.5, s=6)
