@@ -7,9 +7,8 @@ end
 Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%16.8f", grid.omega[1])), $(@sprintf("%16.8f", grid.omega[2]))")
 
 struct FreqFineMesh{D} <: FineMesh
-    color::Int
-    symmetry::Int
-    # N::Integer                      # number of fine grid for each dimension
+    color::Int                            # D+1 sectors
+    symmetry::Int                         # symmetrize colors and (omega1, omega2) <-> (omega2, omega1)
     candidates::Vector{FreqGrid{D}}       # vector of grid points
     selected::Vector{Bool}
     residual::Vector{Double}
@@ -20,7 +19,7 @@ struct FreqFineMesh{D} <: FineMesh
     cacheD::Vector{Double}
 
 
-    function FreqFineMesh{D}(Λ, rtol, projector, sym = 0) where {D}
+    function FreqFineMesh{D}(Λ, rtol, sym = 0) where {D}
         # initialize the residual on fineGrid with <g, g>
         _finegrid = Float.(fineGrid(Λ, rtol))
         Nfine = length(_finegrid)
@@ -91,7 +90,7 @@ function fineGrid(Λ, rtol)
     return grid
 end
 
-function coord2omega(mesh, coord) where {dim}
+function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     fineGrid = mesh.fineGrid
     if dim == 2
         return (fineGrid[coord[1]], fineGrid[coord[2]])
@@ -124,47 +123,68 @@ end
 function mirror(mesh::FreqFineMesh{D}, idx) where {D}
     grid = mesh.candidates[idx]
     coord, sector = grid.coord, grid.sector
-    if mesh.symmetry == false
+    if mesh.symmetry == 0
         return []
     end
     if D == 2
         x, y = coord
-        coords = [(y, x),]
+        coords = [coord, (y, x),]
     elseif D == 3
         x, y, z = coord
-        coords = unique([(x, z, y), (y, x, z), (y, z, x), (z, x, y), (z, y, x)])
+        coords = unique([coord, (x, z, y), (y, x, z), (y, z, x), (z, x, y), (z, y, x)])
     else
         error("not implemented!")
     end
-    return [FreqGrid{D}(s, coord2omega(mesh, c), c) for c in coords for s in 1:mesh.color if s != sector]
+    newgrids = FreqGrid{D}[]
+    for s in 1:mesh.color
+        for c in coords
+            if s!=grid.sector || c !=grid.coord
+                push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
+            end
+        end
+    end
+    return newgrids
 end
 
-# function save(mesh::FreqFineMesh{2}, grids::Vector{FreqGrid{2}})
-#     open("basis.dat", "w") do io
-#         for (i, grid) in enumerate(basis.grid)
-#             if grid.sector == 1
-#                 println(io, grid.vec[1], "   ", grid.vec[2])
-#             end
-#         end
-#     end
-#     Nfine = basis.mesh.N
-#     open("finegrid.dat", "w") do io
-#         for i in 1:Nfine
-#             println(io, basis.mesh.fineGrid[i])
-#         end
-#     end
-#     open("residual.dat", "w") do io
-#         for xi in 1:Nfine
-#             for yi in 1:Nfine
-#                 if xi <= yi
-#                     println(io, basis.mesh.residual[coord2idx(mesh, (xi, yi))])
-#                 else
-#                     println(io, basis.mesh.residual[coord2idx(mesh, (yi, xi))])
-#                 end
-#             end
-#         end
-#     end
-# end
+function save(mesh::FreqFineMesh{2}, grids::Vector{FreqGrid{2}})
+    open("basis.dat", "w") do io
+        for (i, grid) in enumerate(grids)
+            if grid.sector == 1
+                println(io, grid.omega[1], "   ", grid.omega[2])
+            end
+        end
+    end
+    Nfine = length(mesh.fineGrid)
+    open("finegrid.dat", "w") do io
+        for i in 1:Nfine
+            println(io, basis.mesh.fineGrid[i])
+        end
+    end
+    open("residual.dat", "w") do io
+        # println(mesh.symmetry)
+        residual = zeros(Double, Nfine, Nfine)
+        for i in 1:length(mesh.candidates)
+            if mesh.candidates[i].sector == 1
+                x, y = mesh.candidates[i].coord
+                residual[x, y] = mesh.residual[i]
+                # println(x, ", ", y, " -> ", length(mirror(mesh, i)))
+
+                for grid in mirror(mesh, i)
+                    if grid.sector ==1
+                        xp, yp = grid.coord
+                        residual[xp, yp] = residual[x, y]
+                        # println(xp, ", ", yp)
+                    end
+                end
+            end
+        end
+        for i in 1:Nfine
+            for j in 1:Nfine
+                println(io, residual[i, j])
+            end
+        end
+    end
+end
 
 @inline function F(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T} end
 

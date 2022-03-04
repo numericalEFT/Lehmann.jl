@@ -204,8 +204,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 1)
     QR!(basis, verbose = 1)
 
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(640, 1e-8, sym = 1)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-8, sym = 1)
     @time QR!(basis, verbose = 1)
+
+    save(basis.mesh, basis.grid)    
 
     testOrthgonal(basis)
 end
