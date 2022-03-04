@@ -1,7 +1,8 @@
+module FQR
+
 using LinearAlgebra, Printf
 using StaticArrays
 # using GenericLinearAlgebra
-using Lehmann
 
 # const Float = Float64
 
@@ -22,10 +23,14 @@ const Double = Double64
 ### 64 digits by default, but a lot more slower
 # const Float = BigFloat
 
+###################### traits to the functional QR  ############################
 abstract type Grid end
 abstract type FineMesh end
 
-include("./frequency.jl")
+dot(mesh, g1, g2) = error("QR.dot is not implemented!")
+mirror(g) = error("QR.mirror for $(typeof(g)) is not implemented!")
+irreducible(g) = error("QR.irreducible for $(typeof(g)) is not implemented!")
+#################################################################################
 
 mutable struct Basis{D,Grid,Mesh}
     ############    fundamental parameters  ##################
@@ -44,10 +49,9 @@ mutable struct Basis{D,Grid,Mesh}
     ############ fine mesh #################
     mesh::Mesh
 
-    function Basis{d,Grid,Mesh}(Λ, rtol; sym = 1) where {d,Grid,Mesh}
+    function Basis{d,Grid}(Λ, rtol, mesh::Mesh) where {d,Grid,Mesh}
         _Q = Matrix{Float}(undef, (0, 0))
         _R = similar(_Q)
-        mesh = Mesh(Λ, rtol, sym)
         return new{d,Grid,Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
     end
 end
@@ -145,7 +149,7 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
     return _Q, _R
 end
 
-function testOrthgonal(basis::Basis{D}) where {D}
+function test(basis::Basis{D}) where {D}
     println("testing orthognalization...")
     KK = zeros(Double, (basis.N, basis.N))
     Threads.@threads for i in 1:basis.N
@@ -172,15 +176,11 @@ end
 #     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 # end
 
-function QR!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where {dim,G,M}
+function qr!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where {dim,G,M}
     #### add the grid in the idx vector first
-    # println(basis.mesh.candidates[1:4])
-    # println(basis.mesh.residual[1:4])
 
     for i in initial
         addBasisBlock!(basis, i, verbose)
-        # println(basis.R)
-        # println(basis.mesh.residual[1:4])
     end
 
     ####### add grids that has the maximum residual
@@ -190,38 +190,7 @@ function QR!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where 
         maxResidual, idx = findmax(basis.mesh.residual)
     end
     @printf("rtol = %.16e\n", sqrt(maxResidual))
-    # plotResidual(basis)
-    # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
-
-    D = 2
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 1)
-    QR!(basis, verbose = 1)
-
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(640, 1e-8, sym = 1)
-    @time QR!(basis, verbose = 1)
-
-    save(basis.mesh, basis.grid)    
-
-    testOrthgonal(basis)
 end
-
-# function plotResidual(basis)
-#     z = Float64.(basis.residualFineGrid)
-#     z = reshape(z, (basis.Nfine, basis.Nfine))
-#     # contourf(z)
-#     # println(basis.fineGrid)
-#     # println(basis.grid)
-#     # p = heatmap(Float64.(basis.fineGrid), Float64.(basis.fineGrid), z, xaxis = :log, yaxis = :log)
-#     p = heatmap(Float64.(basis.fineGrid), Float64.(basis.fineGrid), z)
-#     # p = heatmap(z)
-#     x = [basis.grid[i][1] for i in 1:basis.N]
-#     y = [basis.grid[i][2] for i in 1:basis.N]
-#     scatter!(p, x, y)
-
-#     display(p)
-#     readline()
-# end
