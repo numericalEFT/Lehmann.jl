@@ -5,10 +5,12 @@ struct FreqGrid{D} <: Grid
 end
 
 show(io, grid::FreqGrid{2}) = print(io, "ω = ($(grid.omega[1]), $(grid.omega[2]))_$(grid.sector)")
+display(io, grid::FreqGrid) = show(io, grid)
 
 struct FreqFineMesh{D} <: FineMesh
+    color::Int
     symmetry::Int
-    N::Integer                      # number of fine grid for each dimension
+    # N::Integer                      # number of fine grid for each dimension
     candidates::Vector{FreqGrid{D}}       # vector of grid points
     selected::Vector{Bool}
     residual::Vector{Double}
@@ -31,16 +33,15 @@ struct FreqFineMesh{D} <: FineMesh
             _cacheD[gi] = exp(-Double(g))
         end
 
-        N = 1
-        mesh = new{D}(sym, N, [], [], [], _finegrid, _cacheF, _cacheD)
+        color = D+1
+        mesh = new{D}(color, sym, [], [], [], _finegrid, _cacheF, _cacheD)
 
         if D == 2
             for (xi, x) in enumerate(_finegrid)
                 for (yi, y) in enumerate(_finegrid)
                     coord = (xi, yi)
-                    for sector in 1:D
+                    for sector in 1:color
                         if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
-                            N += 1
                             g = FreqGrid{D}(sector, (x, y), coord)
                             push!(mesh.candidates, g)
                             push!(mesh.residual, dot(mesh, g, g))
@@ -136,7 +137,7 @@ function mirror(mesh::FreqFineMesh{D}, idx) where {D}
     else
         error("not implemented!")
     end
-    return [FreqGrid{D}(s, coord2omega(mesh, c), c) for c in coords for s in 1:D if s != sector]
+    return [FreqGrid{D}(s, coord2omega(mesh, c), c) for c in coords for s in 1:mesh.color if s != sector]
 end
 
 # function save(mesh::FreqFineMesh{2}, grids::Vector{FreqGrid{2}})

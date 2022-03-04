@@ -3,11 +3,11 @@ using StaticArrays
 # using GenericLinearAlgebra
 using Lehmann
 
-const Float = Float64
+# const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-# const Float = Double64
+const Float = Double64
 const Double = Double64
 
 # similar speed as DoubleFloats
@@ -93,11 +93,13 @@ function updateResidual!(basis::Basis{D}) where {D}
     # q = Float.(basis.Q[end, :])
     q = Double.(basis.Q[end, :])
 
-    Threads.@threads for idx in 1:mesh.N
+    # Threads.@threads for idx in 1:mesh.N
+    for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
             candidate = mesh.candidates[idx]
             pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
             _residual = mesh.residual[idx] - pp * pp
+            # println("working on $candidate : $_residual")
             if _residual < 0
                 if _residual < -basis.rtol
                     @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual[idx]) - $(pp)^2 = $_residual")
@@ -166,8 +168,13 @@ end
 
 function QR!(basis::Basis{dim,G,M}; idx0 = [1,], N = 10000, verbose = 0) where {dim,G,M}
     #### add the grid in the idx vector first
+    # println(basis.mesh.candidates[1:4])
+    # println(basis.mesh.residual[1:4])
+
     for i in idx0
         addBasisBlock!(basis, i, verbose)
+        # println(basis.R)
+        # println(basis.mesh.residual[1:4])
     end
 
     ####### add grids that has the maximum residual
@@ -180,6 +187,10 @@ function QR!(basis::Basis{dim,G,M}; idx0 = [1,], N = 10000, verbose = 0) where {
         # plotResidual(basis)
         # testOrthgonal(basis)
         maxResidual, idx = findmax(basis.mesh.residual)
+
+        # println(basis.R)
+        # println(basis.mesh.residual[1:4])
+        # exit(0)
     end
     testOrthgonal(basis)
     @printf("rtol = %.16e\n", sqrt(maxResidual))
