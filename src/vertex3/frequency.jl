@@ -128,17 +128,18 @@ function mirror(mesh::FreqFineMesh{D}, idx) where {D}
     end
     if D == 2
         x, y = coord
-        coords = [coord, (y, x),]
+        coords = unique([(x, y), (y, x),])
+        # println(coords)
     elseif D == 3
         x, y, z = coord
-        coords = unique([coord, (x, z, y), (y, x, z), (y, z, x), (z, x, y), (z, y, x)])
+        coords = unique([(x, y, z), (x, z, y), (y, x, z), (y, z, x), (z, x, y), (z, y, x)])
     else
         error("not implemented!")
     end
     newgrids = FreqGrid{D}[]
     for s in 1:mesh.color
         for c in coords
-            if s!=grid.sector || c !=grid.coord
+            if s!=grid.sector || c !=Tuple(grid.coord)
                 push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
             end
         end

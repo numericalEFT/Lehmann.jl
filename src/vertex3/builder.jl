@@ -3,11 +3,11 @@ using StaticArrays
 # using GenericLinearAlgebra
 using Lehmann
 
-const Float = Float64
+# const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-# const Float = Double64
+const Float = Double64
 const Double = Double64
 
 # similar speed as DoubleFloats
@@ -58,9 +58,11 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
 
     basis.Q, basis.R = GramSchmidt(basis)
 
+    # println(maximum(basis.mesh.residual))
     # update the residual on the fine mesh
     updateResidual!(basis)
 
+    # println(maximum(basis.mesh.residual))
     # the new rtol achieved by adding the new grid point
     push!(basis.error, sqrt(maximum(basis.mesh.residual)))
 
@@ -68,20 +70,20 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
 end
 
 function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
+    _norm = sqrt(basis.mesh.residual[idx]) # the norm derived from the delta update in updateResidual
     addBasis!(basis, basis.mesh.candidates[idx], verbose)
+    _R = basis.R[end, end] # the norm derived from the GramSchmidt
 
-    ## before set the residual of the selected grid point to be zero, do some check
-    # residual = sqrt(basis.mesh.residual[idx])
-    # _norm = basis.R[end, end]
-    # @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
-    # if abs(_norm - residual) > basis.rtol * 10
-    #     @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
-    # end
+    @assert abs(_norm - _R) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $_R = $(_norm-_R)"
+    if abs(_norm - _R) > basis.rtol * 10
+        @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $_R = $(_norm-_R)")
+    end
 
     ## set the residual of the selected grid point to be zero
     basis.mesh.selected[idx] = true
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
 
+    # println(mirror(basis.mesh, idx))
     for grid in mirror(basis.mesh, idx)
         addBasis!(basis, grid, verbose)
     end
@@ -98,6 +100,7 @@ function updateResidual!(basis::Basis{D}) where {D}
             candidate = mesh.candidates[idx]
             pp = sum(q[j] * dot(mesh, basis.grid[j], candidate) for j in 1:basis.N)
             _residual = mesh.residual[idx] - pp * pp
+            # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
             # println("working on $candidate : $_residual")
             if _residual < 0
                 if _residual < -basis.rtol
@@ -133,6 +136,9 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
 
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
+
+    @assert _norm>eps(Double(1))*100 "$_norm is too small as a denominator!\ngrid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
+
     _R[end, end] = _norm
     _Q[:, end] /= _norm
 
@@ -192,10 +198,10 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 2
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 0)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-4, sym = 1)
     QR!(basis, verbose = 1)
 
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(100, 1e-8, sym = 0)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(100, 1e-8, sym = 1)
     @time QR!(basis, verbose = 1)
 
     save(basis.mesh, basis.grid)    
