@@ -5,6 +5,7 @@ using StaticArrays, Printf
 
 const Float = FQR.Float
 const Double = FQR.Double
+const DotF = FQR.Float
 
 struct FreqGrid{D} <: FQR.Grid
     sector::Int                       # sector
@@ -23,8 +24,8 @@ struct FreqFineMesh{D} <: FQR.FineMesh
 
     ## for frequency mesh only ###
     fineGrid::Vector{Float}         # fine grid for each dimension
-    cacheF::Vector{Float}
-    cacheD::Vector{Double}
+    cache1::Vector{DotF}
+    cache2::Matrix{DotF}
 
 
     function FreqFineMesh{D}(Λ, rtol; sym = 0) where {D}
@@ -32,15 +33,17 @@ struct FreqFineMesh{D} <: FQR.FineMesh
         _finegrid = Float.(fineGrid(Λ, rtol))
         Nfine = length(_finegrid)
 
-        _cacheF = zeros(Float, Nfine)
-        _cacheD = zeros(Double, Nfine)
-        for (gi, g) in enumerate(_finegrid)
-            _cacheF[gi] = exp(-Float(g))
-            _cacheD[gi] = exp(-Double(g))
+        _cache1 = zeros(DotF, Nfine)
+        _cache2 = zeros(DotF, (Nfine, Nfine))
+        for (xi, x) in enumerate(_finegrid)
+            _cache1[xi] = exp(-DotF(x))
+            for (yi, y) in enumerate(_finegrid)
+                _cache2[xi, yi] = exp(-DotF(x)-DotF(y))
+            end
         end
 
         color = D+1
-        mesh = new{D}(color, sym, [], [], [], _finegrid, _cacheF, _cacheD)
+        mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
 
         if D == 2
             for (xi, x) in enumerate(_finegrid)
@@ -154,18 +157,8 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     return newgrids
 end
 
-@inline function F(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T} end
-
-function FQR.dot(mesh::FreqFineMesh{D}, g1::FreqGrid{D}, g2::FreqGrid{D}) where {D}
-    cache = mesh.cacheF
-    T = Float
-    if g1.sector != g2.sector
-        return T(0)
-    end
+@inline function Fii2d(ω1::T, ω2::T, expω1::T, expω2::T) where {T} 
     tiny = T(1e-5)
-    ω1, ω2 = g1.omega[1] + g2.omega[1], g1.omega[2] + g2.omega[2]
-    expω1 = cache[g1.coord[1]] * cache[g2.coord[1]]
-    expω2 = cache[g1.coord[2]] * cache[g2.coord[2]]
     if ω1 < tiny && ω2 < tiny
         return T(1) / 2
     elseif ω1 < tiny && ω2 > tiny
@@ -177,6 +170,48 @@ function FQR.dot(mesh::FreqFineMesh{D}, g1::FreqGrid{D}, g2::FreqGrid{D}) where 
         return T((1 - expω1 * (1 + ω1)) / ω1^2)
     else
         return T((ω1 - ω2 + expω1 * ω2 - expω2 * ω1) / (ω1 * ω2 * (ω1 - ω2)))
+    end
+end
+
+@inline function Fij2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T} 
+    tiny = T(1e-5)
+    if a>tiny && b>tiny && c>tiny # a>0, b>0, c>0
+        
+    else
+        if a<tiny # a=0
+            return Fii2d(b, c, expb, expc)
+        else b<tiny # a>0, b=0
+            return Fii2d(a, c, expa, expc)
+        else # a>0, b>0, c=0
+            return Fii2d(a, b, expa, expb)
+        end
+    end
+end
+
+"""
+basis dot for 2D
+"""
+function FQR.dot(mesh::FreqFineMesh{2}, g1::FreqGrid{2}, g2::FreqGrid{2})
+    T = Float
+    cache1 = mesh.cache1
+    cache2 = mesh.cache2
+    s1, s2 = g1.sector, g2.sector
+    c1, c2 = g1.coord, g2.coord
+    if s1 == s2
+        ω1, ω2 = g1.omega[1] + g2.omega[1], g1.omega[2] + g2.omega[2]
+        expω1 = cache2[c1[1], c2[1]]
+        expω2 = cache2[c1[2], c2[2]]
+        return Fii2d(ω1, ω2, expω1, expω2)
+    else
+        if (s1 == 1 && s2==2) || (s1==2 && s2==3) || (s1==3 && s2==1)
+            a, b, c = g2.omega[2], g1.omega[1], g1.omega[2]+g2.omega[1]
+            ea, eb, ec = cache1[c2[2]], cache1[c1[1]], cache2[c1[2], c2[1]]
+            return Fij2d(a, b, c, ea, eb, ec)
+        else 
+            a, b, c = g1.omega[2], g2.omega[1], g2.omega[2]+g1.omega[1]
+            ea, eb, ec = cache1[c1[2]], cache1[c2[1]], cache2[c2[2], c1[1]]
+            return Fij2d(a, b, c, ea, eb, ec)
+        end
     end
 end
 
