@@ -25,10 +25,9 @@ const Double = Double64
 abstract type Grid end
 abstract type FineMesh end
 
-include("./kernel.jl")
 include("./frequency.jl")
 
-mutable struct Basis{D, Grid, Mesh}
+mutable struct Basis{D,Grid,Mesh}
     ############    fundamental parameters  ##################
     Λ::Float  # UV energy cutoff * inverse temperature
     rtol::Float # error tolerance
@@ -36,7 +35,7 @@ mutable struct Basis{D, Grid, Mesh}
     ###############     DLR grids    ###############################
     N::Int # number of basis
     grid::Vector{Grid} # grid for the basis
-    rtol::Vector{Float}  # the relative error achieved by adding the current grid point 
+    error::Vector{Float}  # the relative error achieved by adding the current grid point 
 
     ###############  linear coefficients for orthognalization #######
     Q::Matrix{Double} # , Q' = R^{-1}, Q*R'= I
@@ -45,53 +44,51 @@ mutable struct Basis{D, Grid, Mesh}
     ############ fine mesh #################
     mesh::Mesh
 
-    function Basis{d,Grid, Mesh}(Λ, rtol, projector; sym = 1) where {d,Grid, Mesh}
+    function Basis{d,Grid,Mesh}(Λ, rtol; sym = 1) where {d,Grid,Mesh}
         _Q = Matrix{Float}(undef, (0, 0))
         _R = similar(_Q)
-        mesh = Mesh(Λ, rtol, projector, sym)
-        return new{d,Grid, Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
+        mesh = Mesh(Λ, rtol, sym)
+        return new{d,Grid,Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
     end
 end
 
-function addBasis!(basis::Basis{D, G, M}, projector, grid, verbose) where {D,G,M}
+function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
     basis.N += 1
     push!(basis.grid, grid)
 
-    basis.Q, basis.R = GramSchmidt(basis, projector)
+    basis.Q, basis.R = GramSchmidt(basis)
 
     # update the residual on the fine mesh
-    updateResidual!(basis, projector)
+    updateResidual!(basis)
 
     # the new rtol achieved by adding the new grid point
-    push!(basis.rtol, sqrt(maximum(mesh.residual)))
+    push!(basis.error, sqrt(maximum(basis.mesh.residual)))
 
-    verbose && @printf("%3i @$(grid) -> error=%16.8g, Rmin=%16.8g\n", basis.N, basis.rtol[end], basis.R[end, end])
+    (verbose > 0) && @printf("%3i %40s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
 end
 
-functoin addBasisBlock!(basis::Basis{D, G, M}, projector, idx, verbose) where {D, G, M}
-    addBasis!(basis, proj, basis.mesh.candidates[idx], verbose)
+function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
+    addBasis!(basis, basis.mesh.candidates[idx], verbose)
 
     ## before set the residual of the selected grid point to be zero, do some check
-    residual = sqrt(basis.mesh.residual[idx])
-    _norm = basis.R[end, end]
-    @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
-    if abs(_norm - residual) > basis.rtol * 10
-        @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
-    end
+    # residual = sqrt(basis.mesh.residual[idx])
+    # _norm = basis.R[end, end]
+    # @assert abs(_norm - residual) < basis.rtol * 100 "inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)"
+    # if abs(_norm - residual) > basis.rtol * 10
+    #     @warn("inconsistent norm on the grid $(basis.grid[end]) $_norm - $residual = $(_norm-residual)")
+    # end
 
     ## set the residual of the selected grid point to be zero
     basis.mesh.selected[idx] = true
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
 
-    for grid in mirror(mesh, idx)
-        addBasis!(basis, proj, grid, verbose)
+    for grid in mirror(basis.mesh, idx)
+        addBasis!(basis, grid, verbose)
     end
-
-    return findmax(basis.mesh.residual)
 end
 
-function updateResidual!(basis::Basis{D}, projector) where {D}
-    N, rtol, mesh = basis.N, basis.rtol, basis.mesh
+function updateResidual!(basis::Basis{D}) where {D}
+    mesh = basis.mesh
 
     # q = Float.(basis.Q[end, :])
     q = Double.(basis.Q[end, :])
@@ -99,7 +96,7 @@ function updateResidual!(basis::Basis{D}, projector) where {D}
     Threads.@threads for idx in 1:mesh.N
         if mesh.selected[idx] == false
             candidate = mesh.candidates[idx]
-            pp = sum(q[j] * projector(mesh, candidate, basis.grid[j]) for j in 1:N)
+            pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
             _residual = mesh.residual[idx] - pp * pp
             if _residual < 0
                 if _residual < -basis.rtol
@@ -116,7 +113,7 @@ end
 """
 Gram-Schmidt process to the last grid point in basis.grid
 """
-function GramSchmidt(basis::Basis{D, G, M}, projector) where {D, G, M}
+function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
     _Q = zeros(Double, (basis.N, basis.N))
     _Q[1:end-1, 1:end-1] = basis.Q
 
@@ -128,12 +125,12 @@ function GramSchmidt(basis::Basis{D, G, M}, projector) where {D, G, M}
 
     for qi in 1:basis.N-1
         # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
-        overlap = sum(_Q[qi, j] * projector(basis, basis.grid[j], newgrid) for j in 1:basis.N)
+        overlap = sum(_Q[qi, j] * dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N)
         _R[qi, end] = overlap
         _Q[end, :] -= overlap * _Q[qi, :]  # <q, qnew> q
     end
 
-    _norm = projector(basis, newgrid, newgrid) - _R[:, end]' * _R[:, end]
+    _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
     _R[end, end] = _norm
     _Q[end, :] /= _norm
@@ -141,12 +138,12 @@ function GramSchmidt(basis::Basis{D, G, M}, projector) where {D, G, M}
     return _Q, _R
 end
 
-function testOrthgonal(basis::Basis{D}, projector) where {D}
+function testOrthgonal(basis::Basis{D}) where {D}
     println("testing orthognalization...")
     KK = zeros(Double, (basis.N, basis.N))
     for (i, g1) in enumerate(basis.grid)
         for (j, g2) in enumerate(basis.grid)
-            KK[i, j] = projector(basis, g1, g2)
+            KK[i, j] = dot(basis.mesh, g1, g2)
         end
     end
     maxerr = maximum(abs.(KK - basis.R' * basis.R))
@@ -167,22 +164,25 @@ end
 #     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 # end
 
-function QR!(basis::Basis{dim, G, M}, proj; idx = [1, ] , N = 10000, verbose = 0) where {dim, G, M}
+function QR!(basis::Basis{dim,G,M}; idx0 = [1,], N = 10000, verbose = 0) where {dim,G,M}
     #### add the grid in the idx vector first
-    for i in idx
-        maxResidual, idx = addBasisBlock!(basis, proj, i, verbose)
+    for i in idx0
+        addBasisBlock!(basis, i, verbose)
     end
 
     ####### add grids that has the maximum residual
-    while sqrt(maxResidual) > rtol && basis.N < N
 
-        maxResidual, idx = addBasisBlock!(basis, proj, i, verbose)
+    maxResidual, idx = findmax(basis.mesh.residual)
+    while sqrt(maxResidual) > basis.rtol && basis.N < N
+
+        addBasisBlock!(basis, idx, verbose)
 
         # plotResidual(basis)
         # testOrthgonal(basis)
+        maxResidual, idx = findmax(basis.mesh.residual)
     end
-    testOrthgonal(basis, proj)
-    @printf("residual = %.16e\n", maxResidual)
+    testOrthgonal(basis)
+    @printf("rtol = %.16e\n", sqrt(maxResidual))
     # plotResidual(basis)
     # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
     return basis
@@ -190,12 +190,12 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    dim = 2
-    basis = Basis{dim, FreqGrid, FreqFineMesh}(10, 1e-6, proj2D, sym = 0)
-    QR!(basis, proj2D, verbose = 0)
+    D = 2
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-6, sym = 0)
+    QR!(basis, verbose = 1)
 
-    basis = Basis{dim, FreqGrid, FreqFineMesh}(100, 1e-8, proj2D, sym = 0)
-    @time QR!(basis, proj2D, verbose = 1)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(100, 1e-8, sym = 0)
+    @time QR!(basis, verbose = 1)
 end
 
 # function plotResidual(basis)
