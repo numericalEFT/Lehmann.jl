@@ -4,8 +4,7 @@ struct FreqGrid{D} <: Grid
     coord::SVector{D,Int}         # integer coordinate of the grid point on the fine meshes
 end
 
-show(io, grid::FreqGrid{2}) = print(io, "ω = ($(grid.omega[1]), $(grid.omega[2]))_$(grid.sector)")
-display(io, grid::FreqGrid) = show(io, grid)
+Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%16.8f", grid.omega[1])), $(@sprintf("%16.8f", grid.omega[2]))")
 
 struct FreqFineMesh{D} <: FineMesh
     color::Int

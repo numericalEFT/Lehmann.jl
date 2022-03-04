@@ -3,11 +3,11 @@ using StaticArrays
 # using GenericLinearAlgebra
 using Lehmann
 
-# const Float = Float64
+const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-const Float = Double64
+# const Float = Double64
 const Double = Double64
 
 # similar speed as DoubleFloats
@@ -64,7 +64,7 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
     # the new rtol achieved by adding the new grid point
     push!(basis.error, sqrt(maximum(basis.mesh.residual)))
 
-    (verbose > 0) && @printf("%3i %40s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
+    (verbose > 0) && @printf("%3i %s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
 end
 
 function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
@@ -93,11 +93,10 @@ function updateResidual!(basis::Basis{D}) where {D}
     # q = Float.(basis.Q[end, :])
     q = Double.(basis.Q[end, :])
 
-    # Threads.@threads for idx in 1:mesh.N
-    for idx in 1:length(mesh.candidates)
+    Threads.@threads for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
             candidate = mesh.candidates[idx]
-            pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
+            pp = sum(q[j] * dot(mesh, basis.grid[j], candidate) for j in 1:basis.N)
             _residual = mesh.residual[idx] - pp * pp
             # println("working on $candidate : $_residual")
             if _residual < 0
@@ -125,11 +124,14 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
 
     newgrid = basis.grid[end]
 
+    overlap = [dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N]
+    # _R[:, end] = _Q'*overlap
+    # _Q[end, :] -= _R[:, end]'*_Q'
+
     for qi in 1:basis.N-1
-        # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
-        overlap = sum(_Q[qi, j] * dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N)
-        _R[qi, end] = overlap
-        _Q[end, :] -= overlap * _Q[qi, :]  # <q, qnew> q
+    #     # overlap = sum(_Q[qi, j] * projector(Double(basis.Λ), basis.D, basis.grid[j], basis.grid[end]) for j in 1:basis.N)
+        _R[qi, end] = _Q[qi, :]' * overlap
+        _Q[end, :] -= _R[qi, end] * _Q[qi, :]  # <q, qnew> q
     end
 
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
@@ -143,7 +145,8 @@ end
 function testOrthgonal(basis::Basis{D}) where {D}
     println("testing orthognalization...")
     KK = zeros(Double, (basis.N, basis.N))
-    for (i, g1) in enumerate(basis.grid)
+    Threads.@threads for i in 1:basis.N
+        g1 = basis.grid[i]
         for (j, g2) in enumerate(basis.grid)
             KK[i, j] = dot(basis.mesh, g1, g2)
         end
@@ -192,7 +195,6 @@ function QR!(basis::Basis{dim,G,M}; idx0 = [1,], N = 10000, verbose = 0) where {
         # println(basis.mesh.residual[1:4])
         # exit(0)
     end
-    testOrthgonal(basis)
     @printf("rtol = %.16e\n", sqrt(maxResidual))
     # plotResidual(basis)
     # plotResidual(basis, proj, Float(0), Float(100), candidate, residual)
@@ -202,11 +204,13 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 2
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-6, sym = 0)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(10, 1e-6, sym = 1)
     QR!(basis, verbose = 1)
 
-    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(100, 1e-8, sym = 0)
+    basis = Basis{D,FreqGrid{D},FreqFineMesh{D}}(640, 1e-8, sym = 1)
     @time QR!(basis, verbose = 1)
+
+    testOrthgonal(basis)
 end
 
 # function plotResidual(basis)
