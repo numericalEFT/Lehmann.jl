@@ -217,8 +217,10 @@ F(any, any, 0)
     elseif ω1 > Tiny && ω2 < Tiny
         return (1 - ω1 - expω1) / ω1 / (ω2 - ω1)
     elseif abs(ω1 - ω2) < Tiny
-        @assert abs(ω1 - ω2) < eps(Float(1)) * 1000 "$ω1 - $ω2 = $(ω1-ω2)"
-        return T((1 - expω1 * (1 + ω1)) / ω1^2)
+        # @assert abs(ω1 - ω2) < eps(Float(1)) * 1000 "$ω1 - $ω2 = $(ω1-ω2)"
+        ω = (ω1 + ω2)/2
+        expω = (expω1+expω2)/2
+        return T((1 - expω * (1 + ω)) / ω/ω)
     else
         return T((ω1 - ω2 + expω1 * ω2 - expω2 * ω1) / (ω1 * ω2 * (ω1 - ω2)))
     end
@@ -288,8 +290,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 40, 1e-6
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 1)
+    lambda, rtol = 1000, 1e-9
+    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
 

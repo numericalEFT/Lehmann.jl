@@ -4,11 +4,11 @@ using LinearAlgebra, Printf
 using StaticArrays
 # using GenericLinearAlgebra
 
-# const Float = Float64
+const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-const Float = Double64
+# const Float = Double64
 const Double = Double64
 
 # similar speed as DoubleFloats
