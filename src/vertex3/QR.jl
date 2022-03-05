@@ -131,17 +131,17 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
 
     newgrid = basis.grid[end]
 
-    overlap = [dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N]
+    overlap = [dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N-1]
 
     for qi in 1:basis.N-1
-        _R[qi, end] = _Q[:, qi]' * overlap
+        _R[qi, end] = basis.Q[:, qi]' * overlap
         _Q[:, end] -= _R[qi, end] * _Q[:, qi]  # <q, qnew> q
     end
 
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
 
-    @assert _norm>eps(Double(1))*100 "$_norm is too small as a denominator!\ngrid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
+    @assert _norm>eps(Double(1))*100 "$_norm is too small as a denominator!\nnewgrid = $newgrid\nexisting grid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
 
     _R[end, end] = _norm
     _Q[:, end] /= _norm

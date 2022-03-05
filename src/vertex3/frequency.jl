@@ -6,6 +6,7 @@ using StaticArrays, Printf
 const Float = FQR.Float
 const Double = FQR.Double
 const DotF = FQR.Float
+const Tiny = DotF(1e-5)
 
 struct FreqGrid{D} <: FQR.Grid
     sector::Int                       # sector
@@ -24,13 +25,14 @@ struct FreqFineMesh{D} <: FQR.FineMesh
 
     ## for frequency mesh only ###
     fineGrid::Vector{Float}         # fine grid for each dimension
-    cache1::Vector{DotF}
-    cache2::Matrix{DotF}
+    cache1::Vector{DotF}            # cache for exp(-x)
+    cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
     function FreqFineMesh{D}(Λ, rtol; sym = 0) where {D}
         # initialize the residual on fineGrid with <g, g>
         _finegrid = Float.(fineGrid(Λ, rtol))
+        separationTest(D, _finegrid)
         Nfine = length(_finegrid)
 
         _cache1 = zeros(DotF, Nfine)
@@ -43,6 +45,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
         end
 
         color = D+1
+        # color = 1
         mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
 
         if D == 2
@@ -97,8 +100,32 @@ function fineGrid(Λ, rtol)
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
+
     println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
     return grid
+end
+
+"""
+Test the finegrids do not overlap
+"""
+function separationTest(D, finegrid)
+    if D==2
+        epsilon = eps(DotF(1))*10
+        for (i, f) in enumerate(finegrid)
+            # either zero, or sufficiently large
+            @assert abs(f)<epsilon || abs(f)>Tiny "$i: $f should either smaller than $epsilon or larger than $Tiny"
+            for (j, g) in enumerate(finegrid)
+                # two frequencies are either the same, or well separated
+                @assert abs(f-g)<epsilon || abs(f-g)>Tiny "$i: $f and $j: $g should either closer than $epsilon or further than $Tiny"
+                fg = f+g
+                for (k, l) in enumerate(finegrid)
+                    @assert abs(l-fg)<epsilon || abs(l-fg)>Tiny "$i: $f + $j: $g = $fg and $k: $l should either closer than $epsilon or further than $Tiny"
+                end
+            end
+        end
+    else
+        error("not implemented!")
+    end
 end
 
 function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
@@ -117,9 +144,11 @@ function irreducible(D, sector, coord, symmetry)
         return true
     else
         if D == 2
-            return (coord[1] <= coord[2]) && (sector == 1)
+            # return (coord[1] <= coord[2]) && (sector == 1)
+            return (coord[1] <= coord[2])
         elseif D == 3
-            return (coord[1] <= coord[2] <= coord[3]) && (sector == 1)
+            # return (coord[1] <= coord[2] <= coord[3]) && (sector == 1)
+            return (coord[1] <= coord[2] <= coord[3])
         else
             error("not implemented!")
         end
@@ -132,7 +161,7 @@ end
 
 function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     grid = mesh.candidates[idx]
-    coord, sector = grid.coord, grid.sector
+    coord, s = grid.coord, grid.sector
     if mesh.symmetry == 0
         return []
     end
@@ -147,25 +176,47 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
         error("not implemented!")
     end
     newgrids = FreqGrid{D}[]
-    for s in 1:mesh.color
-        for c in coords
-            if s!=grid.sector || c !=Tuple(grid.coord)
-                push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
-            end
+    # for s in 1:mesh.color
+    for c in coords
+        if s!=grid.sector || c !=Tuple(grid.coord)
+            push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
         end
     end
+    # end
     return newgrids
 end
 
+"""
+G(x, y) = (exp(-x)-exp(-y))/(x-y)
+G(x, x) = -exp(-x)
+"""
+@inline function G2d(a::T, b::T, expa::T, expb::T) where {T} 
+    if abs(a-b)>Tiny
+        return (expa-expb)/(a-b)
+    else
+        return -(expa+expb)/2
+    end
+end
+
+"""
+F(a, b, c) = (G(a, c)-G(a, c))/(a-b) where a != b, but a or b could be equal to c
+"""
+@inline function F2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
+    @assert abs(a-b)>Tiny "$a - $c > $Tiny"
+    return (G2d(a, c, expa, expc)-G2d(b, c, expb, expc))/(a-b)
+end
+
+"""
+F(any, any, 0)
+"""
 @inline function Fii2d(ω1::T, ω2::T, expω1::T, expω2::T) where {T} 
-    tiny = T(1e-5)
-    if ω1 < tiny && ω2 < tiny
+    if ω1 < Tiny && ω2 < Tiny
         return T(1) / 2
-    elseif ω1 < tiny && ω2 > tiny
+    elseif ω1 < Tiny && ω2 > Tiny
         return (1 - ω2 - expω2) / ω2 / (ω1 - ω2)
-    elseif ω1 > tiny && ω2 < tiny
+    elseif ω1 > Tiny && ω2 < Tiny
         return (1 - ω1 - expω1) / ω1 / (ω2 - ω1)
-    elseif abs(ω1 - ω2) < tiny
+    elseif abs(ω1 - ω2) < Tiny
         @assert abs(ω1 - ω2) < eps(Float(1)) * 1000 "$ω1 - $ω2 = $(ω1-ω2)"
         return T((1 - expω1 * (1 + ω1)) / ω1^2)
     else
@@ -173,17 +224,17 @@ end
     end
 end
 
+"""
+F(a,b,c)
+"""
 @inline function Fij2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T} 
-    tiny = T(1e-5)
-    if a>tiny && b>tiny && c>tiny # a>0, b>0, c>0
-        
-    else
-        if a<tiny # a=0
-            return Fii2d(b, c, expb, expc)
-        else b<tiny # a>0, b=0
-            return Fii2d(a, c, expa, expc)
-        else # a>0, b>0, c=0
-            return Fii2d(a, b, expa, expb)
+    if abs(a-b)>Tiny #a!=b
+        return F2d(a, b, c, expa, expb, expc)
+    else # a=b
+        if abs(a-c)>Tiny # a=b != c
+            return F2d(a, c, b, expa, expc, expb)
+        else # a==b==c: exp(-a)/2
+            return (expa+expb+expc)/6
         end
     end
 end
@@ -192,26 +243,24 @@ end
 basis dot for 2D
 """
 function FQR.dot(mesh::FreqFineMesh{2}, g1::FreqGrid{2}, g2::FreqGrid{2})
-    T = Float
+    # println("dot: ", g1, ", ", g2)
     cache1 = mesh.cache1
     cache2 = mesh.cache2
     s1, s2 = g1.sector, g2.sector
     c1, c2 = g1.coord, g2.coord
-    if s1 == s2
+    if s1 == s2  # F11, F22, F33
         ω1, ω2 = g1.omega[1] + g2.omega[1], g1.omega[2] + g2.omega[2]
         expω1 = cache2[c1[1], c2[1]]
         expω2 = cache2[c1[2], c2[2]]
         return Fii2d(ω1, ω2, expω1, expω2)
-    else
-        if (s1 == 1 && s2==2) || (s1==2 && s2==3) || (s1==3 && s2==1)
-            a, b, c = g2.omega[2], g1.omega[1], g1.omega[2]+g2.omega[1]
-            ea, eb, ec = cache1[c2[2]], cache1[c1[1]], cache2[c1[2], c2[1]]
-            return Fij2d(a, b, c, ea, eb, ec)
-        else 
-            a, b, c = g1.omega[2], g2.omega[1], g2.omega[2]+g1.omega[1]
-            ea, eb, ec = cache1[c1[2]], cache1[c2[1]], cache2[c2[2], c1[1]]
-            return Fij2d(a, b, c, ea, eb, ec)
-        end
+    elseif (s1 == 1 && s2==2) || (s1==2 && s2==3) || (s1==3 && s2==1) #F12, F23, F31
+        a, b, c = g2.omega[2], g1.omega[1], g1.omega[2]+g2.omega[1]
+        ea, eb, ec = cache1[c2[2]], cache1[c1[1]], cache2[c1[2], c2[1]]
+        return Fij2d(a, b, c, ea, eb, ec)
+    else  #F21, F32, F13
+        a, b, c = g1.omega[2], g2.omega[1], g2.omega[2]+g1.omega[1]
+        ea, eb, ec = cache1[c1[2]], cache1[c2[1]], cache2[c2[2], c1[1]]
+        return Fij2d(a, b, c, ea, eb, ec)
     end
 end
 
@@ -220,11 +269,26 @@ if abspath(PROGRAM_FILE) == @__FILE__
     D = 2
 
     lambda, rtol = 10, 1e-4
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 1)
+    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
+
+    # KK = zeros(3, 3)
+    # n = (2, 2)
+    # o = (mesh.fineGrid[n[1]], mesh.fineGrid[n[2]])
+    # for i in 1:3
+    #     g1 = FreqGrid{2}(i, o, n)
+    #     for j in 1:3
+    #         g2 = FreqGrid{2}(j, o, n)
+    #         println(g1, ", ", g2)
+    #         KK[i, j] = FQR.dot(mesh, g1, g2)
+    #     end
+    # end
+    # display(KK)
+    # println()
+
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 100, 1e-8
+    lambda, rtol = 40, 1e-6
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 1)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
