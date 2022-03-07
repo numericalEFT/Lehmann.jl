@@ -141,7 +141,7 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
 
-    @assert _norm>eps(Double(1))*100 "$_norm is too small as a denominator!\nnewgrid = $newgrid\nexisting grid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
+    @assert _norm > eps(Double(1)) * 100 "$_norm is too small as a denominator!\nnewgrid = $newgrid\nexisting grid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
 
     _R[end, end] = _norm
     _Q[:, end] /= _norm
@@ -168,6 +168,17 @@ function test(basis::Basis{D}) where {D}
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 
+    # KK = zeros(Float, (basis.N, basis.N))
+    # Threads.@threads for i in 1:basis.N
+    #     g1 = basis.grid[i]
+    #     for (j, g2) in enumerate(basis.grid)
+    #         KK[i, j] = dot(basis.mesh, g1, g2)
+    #     end
+    # end
+    # println(maximum(abs.(KK' - KK)))
+    # A = cholesky(KK, Val{true}())
+    # println(maximum(abs.(A.L * A.U - KK)))
+    # println(maximum(abs.(A.L' - A.U)))
 end
 
 # function testResidual(basis, proj)

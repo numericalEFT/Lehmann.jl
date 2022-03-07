@@ -40,11 +40,11 @@ struct FreqFineMesh{D} <: FQR.FineMesh
         for (xi, x) in enumerate(_finegrid)
             _cache1[xi] = exp(-DotF(x))
             for (yi, y) in enumerate(_finegrid)
-                _cache2[xi, yi] = exp(-DotF(x)-DotF(y))
+                _cache2[xi, yi] = exp(-DotF(x) - DotF(y))
             end
         end
 
-        color = D+1
+        color = D + 1
         # color = 1
         mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
 
@@ -109,17 +109,17 @@ end
 Test the finegrids do not overlap
 """
 function separationTest(D, finegrid)
-    if D==2
-        epsilon = eps(DotF(1))*10
+    if D == 2
+        epsilon = eps(DotF(1)) * 10
         for (i, f) in enumerate(finegrid)
             # either zero, or sufficiently large
-            @assert abs(f)<epsilon || abs(f)>Tiny "$i: $f should either smaller than $epsilon or larger than $Tiny"
+            @assert abs(f) < epsilon || abs(f) > Tiny "$i: $f should either smaller than $epsilon or larger than $Tiny"
             for (j, g) in enumerate(finegrid)
                 # two frequencies are either the same, or well separated
-                @assert abs(f-g)<epsilon || abs(f-g)>Tiny "$i: $f and $j: $g should either closer than $epsilon or further than $Tiny"
-                fg = f+g
+                @assert abs(f - g) < epsilon || abs(f - g) > Tiny "$i: $f and $j: $g should either closer than $epsilon or further than $Tiny"
+                fg = f + g
                 for (k, l) in enumerate(finegrid)
-                    @assert abs(l-fg)<epsilon || abs(l-fg)>Tiny "$i: $f + $j: $g = $fg and $k: $l should either closer than $epsilon or further than $Tiny"
+                    @assert abs(l - fg) < epsilon || abs(l - fg) > Tiny "$i: $f + $j: $g = $fg and $k: $l should either closer than $epsilon or further than $Tiny"
                 end
             end
         end
@@ -178,7 +178,7 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     newgrids = FreqGrid{D}[]
     # for s in 1:mesh.color
     for c in coords
-        if s!=grid.sector || c !=Tuple(grid.coord)
+        if s != grid.sector || c != Tuple(grid.coord)
             push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
         end
     end
@@ -190,11 +190,11 @@ end
 G(x, y) = (exp(-x)-exp(-y))/(x-y)
 G(x, x) = -exp(-x)
 """
-@inline function G2d(a::T, b::T, expa::T, expb::T) where {T} 
-    if abs(a-b)>Tiny
-        return (expa-expb)/(a-b)
+@inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
+    if abs(a - b) > Tiny
+        return (expa - expb) / (a - b)
     else
-        return -(expa+expb)/2
+        return -(expa + expb) / 2
     end
 end
 
@@ -202,14 +202,14 @@ end
 F(a, b, c) = (G(a, c)-G(a, c))/(a-b) where a != b, but a or b could be equal to c
 """
 @inline function F2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
-    @assert abs(a-b)>Tiny "$a - $c > $Tiny"
-    return (G2d(a, c, expa, expc)-G2d(b, c, expb, expc))/(a-b)
+    @assert abs(a - b) > Tiny "$a - $c > $Tiny"
+    return (G2d(a, c, expa, expc) - G2d(b, c, expb, expc)) / (a - b)
 end
 
 """
 F(any, any, 0)
 """
-@inline function Fii2d(ω1::T, ω2::T, expω1::T, expω2::T) where {T} 
+@inline function Fii2d(ω1::T, ω2::T, expω1::T, expω2::T) where {T}
     if ω1 < Tiny && ω2 < Tiny
         return T(1) / 2
     elseif ω1 < Tiny && ω2 > Tiny
@@ -218,9 +218,9 @@ F(any, any, 0)
         return (1 - ω1 - expω1) / ω1 / (ω2 - ω1)
     elseif abs(ω1 - ω2) < Tiny
         # @assert abs(ω1 - ω2) < eps(Float(1)) * 1000 "$ω1 - $ω2 = $(ω1-ω2)"
-        ω = (ω1 + ω2)/2
-        expω = (expω1+expω2)/2
-        return T((1 - expω * (1 + ω)) / ω/ω)
+        ω = (ω1 + ω2) / 2
+        expω = (expω1 + expω2) / 2
+        return T((1 - expω * (1 + ω)) / ω / ω)
     else
         return T((ω1 - ω2 + expω1 * ω2 - expω2 * ω1) / (ω1 * ω2 * (ω1 - ω2)))
     end
@@ -229,14 +229,14 @@ end
 """
 F(a,b,c)
 """
-@inline function Fij2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T} 
-    if abs(a-b)>Tiny #a!=b
+@inline function Fij2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
+    if abs(a - b) > Tiny #a!=b
         return F2d(a, b, c, expa, expb, expc)
     else # a=b
-        if abs(a-c)>Tiny # a=b != c
+        if abs(a - c) > Tiny # a=b != c
             return F2d(a, c, b, expa, expc, expb)
         else # a==b==c: exp(-a)/2
-            return (expa+expb+expc)/6
+            return (expa + expb + expc) / 6
         end
     end
 end
@@ -255,12 +255,12 @@ function FQR.dot(mesh::FreqFineMesh{2}, g1::FreqGrid{2}, g2::FreqGrid{2})
         expω1 = cache2[c1[1], c2[1]]
         expω2 = cache2[c1[2], c2[2]]
         return Fii2d(ω1, ω2, expω1, expω2)
-    elseif (s1 == 1 && s2==2) || (s1==2 && s2==3) || (s1==3 && s2==1) #F12, F23, F31
-        a, b, c = g2.omega[2], g1.omega[1], g1.omega[2]+g2.omega[1]
+    elseif (s1 == 1 && s2 == 2) || (s1 == 2 && s2 == 3) || (s1 == 3 && s2 == 1) #F12, F23, F31
+        a, b, c = g2.omega[2], g1.omega[1], g1.omega[2] + g2.omega[1]
         ea, eb, ec = cache1[c2[2]], cache1[c1[1]], cache2[c1[2], c2[1]]
         return Fij2d(a, b, c, ea, eb, ec)
     else  #F21, F32, F13
-        a, b, c = g1.omega[2], g2.omega[1], g2.omega[2]+g1.omega[1]
+        a, b, c = g1.omega[2], g2.omega[1], g2.omega[2] + g1.omega[1]
         ea, eb, ec = cache1[c1[2]], cache1[c2[1]], cache2[c2[2], c1[1]]
         return Fij2d(a, b, c, ea, eb, ec)
     end
@@ -290,7 +290,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 1000, 1e-9
+    lambda, rtol = 100, 1e-10
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
@@ -322,7 +322,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 # println(x, ", ", y, " -> ", length(mirror(mesh, i)))
 
                 for grid in FQR.mirror(mesh, i)
-                    if grid.sector ==1
+                    if grid.sector == 1
                         xp, yp = grid.coord
                         residual[xp, yp] = residual[x, y]
                         # println(xp, ", ", yp)
