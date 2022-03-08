@@ -93,7 +93,7 @@ function fineGrid(Λ, rtol)
     ############# DLR based fine grid ##########################################
     dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 4
+    degree = 2
     grid = Vector{Double}(undef, 0)
     panel = Double.(dlr.ω)
     for i in 1:length(panel)-1
@@ -290,7 +290,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 10000, 1e-8
+    lambda, rtol = 1000, 1e-8
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
