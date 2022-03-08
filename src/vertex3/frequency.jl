@@ -93,7 +93,7 @@ function fineGrid(Λ, rtol)
     ############# DLR based fine grid ##########################################
     dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 2
+    degree = 4
     grid = Vector{Double}(undef, 0)
     panel = Double.(dlr.ω)
     for i in 1:length(panel)-1
@@ -123,6 +123,8 @@ function separationTest(D, finegrid)
                 end
             end
         end
+    elseif D==1
+        return
     else
         error("not implemented!")
     end
@@ -130,7 +132,9 @@ end
 
 function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     fineGrid = mesh.fineGrid
-    if dim == 2
+    if dim == 1
+        return fineGrid[coord[1]]
+    elseif dim == 2
         return (fineGrid[coord[1]], fineGrid[coord[2]])
     elseif dim == 3
         return (fineGrid[coord[1]], fineGrid[coord[2]], fineGrid[coord[3]])
@@ -187,14 +191,25 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
 end
 
 """
+F(x) = (1-exp(-y))/(x-y)
+"""
+# @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
+#     if abs(a - b) > Tiny
+#         return (expa - expb) / (b - a)
+#     else
+#         return (expa + expb) / 2
+#     end
+# end
+
+"""
 G(x, y) = (exp(-x)-exp(-y))/(x-y)
 G(x, x) = -exp(-x)
 """
 @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
     if abs(a - b) > Tiny
-        return (expa - expb) / (a - b)
+        return (expa - expb) / (b - a)
     else
-        return -(expa + expb) / 2
+        return (expa + expb) / 2
     end
 end
 
@@ -203,7 +218,7 @@ F(a, b, c) = (G(a, c)-G(a, c))/(a-b) where a != b, but a or b could be equal to 
 """
 @inline function F2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
     @assert abs(a - b) > Tiny "$a - $c > $Tiny"
-    return (G2d(a, c, expa, expc) - G2d(b, c, expb, expc)) / (a - b)
+    return (G2d(a, c, expa, expc) - G2d(b, c, expb, expc)) / (b - a)
 end
 
 """
