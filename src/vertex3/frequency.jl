@@ -290,7 +290,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 100, 1e-10
+    lambda, rtol = 10000, 1e-8
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
