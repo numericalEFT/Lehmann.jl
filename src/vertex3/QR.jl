@@ -4,11 +4,11 @@ using LinearAlgebra, Printf
 using StaticArrays
 # using GenericLinearAlgebra
 
-const Float = Float64
+# const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-# const Float = Double64
+const Float = Double64
 const Double = Double64
 
 # similar speed as DoubleFloats
@@ -107,7 +107,7 @@ function updateResidual!(basis::Basis{D}) where {D}
             # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
             # println("working on $candidate : $_residual")
             if _residual < 0
-                if _residual < -basis.rtol
+                if sqrt(-_residual) > basis.rtol
                     @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual[idx]) - $(pp)^2 = $_residual")
                 end
                 mesh.residual[idx] = 0

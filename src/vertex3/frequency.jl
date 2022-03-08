@@ -14,6 +14,7 @@ struct FreqGrid{D} <: FQR.Grid
     coord::SVector{D,Int}         # integer coordinate of the grid point on the fine meshes
 end
 
+Base.show(io::IO, grid::FreqGrid{1}) = print(io, "ω$(grid.sector) = $(@sprintf("%12.4f", grid.omega[1]))")
 Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%12.4f", grid.omega[1])), $(@sprintf("%12.4f", grid.omega[2])))")
 
 struct FreqFineMesh{D} <: FQR.FineMesh
@@ -48,7 +49,19 @@ struct FreqFineMesh{D} <: FQR.FineMesh
         # color = 1
         mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
 
-        if D == 2
+        if D == 1
+            for (xi, x) in enumerate(_finegrid)
+                coord = (xi, )
+                for sector in 1:color
+                    if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
+                        g = FreqGrid{D}(sector, (x, ), coord)
+                        push!(mesh.candidates, g)
+                        push!(mesh.residual, FQR.dot(mesh, g, g))
+                        push!(mesh.selected, false)
+                    end
+                end
+            end
+        elseif D == 2
             for (xi, x) in enumerate(_finegrid)
                 for (yi, y) in enumerate(_finegrid)
                     coord = (xi, yi)
@@ -93,7 +106,7 @@ function fineGrid(Λ, rtol)
     ############# DLR based fine grid ##########################################
     dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 4
+    degree = 2
     grid = Vector{Double}(undef, 0)
     panel = Double.(dlr.ω)
     for i in 1:length(panel)-1
@@ -191,21 +204,21 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
 end
 
 """
-F(x) = (1-exp(-y))/(x-y)
+F(x) = (1-exp(-x))/x
 """
-# @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
-#     if abs(a - b) > Tiny
-#         return (expa - expb) / (b - a)
-#     else
-#         return (expa + expb) / 2
-#     end
-# end
+@inline function F(x::T, expx::T) where {T}
+    if abs(x) > Tiny
+        return (1 - expx) / x
+    else
+        return T(1)
+    end
+end
 
 """
 G(x, y) = (exp(-x)-exp(-y))/(x-y)
 G(x, x) = -exp(-x)
 """
-@inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
+@inline function G(a::T, b::T, expa::T, expb::T) where {T}
     if abs(a - b) > Tiny
         return (expa - expb) / (b - a)
     else
@@ -214,11 +227,31 @@ G(x, x) = -exp(-x)
 end
 
 """
+basis dot for 1D
+"""
+function FQR.dot(mesh::FreqFineMesh{1}, g1::FreqGrid{1}, g2::FreqGrid{1})
+    # println("dot: ", g1, ", ", g2)
+    cache1 = mesh.cache1
+    cache2 = mesh.cache2
+    s1, s2 = g1.sector, g2.sector
+    c1, c2 = g1.coord, g2.coord
+    if s1 == s2  # F11, F22
+        ω = g1.omega[1] + g2.omega[1]
+        expω = cache2[c1[1], c2[1]]
+        return F(ω, expω)
+    else  # off-diagonal
+        a, b = g1.omega[1], g2.omega[1]
+        ea, eb = cache1[c1[1]], cache1[c2[1]]
+        return G(a, b, ea, eb)
+    end
+end
+
+"""
 F(a, b, c) = (G(a, c)-G(a, c))/(a-b) where a != b, but a or b could be equal to c
 """
 @inline function F2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
     @assert abs(a - b) > Tiny "$a - $c > $Tiny"
-    return (G2d(a, c, expa, expc) - G2d(b, c, expb, expc)) / (b - a)
+    return (G(a, c, expa, expc) - G(b, c, expb, expc)) / (b - a)
 end
 
 """
@@ -305,7 +338,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 1000, 1e-8
+    lambda, rtol = 1000, 1e-9
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose = 1)
@@ -317,7 +350,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     open("basis.dat", "w") do io
         for (i, grid) in enumerate(grids)
             if grid.sector == 1
-                println(io, grid.omega[1], "   ", grid.omega[2])
+                if D == 1
+                    println(io, grid.omega[1])
+                else
+                    println(io, grid.omega[1], "   ", grid.omega[2])
+                end
             end
         end
     end
@@ -329,27 +366,51 @@ if abspath(PROGRAM_FILE) == @__FILE__
     end
     open("residual.dat", "w") do io
         # println(mesh.symmetry)
-        residual = zeros(Double, Nfine, Nfine)
-        for i in 1:length(mesh.candidates)
-            if mesh.candidates[i].sector == 1
-                x, y = mesh.candidates[i].coord
-                residual[x, y] = mesh.residual[i]
-                # println(x, ", ", y, " -> ", length(mirror(mesh, i)))
+        if D == 1
+            residual = zeros(Double, Nfine)
+            for i in 1:length(mesh.candidates)
+                if mesh.candidates[i].sector == 1
+                    x = mesh.candidates[i].coord[1]
+                    residual[x] = mesh.residual[i]
 
-                for grid in FQR.mirror(mesh, i)
-                    if grid.sector == 1
-                        xp, yp = grid.coord
-                        residual[xp, yp] = residual[x, y]
-                        # println(xp, ", ", yp)
+                    for grid in FQR.mirror(mesh, i)
+                        if grid.sector == 1
+                            xp = grid.coord[1]
+                            residual[xp] = residual[x]
+                            # println(xp, ", ", yp)
+                        end
                     end
                 end
             end
-        end
 
-        for i in 1:Nfine
-            for j in 1:Nfine
-                println(io, residual[i, j])
+            for i in 1:Nfine
+                println(io, residual[i])
             end
+        elseif D == 2
+            residual = zeros(Double, Nfine, Nfine)
+            for i in 1:length(mesh.candidates)
+                if mesh.candidates[i].sector == 1
+                    x, y = mesh.candidates[i].coord
+                    residual[x, y] = mesh.residual[i]
+                    # println(x, ", ", y, " -> ", length(mirror(mesh, i)))
+
+                    for grid in FQR.mirror(mesh, i)
+                        if grid.sector == 1
+                            xp, yp = grid.coord
+                            residual[xp, yp] = residual[x, y]
+                            # println(xp, ", ", yp)
+                        end
+                    end
+                end
+            end
+
+            for i in 1:Nfine
+                for j in 1:Nfine
+                    println(io, residual[i, j])
+                end
+            end
+        else
+            error("not implemented!")
         end
     end
 end
