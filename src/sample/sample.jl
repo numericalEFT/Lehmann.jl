@@ -40,6 +40,14 @@ function SemiCircle(Euv, β, isFermi::Bool, Grid, type::Symbol, symmetry::Symbol
     end
     pbp[1:npo] = -pbp[2npo+1:-1:npo+2]
 
+    # if IsMatFreq 
+    #     if isFermi
+    #         kernel = Spectral.kernelFermiΩ
+    #     else
+    #     end
+    # else
+    # end
+
     g1 = _Green(Val(IsMatFreq), Euv, β, isFermi, Grid, symmetry, degree, pbp, npo, regularized)
     # g1 = _Green(IsMatFreq, Euv, β, isFermi, Grid, symmetry, degree, pbp, npo, regularized)
 
@@ -53,6 +61,22 @@ end
 function SemiCircle(dlr, type::Symbol, Grid = dlrGrid(dlr, type); degree = 24, regularized::Bool = true)
     return SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, Grid, type, dlr.symmetry; rtol = dlr.rtol, degree = degree, regularized = regularized)
 end
+
+# @inline function kernelΩ(isFermi, symmetry, regularized::Bool = false) where {T<:AbstractFloat,isFermi,symmetry}
+#     if symmetry == :none
+#         if regularized
+#             return isFermi ? kernelFermiΩ : kernelBoseΩ_regular
+#         else
+#             return isFermi ? kernelFermiΩ : kernelBoseΩ
+#         end
+#     elseif symmetry == :ph
+#         return isFermi ? kernelFermiΩ_PH : kernelBoseΩ_PH
+#     elseif symmetry == :pha
+#         return isFermi ? kernelFermiΩ_PHA : kernelBoseΩ_PHA
+#     else
+#         error("Symmetry $symmetry  is not implemented!")
+#     end
+# end
 
 function dlrGrid(dlr, type::Symbol)
     if type == :τ
@@ -77,6 +101,8 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
     xl, wl = gausslegendre(n)
     xj, wj = gaussjacobi(n, 1 / 2, 0.0)
     # println(IsMatFreq)
+    type = Val(isFermi)
+    sym = Val(symmetry)
 
     G = IsMatFreq ? zeros(ComplexF64, length(Grid)) : zeros(Float64, length(Grid))
     # G = getG(isMatFreq, Grid)
@@ -90,8 +116,8 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
                     continue
                 end
                 ker = IsMatFreq ?
-                      Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
-                      Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+                      Spectral.kernelΩ(type, sym, τ, Euv * x, β, regularized) :
+                      Spectral.kernelT(type, sym, τ, Euv * x, β, regularized)
                 G[τi] += (b - a) / 2 * wl[jj] * ker * sqrt(1 - x^2)
             end
         end
@@ -100,8 +126,8 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
         for jj = 1:n
             x = (a + b) / 2 + (b - a) / 2 * xj[jj]
             ker = IsMatFreq ?
-                  Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
-                  Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+                  Spectral.kernelΩ(type, sym, τ, Euv * x, β, regularized) :
+                  Spectral.kernelT(type, sym, τ, Euv * x, β, regularized)
             G[τi] += ((b - a) / 2)^1.5 * wj[jj] * ker * sqrt(1 + x)
         end
 
@@ -111,8 +137,8 @@ function _Green(::Val{IsMatFreq}, Euv, β, isFermi, Grid, symmetry, n, pbp, npo,
             for jj = 1:n
                 x = (a + b) / 2 + (b - a) / 2 * (-xj[n-jj+1])
                 ker = IsMatFreq ?
-                      Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized) :
-                      Spectral.kernelT(Val(isFermi), Val(symmetry), τ, Euv * x, β, regularized)
+                      Spectral.kernelΩ(type, sym, τ, Euv * x, β, regularized) :
+                      Spectral.kernelT(type, sym, τ, Euv * x, β, regularized)
                 G[τi] += ((b - a) / 2)^1.5 * wj[n-jj+1] * ker * sqrt(1 - x)
             end
         end

@@ -111,7 +111,7 @@ end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [SemiCircle, MultiPole]
     Λ = [1e3, 1e5, 1e7]
-    rtol = [1e-8, 1e-10, 1e-12]
+    rtol = [1e-8, 1e-10]
     for case in cases
         for l in Λ
             for r in rtol

@@ -27,6 +27,7 @@
     testKernelT(false, :none, 1.0, 10.0, 1.0, 1.0e-6) # small ϵ for bosonic case is particularly dangerous because the kernal diverges ~1/ϵ
 
     function testAccuracy(isFermi, symmetry, τGrid, ωGrid, β)
+        setprecision(128)
         maxErr = BigFloat(0.0)
         τ0, ω0, macheps = 0.0, 0.0, 0.0
         for (τi, τ) in enumerate(τGrid)
@@ -43,6 +44,7 @@
         return maxErr, τ0, ω0, macheps
     end
 
+    println("testing kernel accuracy")
     β, Euv = 10000.0, 100.0
     τGrid = [t for t in LinRange(-β + 1e-10, β, 100)]
     ωGrid = [w for w in LinRange(-Euv, Euv, 100)]
@@ -63,4 +65,5 @@
     ωGrid = [w for w in LinRange(-Euv, Euv, 100)]
     maxErr, τ0, ω0, macheps = testAccuracy(true, :none, τGrid, ωGrid, β)
     maxErr, τ0, ω0, macheps = testAccuracy(false, :none, τGrid, ωGrid, β)
+    println("kernel accuracy tested")
 end
