@@ -21,18 +21,20 @@ struct FreqFineMesh{D} <: FQR.FineMesh
     color::Int                            # D+1 sectors
     symmetry::Int                         # symmetrize colors and (omega1, omega2) <-> (omega2, omega1)
     candidates::Vector{FreqGrid{D}}       # vector of grid points
+    weight::Vector{Double}
     selected::Vector{Bool}
     residual::Vector{Double}
 
     ## for frequency mesh only ###
     fineGrid::Vector{Float}         # fine grid for each dimension
+    # weight::Vector{Double}
     cache1::Vector{DotF}            # cache for exp(-x)
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
     function FreqFineMesh{D}(Λ, rtol; sym = 0) where {D}
         # initialize the residual on fineGrid with <g, g>
-        _finegrid = Float.(fineGrid(Λ, rtol))
+        _finegrid, _weight = fineGrid(Λ, rtol)
         separationTest(D, _finegrid)
         Nfine = length(_finegrid)
 
@@ -47,7 +49,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
 
         color = D + 1
         # color = 1
-        mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
+        mesh = new{D}(color, sym, [], [], [], [], _finegrid, _cache1, _cache2)
 
         if D == 1
             for (xi, x) in enumerate(_finegrid)
@@ -58,6 +60,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
                         push!(mesh.candidates, g)
                         push!(mesh.residual, FQR.dot(mesh, g, g))
                         push!(mesh.selected, false)
+                        push!(mesh.weight, _weight[xi])
                     end
                 end
             end
@@ -71,6 +74,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
                             push!(mesh.candidates, g)
                             push!(mesh.residual, FQR.dot(mesh, g, g))
                             push!(mesh.selected, false)
+                            push!(mesh.weight, _weight[xi]*_weight[yi])
                         end
                     end
                 end
@@ -106,16 +110,23 @@ function fineGrid(Λ, rtol)
     ############# DLR based fine grid ##########################################
     dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 2
+    degree = 4
     grid = Vector{Double}(undef, 0)
     panel = Double.(dlr.ω)
     for i in 1:length(panel)-1
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
+    # println(grid)
+    weight = similar(grid)
+    weight[1] = (grid[2]-grid[1])/2.0
+    weight[end] = (grid[end]-grid[end-1])/2.0
+    for i in 2:length(grid)-1
+        weight[i] = grid[i+1]-grid[i-1]
+    end
 
     println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
-    return grid
+    return grid, weight
 end
 
 """
@@ -338,12 +349,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose = 1)
 
-    lambda, rtol = 1000, 1e-9
+    lambda, rtol = 400, 1e-8
     mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
-    @time FQR.qr!(basis, verbose = 1)
+    # @time FQR.qr!(basis, verbose = 1)
 
-    FQR.test(basis)
+    # FQR.test(basis)
 
     mesh = basis.mesh
     grids = basis.grid

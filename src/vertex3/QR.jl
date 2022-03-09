@@ -41,6 +41,8 @@ mutable struct Basis{D,Grid,Mesh}
     N::Int # number of basis
     grid::Vector{Grid} # grid for the basis
     error::Vector{Float}  # the relative error achieved by adding the current grid point 
+    normF::Float
+    normF0::Float
 
     ###############  linear coefficients for orthognalization #######
     Q::Matrix{Double} # , Q = R^{-1}, Q*R'= I
@@ -52,7 +54,9 @@ mutable struct Basis{D,Grid,Mesh}
     function Basis{d,Grid}(Λ, rtol, mesh::Mesh) where {d,Grid,Mesh}
         _Q = Matrix{Float}(undef, (0, 0))
         _R = similar(_Q)
-        return new{d,Grid,Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
+        residual = sum(mesh.weight[i]*mesh.residual[i] for i in 1:length(mesh.residual))
+        println("residual: ", sqrt(residual))
+        return new{d,Grid,Mesh}(Λ, rtol, 0, [], [], sqrt(residual), sqrt(residual), _Q, _R, mesh)
     end
 end
 
@@ -70,7 +74,7 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
     # the new rtol achieved by adding the new grid point
     push!(basis.error, sqrt(maximum(basis.mesh.residual)))
 
-    (verbose > 0) && @printf("%3i %s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
+    (verbose > 0) && @printf("%3i %s -> error=%16.8g, Rmin=%16.8g, Fnorm=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end], basis.normF/basis.normF0)
 end
 
 function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
@@ -98,6 +102,8 @@ function updateResidual!(basis::Basis{D}) where {D}
 
     # q = Float.(basis.Q[end, :])
     q = Double.(basis.Q[:, end])
+    
+    total = Double(0)
 
     Threads.@threads for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
@@ -114,8 +120,11 @@ function updateResidual!(basis::Basis{D}) where {D}
             else
                 mesh.residual[idx] = _residual
             end
+            total +=mesh.weight[idx]*mesh.residual[idx]
         end
     end
+
+    basis.normF = sqrt(total)
 end
 
 """
@@ -197,6 +206,7 @@ function qr!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where 
     ####### add grids that has the maximum residual
     maxResidual, idx = findmax(basis.mesh.residual)
     while sqrt(maxResidual) > basis.rtol && basis.N < N
+    # while basis.normF/basis.normF0 > basis.rtol && basis.N < N
         addBasisBlock!(basis, idx, verbose)
         maxResidual, idx = findmax(basis.mesh.residual)
     end
