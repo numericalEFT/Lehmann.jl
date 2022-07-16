@@ -12,7 +12,7 @@ Imaginary-time Green's functions encode the thermodynamic properties of quantum 
 
 The physical Green's functions always have the analytic structure specified by the Lehmann representation,
 ```math
-G(\tau)=-\int_{-\infty}^{\infty} K(\tau, \omega) \rho(\omega) d \omega
+G(\tau)=\int_{-\infty}^{\infty} K(\tau, \omega) \rho(\omega) d \omega
 ```
 where $\tau$ is the imaginary time, $\omega$ is the real frequency. While the spectral density $\rho(\omega)$ depends on the details of the quantum many-body system, the convolution kernel $K(\tau, \omega)$ is universal and is roughly an exponential function $\exp(-\omega \tau)$. 
 
