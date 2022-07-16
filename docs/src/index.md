@@ -8,7 +8,7 @@ Documentation for [Lehmann.jl](https://github.com/numericaleft/Lehmann.jl).
 
 This package provides subroutines to represent and manuipulate Green's functions in the imaginary-time or in the Matsubara-frequency domain. 
 
-Imaginary-time Green's functions encode the thermodynamic properites of quantum many-body systems. At low temperature, they are typically very singular and hard to deal with in numerical calculations. 
+Imaginary-time Green's functions encode the thermodynamic properties of quantum many-body systems. At low temperature, they are typically very singular and hard to deal with in numerical calculations. 
 
 The physical Green's functions always have the analytic structure specified by the Lehmann representation,
 ```math
