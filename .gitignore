@@ -7,3 +7,4 @@ Manifest.toml
 *.DS_Store
 *.pb.gz
 *.pdf
+.history
