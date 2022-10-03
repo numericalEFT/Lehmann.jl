@@ -26,7 +26,7 @@ struct DLRGrid
 - `ωn` or `omegaN` : (2n+1)π/β
 - `τ` or `tau` : selected representative imaginary-time grid
 """
-mutable struct DLRGrid{T, S}
+mutable struct DLRGrid{T<:Real, S}
     isFermi::Bool
     symmetry::Symbol
     Euv::T

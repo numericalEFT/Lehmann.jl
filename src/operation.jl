@@ -383,6 +383,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T, S}, dlrcoeff, nGrid = dlrGrid.n; axis =
     # else
     #     kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
     # end
+
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
         if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) 
             if length(dlrGrid.kernel_n) == 1
