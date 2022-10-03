@@ -38,11 +38,11 @@ end
 
 Compute kernel with given τ and ω grids.
 """
-function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
-    kernel = zeros(type, (length(τGrid), length(ωGrid)))
+function kernelT(::Type{T}, isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    kernel = zeros(T, (length(τGrid), length(ωGrid)))
     for (τi, τ) in enumerate(τGrid)
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[τi, ωi] = kernelT(isFermi, symmetry, τ, ω, β, regularized)
+            kernel[τi, ωi] = kernelT(isFermi, symmetry, T(τ), T(ω), T(β), regularized)
         end
     end
     return kernel
@@ -266,12 +266,17 @@ end
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
-function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
+function kernelΩ(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false) where {T<:AbstractFloat, isFermi, symmetry}
     # println(type)
-    kernel = zeros(type, (length(nGrid), length(ωGrid)))
+    if (symmetry == :none) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
+        kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
+    else
+        kernel = zeros(T, (length(nGrid), length(ωGrid)))
+    end
+    # println(symmetry, ", ", isFermi)
     for (ni, n) in enumerate(nGrid)
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[ni, ωi] = kernelΩ(isFermi, symmetry, n, ω, β, regularized)
+            kernel[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n, T(ω), T(β), regularized)
         end
     end
     return kernel

@@ -53,6 +53,7 @@ end
 
         ########################## imaginary-time to dlr #######################################
         coeff = tau2dlr(dlr, Gdlr)
+        @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
         Gfitted = dlr2tau(dlr, coeff, τSample)
         compare("dlr τ → dlr → generic τ $case", Gsample, Gfitted, eps, 100, para)
         # for (ti, t) in enumerate(τSample)
