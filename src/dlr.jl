@@ -26,23 +26,24 @@ struct DLRGrid
 - `ωn` or `omegaN` : (2n+1)π/β
 - `τ` or `tau` : selected representative imaginary-time grid
 """
-mutable struct DLRGrid
+mutable struct DLRGrid{T, S}
     isFermi::Bool
     symmetry::Symbol
-    Euv::Float64
-    β::Float64
-    Λ::Float64
-    rtol::Float64
+    Euv::T
+    β::T
+    Λ::T
+    rtol::T
 
     # dlr grids
     # size::Int # rank of the dlr representation
-    ω::Vector{Float64}
+    ω::Vector{T}
     n::Vector{Int} # integers, (2n+1)π/β gives the Matsubara frequency
-    ωn::Vector{Float64} # (2n+1)π/β
-    τ::Vector{Float64}
+    ωn::Vector{T} # (2n+1)π/β
+    τ::Vector{T}
 
-    kernel_τ::Any
-    kernel_n::Any
+    kernel_τ::Matrix{T}
+    kernel_n::Matrix{T}
+    kernel_nc::Matrix{Complex{T}}
 
     """
     function DLRGrid(Euv, β, rtol, isFermi::Bool; symmetry::Symbol = :none, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
@@ -62,7 +63,11 @@ mutable struct DLRGrid
     - `algorithm`   : if rebuild = true, then set :functional to use the functional algorithm to generate the DLR basis, or set :discrete to use the matrix algorithm.
     - `verbose`     : false not to print DLRGrid to terminal, or true to print
     """
-    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
+    function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol = :none; 
+        rebuild = false, folder = nothing, algorithm = :functional, verbose = false, dtype=Float64)
+
+        T = dtype
+
         Λ = Euv * β # dlr only depends on this dimensionless scale
         # println("Get $Λ")
         @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
@@ -84,7 +89,7 @@ mutable struct DLRGrid
         if abs(rtolpower) < 4
             rtolpower = -4
         end
-        rtol = 10.0^float(rtolpower)
+        rtol = T(10.0)^T(rtolpower)
 
         function finddlr(folder, filename)
             searchdir(path, key) = filter(x -> occursin(key, x), readdir(path))
@@ -126,10 +131,10 @@ mutable struct DLRGrid
             dlrfile = finddlr(folderList, file)
 
             if isnothing(dlrfile) == false
-                dlr = new(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [], nothing, nothing)
+                dlr = new{T, symmetry}(isFermi, symmetry, Euv, β, Λ, rtol, [], [], [], [], zeros(T, 1,1), zeros(T, 1, 1), zeros(Complex{T}, 1, 1))
                 _load!(dlr, dlrfile, verbose)
-                dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
-                dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
+                # dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
+                # dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
                 return dlr
             else
                 @warn("No DLR is found in the folder $folder, try to rebuild instead.")
@@ -138,25 +143,27 @@ mutable struct DLRGrid
         end
 
         # try to rebuild the dlrGrid
-        dlr = new(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [], nothing, nothing)
+        dlr = new{T, symmetry}(isFermi, symmetry, Euv, β, Euv * β, rtol, [], [], [], [], zeros(T, 1,1), zeros(T, 1, 1), zeros(Complex{T}, 1, 1))
         file2save = filename(Euv * β, rtolpower)
         _build!(dlr, folder, file2save, algorithm, verbose)
 
-        dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
-        dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
+        # dlr.kernel_τ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), dlr.τ, dlr.ω, dlr.β, true)
+        # dlr.kernel_n = Spectral.kernelΩ(Val(dlr.isFermi), Val(dlr.symmetry), dlr.n, dlr.ω, dlr.β, true)
         return dlr
     end
 
-    function DLRGrid(; isFermi::Bool, β = -1.0, beta = -1.0, Euv = 1.0, symmetry::Symbol = :none, rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false)
-        if β <= 0.0 && beta > 0.0
+    function DLRGrid(; isFermi::Bool, β = -1.0, beta = -1.0, Euv = 1.0, symmetry::Symbol = :none, 
+        rtol = 1e-14, rebuild = false, folder = nothing, algorithm = :functional, verbose = false, dtype=Float64)
+        T = dtype
+        if β <= T(0) && beta > T(0)
             β = beta
-        elseif β > 0.0 && beta <= 0.0
+        elseif β > T(0) && beta <= T(0)
             beta = β
-        elseif β < 0.0 && beta < 0.0
+        elseif β < T(0) && beta < T(0)
             error("Either β or beta needs to be initialized with a positive value!")
         end
         @assert β ≈ beta
-        return DLRGrid(Euv, β, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose)
+        return DLRGrid(Euv, β, rtol, isFermi, symmetry; rebuild = rebuild, folder = folder, algorithm = algorithm, verbose = verbose, dtype=dtype)
     end
 end
 

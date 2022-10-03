@@ -189,18 +189,17 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+function tau2dlr(dlrGrid::DLRGrid{T, S}, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true) where {T, S}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
     typ = promote_type(eltype(dlrGrid.kernel_τ), eltype(green))
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol = 1e-14)
-        kernel = dlrGrid.kernel_τ
-    else
-        kernel = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, dlrGrid.β, true; type = typ)
+    if length(τGrid) != dlrGrid.size || (isapprox(τGrid, dlrGrid.τ; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_τ) == 1)
+        dlrGrid.kernel_τ = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, dlrGrid.β, true; type = typ)
     end
+    kernel = dlrGrid.kernel_τ
 
     if typ != eltype(kernel)
         kernel = convert.(typ, kernel)
@@ -254,18 +253,17 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verb
 - `axis`     : imaginary-time axis in the data `dlrcoeff`
 - `verbose`  : true to print warning information
 """
-function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
+function dlr2tau(dlrGrid::DLRGrid{T, S}, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true) where {T, S}
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == size(dlrGrid)
 
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol = 1e-14)
-        kernel = dlrGrid.kernel_τ
-    else
-        kernel = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, dlrGrid.β, true)
+    if length(τGrid) != dlrGrid.size || (isapprox(τGrid, dlrGrid.τ; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_τ) == 1)
+        dlrGrid.kernel_τ = Spectral.kernelT(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), τGrid, ωGrid, dlrGrid.β, true; type = typ)
     end
+    kernel = dlrGrid.kernel_τ
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
@@ -288,7 +286,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+function matfreq2dlr(dlrGrid::DLRGrid{T, S}, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true) where {T, S}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(nGrid)
     @assert eltype(nGrid) <: Integer
@@ -296,10 +294,16 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 
     typ = promote_type(eltype(dlrGrid.kernel_n), eltype(green))
 
-    if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 1e-14)
+    if S == :ph || S == :pha
+        if length(nGrid) != dlrGrid.size || (isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_n) == 1)
+            dlrGrid.kernel_n = Spectral.kernelΩ(Val(dlrGrid.isFermi), S, nGrid, ωGrid, dlrGrid.β, true; type = typ)
+        end
         kernel = dlrGrid.kernel_n
     else
-        kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true; type = typ)
+        if length(nGrid) != dlrGrid.size || (isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_nc) == 1)
+            dlrGrid.kernel_nc = Spectral.kernelΩ(Val(dlrGrid.isFermi), S, nGrid, ωGrid, dlrGrid.β, true; type = typ)
+        end
+        kernel = dlrGrid.kernel_nc
     end
 
     if typ != eltype(green)
@@ -358,10 +362,21 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, ve
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 1e-14)
+    # if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 1e-14)
+    #     kernel = dlrGrid.kernel_n
+    # else
+    #     kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
+    # end
+    if S == :ph || S == :pha
+        if length(nGrid) != dlrGrid.size || (isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_n) == 1)
+            dlrGrid.kernel_n = Spectral.kernelΩ(Val(dlrGrid.isFermi), S, nGrid, ωGrid, dlrGrid.β, true; type = typ)
+        end
         kernel = dlrGrid.kernel_n
     else
-        kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
+        if length(nGrid) != dlrGrid.size || (isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) == false) || (length(dlrGrid.kernel_nc) == 1)
+            dlrGrid.kernel_nc = Spectral.kernelΩ(Val(dlrGrid.isFermi), S, nGrid, ωGrid, dlrGrid.β, true; type = typ)
+        end
+        kernel = dlrGrid.kernel_nc
     end
 
     coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
