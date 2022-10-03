@@ -55,6 +55,7 @@ end
         coeff = tau2dlr(dlr, Gdlr)
         @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
         Gfitted = dlr2tau(dlr, coeff, τSample)
+        @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
         compare("dlr τ → dlr → generic τ $case", Gsample, Gfitted, eps, 100, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
