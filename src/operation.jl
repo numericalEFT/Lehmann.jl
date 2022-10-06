@@ -1,4 +1,4 @@
-function _tensor2matrix(tensor::AbstractArray{T, N}, axis) where {T, N}
+function _tensor2matrix(tensor::AbstractArray{T,N}, axis) where {T,N}
     # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
     dim = N
     n1 = size(tensor)[axis]
@@ -164,7 +164,7 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
             Gτ[i, :] .+= kernel_m0[i] * sumrule
         end
         #add back the coeff that are fixed by the sum rule
-        coeffmore = sumrule' .- sum(coeff, dims = 1)
+        coeffmore = sumrule' .- sum(coeff, dims=1)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
         cnew[1:M-1, :] = coeff[1:M-1, :]
         cnew[M+1:end, :] = coeff[M:end, :]
@@ -189,14 +189,12 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2dlr(dlrGrid::DLRGrid{T, S}, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true) where {T, S}
+function tau2dlr(dlrGrid::DLRGrid{T,S}, green, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    # typ = promote_type(eltype(dlrGrid.kernel_τ), eltype(green))
-
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol = 10*eps(T)) 
+    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -204,13 +202,6 @@ function tau2dlr(dlrGrid::DLRGrid{T, S}, green, τGrid = dlrGrid.τ; error = not
     else
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
-
-    # if typ != eltype(kernel)
-    #     kernel = convert.(typ, kernel)
-    # end
-    # if typ != eltype(green)
-    #     green = convert.(typ, green)
-    # end
 
     g, partialsize = _tensor2matrix(green, axis)
 
@@ -236,7 +227,7 @@ function tau2dlr(dlrGrid::DLRGrid{T, S}, green, τGrid = dlrGrid.τ; error = not
 
     if isnothing(sumrule) == false
         #check how exact is the sum rule
-        coeffsum = sum(coeff, dims = 1) .- sumrule
+        coeffsum = sum(coeff, dims=1) .- sumrule
         if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
@@ -257,14 +248,14 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verb
 - `axis`     : imaginary-time axis in the data `dlrcoeff`
 - `verbose`  : true to print warning information
 """
-function dlr2tau(dlrGrid::DLRGrid{T, S}, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true) where {T, S}
+function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff, τGrid=dlrGrid.τ; axis=1, verbose=true) where {T,S}
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
-    @assert size(dlrcoeff)[axis] == size(dlrGrid)
+    @assert size(dlrcoeff)[axis] == length(dlrGrid)
 
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol = 10*eps(T)) 
+    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -294,7 +285,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function matfreq2dlr(dlrGrid::DLRGrid{T, S}, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true) where {T, S}
+function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green, nGrid=dlrGrid.n; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(nGrid)
     @assert eltype(nGrid) <: Integer
@@ -303,7 +294,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T, S}, green, nGrid = dlrGrid.n; error = n
     # typ = promote_type(eltype(dlrGrid.kernel_n), eltype(green))
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) 
+        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -312,7 +303,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T, S}, green, nGrid = dlrGrid.n; error = n
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) 
+        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -352,7 +343,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T, S}, green, nGrid = dlrGrid.n; error = n
 
     if isnothing(sumrule) == false
         #check how exact is the sum rule
-        coeffsum = sum(coeff, dims = 1) .- sumrule
+        coeffsum = sum(coeff, dims=1) .- sumrule
         if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
@@ -372,9 +363,9 @@ function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, ve
 - `axis`     : Matsubara-frequency axis in the data `dlrcoeff`
 - `verbose`  : true to print warning information
 """
-function dlr2matfreq(dlrGrid::DLRGrid{T, S}, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true) where {T, S}
+function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid=dlrGrid.n; axis=1, verbose=true) where {T,S,TC,N}
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
-    @assert size(dlrcoeff)[axis] == size(dlrGrid)
+    @assert size(dlrcoeff)[axis] == length(dlrGrid)
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
@@ -385,7 +376,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T, S}, dlrcoeff, nGrid = dlrGrid.n; axis =
     # end
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) 
+        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -394,7 +385,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T, S}, dlrcoeff, nGrid = dlrGrid.n; axis =
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 10*eps(T)) 
+        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -426,9 +417,9 @@ function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
-    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
-    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis, verbose = verbose)
+function tau2matfreq(dlrGrid, green, nNewGrid=dlrGrid.n, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error=error, axis=axis, sumrule=sumrule, verbose=verbose)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis=axis, verbose=verbose)
 end
 
 """
@@ -446,9 +437,9 @@ function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
-    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis, verbose = verbose)
+function matfreq2tau(dlrGrid, green, τNewGrid=dlrGrid.τ, nGrid=dlrGrid.n; error=nothing, axis=1, sumrule=nothing, verbose=true)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error=error, axis=axis, sumrule=sumrule, verbose=verbose)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis=axis, verbose=verbose)
 end
 
 """
@@ -466,9 +457,9 @@ function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
-    coeff = tau2dlr(dlrGrid, green, τGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
-    return dlr2tau(dlrGrid, coeff, τNewGrid, axis = axis, verbose = verbose)
+function tau2tau(dlrGrid, green, τNewGrid, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true)
+    coeff = tau2dlr(dlrGrid, green, τGrid; error=error, axis=axis, sumrule=sumrule, verbose=verbose)
+    return dlr2tau(dlrGrid, coeff, τNewGrid, axis=axis, verbose=verbose)
 end
 
 """
@@ -486,9 +477,9 @@ function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = no
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
-    coeff = matfreq2dlr(dlrGrid, green, nGrid; error = error, axis = axis, sumrule = sumrule, verbose = verbose)
-    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis = axis, verbose = verbose)
+function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid=dlrGrid.n; error=nothing, axis=1, sumrule=nothing, verbose=true)
+    coeff = matfreq2dlr(dlrGrid, green, nGrid; error=error, axis=axis, sumrule=sumrule, verbose=verbose)
+    return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis=axis, verbose=verbose)
 end
 
 # function convolution(dlrGrid, green1, green2; axis = 1)
