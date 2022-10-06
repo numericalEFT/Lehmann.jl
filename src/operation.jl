@@ -189,7 +189,7 @@ function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2dlr(dlrGrid::DLRGrid{T,S}, green, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S}
+function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S,TC,N}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
@@ -248,7 +248,7 @@ function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verb
 - `axis`     : imaginary-time axis in the data `dlrcoeff`
 - `verbose`  : true to print warning information
 """
-function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff, τGrid=dlrGrid.τ; axis=1, verbose=true) where {T,S}
+function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dlrGrid.τ; axis=1, verbose=true) where {T,S,TC,N}
     @assert length(size(dlrcoeff)) >= axis "dimension of the dlr coefficients should be larger than axis!"
     @assert size(dlrcoeff)[axis] == length(dlrGrid)
 
@@ -285,7 +285,7 @@ function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green, nGrid=dlrGrid.n; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S}
+function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dlrGrid.n; error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S,TC,N}
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(nGrid)
     @assert eltype(nGrid) <: Integer
@@ -368,12 +368,6 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
     @assert size(dlrcoeff)[axis] == length(dlrGrid)
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
-
-    # if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol = 1e-14)
-    #     kernel = dlrGrid.kernel_n
-    # else
-    #     kernel = Spectral.kernelΩ(Val(dlrGrid.isFermi), Val(dlrGrid.symmetry), nGrid, ωGrid, dlrGrid.β, true)
-    # end
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
         if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
