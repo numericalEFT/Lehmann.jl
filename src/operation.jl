@@ -40,6 +40,34 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
+function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N}, axis::Int) where {T,TC,N}
+    #calculate \sum_j mat[i, j]*tensor[..., j, ...]  where j is the axis-th dimension of tensor
+    @assert 0 < axis <= N
+    _n, _m = size(mat)
+    _size = collect(size(tensor))
+    @assert _m == _size[axis]
+    if axis == 1
+        return mat * tensor
+    elseif axis == N
+        return tensor * transpose(mat)
+    else
+        _l = reduce(*, _size[1:axis-1])
+        _r = reduce(*, _size[axis+1:end])
+        tensor = reshape(tensor, (_l, _m, _r))
+        res = zeros(promote_type(T, TC), _l, _n, _r)
+        @inbounds for j = 1:_r
+            @inbounds for q = 1:_n
+                @inbounds for k = 1:_m
+                    @inbounds for i = 1:_l
+                        res[i, q, j] += tensor[i, k, j] * mat[q, k]
+                    end
+                end
+            end
+        end
+        return res
+    end
+end
+
 # function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
 #     # Gτ: (Nτ, N), kernel: (Nτ, Nω)
 #     # error: (Nτ, N), sumrule: (N, 1)
