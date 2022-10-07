@@ -40,31 +40,46 @@ function _matrix2tensor(mat, partialsize, axis)
     end
 end
 
+#replace one of the tuple elements. See https://discourse.julialang.org/t/computing-tuple-replacements/69581/10
+@generated function _set_tuple(t::NTuple{N,Int}, x, i) where {N}
+    Expr(:tuple, (:(ifelse($j == i, x, t[$j])) for j in 1:N)...)
+end
+
 function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N}, axis::Int) where {T,TC,N}
     #calculate \sum_j mat[i, j]*tensor[..., j, ...]  where j is the axis-th dimension of tensor
     @assert 0 < axis <= N
     _n, _m = size(mat)
     _size = collect(size(tensor))
-    @assert _m == _size[axis]
+    @assert (_m == _size[axis]) "matrix size $(size(mat)) and tensor size ($(_size)) do not match at axis = $axis"
+    _target_size = _set_tuple(size(tensor), _n, axis)
     if axis == 1
-        return mat * tensor
+        _r = reduce(*, _size[axis+1:end])
+        _tensor = reshape(tensor, (_m, _r))
+        res = mat * _tensor
+        # _target_size = (_n, _size[2:end]...)::NTuple{N,Int}
+        return reshape(res, _target_size)
     elseif axis == N
-        return tensor * transpose(mat)
+        # _target_size = (_size[1:end-1]..., _n)::NTuple{N,Int}
+        _l = reduce(*, _size[1:axis-1])
+        _tensor = reshape(tensor, (_l, _m))
+        res = _tensor * transpose(mat)
+        return reshape(res, _target_size)
     else
         _l = reduce(*, _size[1:axis-1])
         _r = reduce(*, _size[axis+1:end])
-        tensor = reshape(tensor, (_l, _m, _r))
+        _tensor = reshape(tensor, (_l, _m, _r))
         res = zeros(promote_type(T, TC), _l, _n, _r)
         @inbounds for j = 1:_r
             @inbounds for q = 1:_n
                 @inbounds for k = 1:_m
                     @inbounds for i = 1:_l
-                        res[i, q, j] += tensor[i, k, j] * mat[q, k]
+                        res[i, q, j] += _tensor[i, k, j] * mat[q, k]
                     end
                 end
             end
         end
-        return res
+        # _target_size = (_size[1:axis-1]..., _n, _size[axis+1:end]...)::NTuple{N,Int}
+        return reshape(res, _target_size)
     end
 end
 
@@ -292,11 +307,12 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
 
-    coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
+    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
-    G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
+    # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
 
-    return _matrix2tensor(G, partialsize, axis)
+    # return _matrix2tensor(G, partialsize, axis)
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """
@@ -417,11 +433,13 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
         end
     end
 
-    coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
+    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
-    G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
+    # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
 
-    return _matrix2tensor(G, partialsize, axis)
+    # return _matrix2tensor(G, partialsize, axis)
+
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """
