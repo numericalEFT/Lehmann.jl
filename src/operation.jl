@@ -1,49 +1,53 @@
-function _tensor2matrix(tensor::AbstractArray{T,N}, axis) where {T,N}
-    # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
-    dim = N
-    n1 = size(tensor)[axis]
-    partialsize = deleteat!(collect(size(tensor)), axis) # the size of the tensor except the axis-th dimension
-    n2 = reduce(*, partialsize)
+# function _tensor2matrix(tensor::AbstractArray{T,N}, axis) where {T,N}
+#     # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
+#     dim = N
+#     n1 = size(tensor)[axis]
+#     partialsize = deleteat!(collect(size(tensor)), axis) # the size of the tensor except the axis-th dimension
+#     n2 = reduce(*, partialsize)
 
-    if axis == 1 #no need to permutate the axis
-        return reshape(tensor, (n1, n2)), partialsize
-    elseif axis == 2 && dim == 2 #for matrix, simply transpose, no copy is created
-        return transpose(tensor), partialsize
-    else
-        permu = [i for i = 1:dim]
-        permu[1], permu[axis] = axis, 1
-        partialsize = collect(size(tensor)[permu][2:end])
-        ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created 
-        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
-        ntensor = reshape(ntensor, (n1, n2)) # no copy is created
-        return ntensor, partialsize
-    end
-end
+#     if axis == 1 #no need to permutate the axis
+#         return reshape(tensor, (n1, n2)), partialsize
+#     elseif axis == 2 && dim == 2 #for matrix, simply transpose, no copy is created
+#         return transpose(tensor), partialsize
+#     else
+#         permu = [i for i = 1:dim]
+#         permu[1], permu[axis] = axis, 1
+#         partialsize = collect(size(tensor)[permu][2:end])
+#         ntensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created 
+#         # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
+#         ntensor = reshape(ntensor, (n1, n2)) # no copy is created
+#         return ntensor, partialsize
+#     end
+# end
 
-function _matrix2tensor(mat, partialsize, axis)
-    # internal function to reshape matrix to a tensor, then swap the first index with the axis-th dimension
-    @assert size(mat)[2] == reduce(*, partialsize) # total number of elements of mat and the tensor must match
-    tsize = vcat(size(mat)[1], partialsize)
-    tensor = reshape(mat, Tuple(tsize))
-    dim = length(partialsize) + 1
+# function _matrix2tensor(mat, partialsize, axis)
+#     # internal function to reshape matrix to a tensor, then swap the first index with the axis-th dimension
+#     @assert size(mat)[2] == reduce(*, partialsize) # total number of elements of mat and the tensor must match
+#     tsize = vcat(size(mat)[1], partialsize)
+#     tensor = reshape(mat, Tuple(tsize))
+#     dim = length(partialsize) + 1
 
-    if axis == 1
-        return tensor
-    elseif axis == 2 && dim == 2
-        return transpose(tensor) #transpose do not create copy
-    else
-        permu = [i for i = 1:dim]
-        permu[1], permu[axis] = axis, 1
-        return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created
-        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
-        # return ntensor
-    end
-end
+#     if axis == 1
+#         return tensor
+#     elseif axis == 2 && dim == 2
+#         return transpose(tensor) #transpose do not create copy
+#     else
+#         permu = [i for i = 1:dim]
+#         permu[1], permu[axis] = axis, 1
+#         return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created
+#         # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
+#         # return ntensor
+#     end
+# end
 
 #replace one of the tuple elements. See https://discourse.julialang.org/t/computing-tuple-replacements/69581/10
-@generated function _set_tuple(t::NTuple{N,Int}, x, i) where {N}
+@generated function _reset_tuple(t::NTuple{N,Int}, x, i) where {N}
     Expr(:tuple, (:(ifelse($j == i, x, t[$j])) for j in 1:N)...)
 end
+
+# @generated function _remove_tuple(t::NTuple{N,Int}, x, i) where {N}
+#     Expr(:tuple, (:(ifelse($j == i, x, t[$j])) for j in 1:N)...)
+# end
 
 function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N}, axis::Int) where {T,TC,N}
     #calculate \sum_j mat[i, j]*tensor[..., j, ...]  where j is the axis-th dimension of tensor
@@ -51,7 +55,7 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
     _n, _m = size(mat)
     _size = collect(size(tensor))
     @assert (_m == _size[axis]) "matrix size $(size(mat)) and tensor size ($(_size)) do not match at axis = $axis"
-    _target_size = _set_tuple(size(tensor), _n, axis)
+    _target_size = _reset_tuple(size(tensor), _n, axis)
     if axis == 1
         _r = reduce(*, _size[axis+1:end])
         _tensor = reshape(tensor, (_m, _r))
@@ -78,8 +82,54 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
                 end
             end
         end
-        # _target_size = (_size[1:axis-1]..., _n, _size[axis+1:end]...)::NTuple{N,Int}
         return reshape(res, _target_size)
+    end
+end
+
+function _tensor2matrix(tensor::AbstractArray{T,N}, ::Val{axis}) where {T,N,axis}
+    # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
+    _size = size(tensor)
+    n1 = _size[axis]
+    partialsize = (_size[1:axis-1]..., _size[axis+1:end]...) # the size of the tensor except the axis-th dimension
+    n2 = reduce(*, partialsize)
+
+    if axis == 1 #no need to permutate the axis
+        return reshape(tensor, (n1, n2)), partialsize
+    elseif axis == N
+        _tensor = reshape(tensor, (n2, n1))
+        return transpose(_tensor), partialsize  #transpose do not create copy
+    else
+        permu = (axis, 2:axis-1..., 1, axis+1:N...)
+        _tensor = permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created 
+        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
+        ntensor = reshape(_tensor, (n1, n2)) # no copy is created
+        return ntensor, partialsize
+    end
+end
+
+function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::NTuple{dim,Int}, ::Val{axis}) where {T,dim,axis}
+    # internal function to reshape matrix to a tensor, then swap the first index with the axis-th dimension
+    n1, n2 = size(mat)
+    @assert n2 == reduce(*, partialsize) # total number of elements of mat and the tensor must match
+    # tsize = vcat(n1, partialsize)
+    N = dim + 1
+
+    if axis == 1
+        tsize = (n1, partialsize...)
+        tensor = reshape(mat, tsize)
+        return tensor
+    elseif axis == N # mat must be transposed to (n2, n1)
+        _tensor = transpose(mat) #transpose do not create copy
+        return reshape(_tensor, (partialsize..., n1))
+    else
+        # permu = [i for i = 1:dim]
+        # permu[1], permu[axis] = axis, 1
+        permu = (axis, 2:axis-1..., 1, axis+1:N...)
+        tsize = (n1, partialsize...)
+        tensor = reshape(mat, tsize)
+        return permutedims(tensor, permu) # permutate the axis-th and the 1st dim, a copy of the tensor is created
+        # ntensor = nocopy ? PermutedDimsArray(tensor, permu) : permutedims(tensor, permu) # permutate the axis-th and the 1st dim
+        # return ntensor
     end
 end
 
@@ -164,7 +214,7 @@ end
 function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
     @assert size(Gτ)[1] == Nτ
-    if isnothing(sumrule) == false
+    if isnothing(sumrule) == false #require sumrule
         @assert dlrGrid.symmetry == :none && dlrGrid.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
         M = Int(floor(dlrGrid.size / 2))
@@ -192,7 +242,8 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
         w = 1.0 ./ (error .+ 1e-16)
 
         for i = 1:Nτ
-            w[i, :] /= sum(w[i, :]) / length(w[i, :])
+            wview = view(w, i, :)
+            w[i, :] /= sum(wview) / length(wview)
         end
         B = w .* kernel
         C = w .* Gτ
@@ -209,9 +260,9 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
         #add back the coeff that are fixed by the sum rule
         coeffmore = sumrule' .- sum(coeff, dims=1)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-        cnew[1:M-1, :] = coeff[1:M-1, :]
-        cnew[M+1:end, :] = coeff[M:end, :]
-        cnew[M, :] = coeffmore
+        cnew[1:M-1, :] .= coeff[1:M-1, :]
+        cnew[M+1:end, :] .= coeff[M:end, :]
+        cnew[M, :] .= coeffmore
         return cnew
     else
         return coeff
@@ -246,7 +297,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
 
-    g, partialsize = _tensor2matrix(green, axis)
+    g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
@@ -259,7 +310,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
 
     if isnothing(error) == false
         @assert size(error) == size(green)
-        error, psize = _tensor2matrix(error, axis)
+        error, partialsize = _tensor2matrix(error, Val(axis))
     end
 
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
@@ -276,7 +327,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
         end
     end
 
-    return _matrix2tensor(coeff, partialsize, axis)
+    return _matrix2tensor(coeff, partialsize, Val(axis))
 end
 
 """
@@ -365,7 +416,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     #     dlrGrid.kernel_n = convert.(typ, dlrGrid.kernel_n)
     # end
 
-    g, partialsize = _tensor2matrix(green, axis)
+    g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
@@ -378,7 +429,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
 
     if isnothing(error) == false
         @assert size(error) == size(green)
-        error, psize = _tensor2matrix(error, axis)
+        error, psize = _tensor2matrix(error, Val(axis))
     end
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
@@ -392,7 +443,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
     end
-    return _matrix2tensor(coeff, partialsize, axis)
+    return _matrix2tensor(coeff, partialsize, Val(axis))
 end
 
 """

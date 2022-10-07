@@ -33,6 +33,27 @@ function compare_atol(case, a, b, atol, para="")
 end
 
 @testset "Operation Utility" begin
+    #### _tensor2matrix and _matrix2tensor ############
+    a = rand(3, 4, 5)
+    _a, psize = Lehmann._tensor2matrix(a, Val(2))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(2))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(2))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(2))
+
+    _a, psize = Lehmann._tensor2matrix(a, Val(1))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(1))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(1))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(1))
+
+    _a, psize = Lehmann._tensor2matrix(a, Val(3))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(3))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(3))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(3))
+
+    ########## test _matrix_tensor_dot  #################
     # middle
     a = rand(5, 4)
     b = rand(3, 4, 6)
@@ -41,9 +62,9 @@ end
 
     @test size(c) == (3, 5, 6)
 
-    _b, psize = Lehmann._tensor2matrix(b, 2)
+    _b, psize = Lehmann._tensor2matrix(b, Val(2))
     _c = a * _b
-    _c = Lehmann._matrix2tensor(_c, psize, 2)
+    _c = Lehmann._matrix2tensor(_c, psize, Val(2))
 
     @test c ≈ _c
 
@@ -55,9 +76,9 @@ end
 
     @test size(c) == (5, 3, 6)
 
-    _b, psize = Lehmann._tensor2matrix(b, 1)
+    _b, psize = Lehmann._tensor2matrix(b, Val(1))
     _c = a * _b
-    _c = Lehmann._matrix2tensor(_c, psize, 1)
+    _c = Lehmann._matrix2tensor(_c, psize, Val(1))
 
     @test c ≈ _c
 
@@ -69,9 +90,9 @@ end
 
     @test size(c) == (3, 6, 5)
 
-    _b, psize = Lehmann._tensor2matrix(b, 3)
+    _b, psize = Lehmann._tensor2matrix(b, Val(3))
     _c = a * _b
-    _c = Lehmann._matrix2tensor(_c, psize, 3)
+    _c = Lehmann._matrix2tensor(_c, psize, Val(3))
 
     @test c ≈ _c
 end
