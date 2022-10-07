@@ -270,7 +270,9 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
         cnew[1:M-1, :] .= coeff[1:M-1, :]
         cnew[M+1:end, :] .= coeff[M:end, :]
-        cnew[M, :] .= coeffmore
+        # println(size(coeffmore), ", ", size(cnew))
+        # println(coeffmore)
+        cnew[M, :] = coeffmore #broadcast cnew[M, :] .= coeffmore doesn't work for Julia 1.6
         return cnew
     else
         return coeff
