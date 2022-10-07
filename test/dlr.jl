@@ -33,26 +33,6 @@ function compare_atol(case, a, b, atol, para="")
 end
 
 @testset "Operation Utility" begin
-    #### _tensor2matrix and _matrix2tensor ############
-    a = rand(3, 4, 5)
-    _a, psize = Lehmann._tensor2matrix(a, Val(2))
-    __a = Lehmann._matrix2tensor(_a, psize, Val(2))
-    @test a ≈ __a
-    @inferred Lehmann._tensor2matrix(a, Val(2))
-    @inferred Lehmann._matrix2tensor(_a, psize, Val(2))
-
-    _a, psize = Lehmann._tensor2matrix(a, Val(1))
-    __a = Lehmann._matrix2tensor(_a, psize, Val(1))
-    @test a ≈ __a
-    @inferred Lehmann._tensor2matrix(a, Val(1))
-    @inferred Lehmann._matrix2tensor(_a, psize, Val(1))
-
-    _a, psize = Lehmann._tensor2matrix(a, Val(3))
-    __a = Lehmann._matrix2tensor(_a, psize, Val(3))
-    @test a ≈ __a
-    @inferred Lehmann._tensor2matrix(a, Val(3))
-    @inferred Lehmann._matrix2tensor(_a, psize, Val(3))
-
     ########## test _matrix_tensor_dot  #################
     # middle
     a = rand(5, 4)
@@ -197,25 +177,53 @@ end
 @testset "Tensor ↔ Matrix Mapping" begin
     a = rand(3)
     acopy = deepcopy(a)
-    b, psize = Lehmann._tensor2matrix(a, 1)
-    anew = Lehmann._matrix2tensor(b, psize, 1)
+    b, psize = Lehmann._tensor2matrix(a, Val(1))
+    anew = Lehmann._matrix2tensor(b, psize, Val(1))
     @test acopy ≈ anew
 
     a = rand(3, 4)
     acopy = deepcopy(a)
     for axis = 1:2
-        b, psize = Lehmann._tensor2matrix(a, axis)
-        anew = Lehmann._matrix2tensor(b, psize, axis)
+        b, psize = Lehmann._tensor2matrix(a, Val(axis))
+        anew = Lehmann._matrix2tensor(b, psize, Val(axis))
         @test acopy ≈ anew
     end
 
     a = rand(3, 4, 5)
     acopy = deepcopy(a)
     for axis = 1:3
-        b, psize = Lehmann._tensor2matrix(a, axis)
-        anew = Lehmann._matrix2tensor(b, psize, axis)
+        b, psize = Lehmann._tensor2matrix(a, Val(axis))
+        anew = Lehmann._matrix2tensor(b, psize, Val(axis))
         @test acopy ≈ anew
     end
+
+    #### _tensor2matrix and _matrix2tensor type stability ############
+    a = rand(5)
+    _a, psize = Lehmann._tensor2matrix(a, Val(1))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(1))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(1))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(1))
+
+    a = rand(3, 4, 5)
+    _a, psize = Lehmann._tensor2matrix(a, Val(2))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(2))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(2))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(2))
+
+    _a, psize = Lehmann._tensor2matrix(a, Val(1))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(1))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(1))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(1))
+
+    _a, psize = Lehmann._tensor2matrix(a, Val(3))
+    __a = Lehmann._matrix2tensor(_a, psize, Val(3))
+    @test a ≈ __a
+    @inferred Lehmann._tensor2matrix(a, Val(3))
+    @inferred Lehmann._matrix2tensor(_a, psize, Val(3))
+
 end
 
 @testset "Tensor DLR" begin
@@ -252,8 +260,10 @@ end
     tensorGn_copy = tensorGn
 
     compare("τ ↔ iω tensor", tau2matfreq(dlr, Gτ_copy), Gn, eps, 1000.0, para)
+    @inferred tau2matfreq(dlr, Gτ_copy)
     @test Gτ ≈ Gτ_copy #make sure there is no side effect on G
     compare("iω ↔ τ tensor", matfreq2tau(dlr, Gn_copy), Gτ, eps, 1000.0, para)
+    @inferred matfreq2tau(dlr, Gn_copy)
     @test Gn ≈ Gn_copy #make sure there is no side effect on G
 
     compare("τ ↔ iω tensor", tau2matfreq(dlr, Gτ_copy; sumrule=weight), Gn, eps, 1000.0, para)
@@ -262,14 +272,33 @@ end
     @test Gn ≈ Gn_copy #make sure there is no side effect on G
 
     compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ_copy; axis=3), tensorGn, eps, 1000.0, para)
+    # println(typeof(tensorGτ_copy))
+    # @inferred tau2matfreq(dlr, tensorGτ_copy; axis=3)
     @test tensorGτ ≈ tensorGτ_copy #make sure there is no side effect on G
     compare("iω ↔ τ tensor", matfreq2tau(dlr, tensorGn_copy; axis=3), tensorGτ, eps, 1000.0, para)
+    # @inferred matfreq2tau(dlr, tensorGn_copy; axis=3)
     @test tensorGn ≈ tensorGn_copy #make sure there is no side effect on G
 
+
     compare("τ ↔ iω tensor", tau2matfreq(dlr, tensorGτ_copy; axis=3, sumrule=sumrule_τ), tensorGn, eps, 1000.0, para)
+    # @inferred tau2matfreq(dlr, tensorGτ_copy; axis=3)
     @test tensorGτ ≈ tensorGτ_copy #make sure there is no side effect on G
     compare("iω ↔ τ tensor", matfreq2tau(dlr, tensorGn_copy; axis=3, sumrule=sumrule_n), tensorGτ, eps, 1000.0, para)
+    # @inferred matfreq2tau(dlr, tensorGn_copy; axis=3)
     @test tensorGn ≈ tensorGn_copy #make sure there is no side effect on G
+
+    tensor = zeros(128, 128, length(dlr))
+    tau2matfreq(dlr, tensor; axis=3)
+    coeff = tau2dlr(dlr, tensor; axis=3)
+    dlr2matfreq(dlr, coeff; axis=3)
+
+    tensor = zeros(128, 128, length(dlr))
+    prinln("tau2matfreq timing:")
+    @time tau2matfreq(dlr, tensor; axis=3)
+    prinln("tau2dlr timing:")
+    @time coeff = tau2dlr(dlr, tensor; axis=3)
+    prinln("dlr2matfreq timing:")
+    @time dlr2matfreq(dlr, coeff; axis=3)
 
 end
 

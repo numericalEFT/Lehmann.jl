@@ -86,6 +86,10 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
     end
 end
 
+function _tensor2matrix(tensor::AbstractVector{T}, ::Val{axis}) where {T,axis}
+    return reshape(tensor, length(tensor), 1), nothing
+end
+
 function _tensor2matrix(tensor::AbstractArray{T,N}, ::Val{axis}) where {T,N,axis}
     # internal function to move the axis dim to the first index, then reshape the tensor into a matrix
     _size = size(tensor)
@@ -105,6 +109,10 @@ function _tensor2matrix(tensor::AbstractArray{T,N}, ::Val{axis}) where {T,N,axis
         ntensor = reshape(_tensor, (n1, n2)) # no copy is created
         return ntensor, partialsize
     end
+end
+
+function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::Nothing, ::Val{axis}) where {T,axis}
+    return reshape(mat, length(mat))
 end
 
 function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::NTuple{dim,Int}, ::Val{axis}) where {T,dim,axis}
@@ -303,7 +311,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
         #     sumrule = sumrule ./ 2.0
         # end
-        if isempty(partialsize) == false
+        if isnothing(partialsize) == false
             sumrule = reshape(sumrule, size(g)[2])
         end
     end
@@ -422,14 +430,14 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
         #     sumrule = sumrule ./ 2.0
         # end
-        if isempty(partialsize) == false
+        if isnothing(partialsize) == false
             sumrule = reshape(sumrule, size(g)[2])
         end
     end
 
     if isnothing(error) == false
         @assert size(error) == size(green)
-        error, psize = _tensor2matrix(error, Val(axis))
+        error, partialsize = _tensor2matrix(error, Val(axis))
     end
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
@@ -508,7 +516,8 @@ function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; 
 - `sumrule`  : enforce the sum rule 
 - `verbose`  : true to print warning information
 """
-function tau2matfreq(dlrGrid, green, nNewGrid=dlrGrid.n, τGrid=dlrGrid.τ; error=nothing, axis=1, sumrule=nothing, verbose=true)
+function tau2matfreq(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nNewGrid::AbstractVector{Int}=dlrGrid.n, τGrid=dlrGrid.τ;
+    error=nothing, axis=1, sumrule=nothing, verbose=true) where {T,S,TC,N}
     coeff = tau2dlr(dlrGrid, green, τGrid; error=error, axis=axis, sumrule=sumrule, verbose=verbose)
     return dlr2matfreq(dlrGrid, coeff, nNewGrid, axis=axis, verbose=verbose)
 end
