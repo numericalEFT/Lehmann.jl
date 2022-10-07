@@ -292,12 +292,15 @@ end
     coeff = tau2dlr(dlr, tensor; axis=3)
     dlr2matfreq(dlr, coeff; axis=3)
 
+    # @inferred tau2dlr(dlr, tensor; axis=3)
+    # @inferred dlr2matfreq(dlr, coeff; axis=3)
+
     tensor = zeros(128, 128, length(dlr))
-    prinln("tau2matfreq timing:")
+    println("tau2matfreq timing:")
     @time tau2matfreq(dlr, tensor; axis=3)
-    prinln("tau2dlr timing:")
+    println("tau2dlr timing:")
     @time coeff = tau2dlr(dlr, tensor; axis=3)
-    prinln("dlr2matfreq timing:")
+    println("dlr2matfreq timing:")
     @time dlr2matfreq(dlr, coeff; axis=3)
 
 end
