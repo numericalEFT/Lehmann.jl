@@ -2,8 +2,12 @@
 Spectral representation related functions
 """
 module Spectral
+using ChainRulesCore
+
 export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
+
+include("spectral_derivative.jl")
 
 """
     kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
@@ -62,7 +66,7 @@ g(τ>0) = e^{-ωτ}/(1+e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1+e^{ωβ})
 - `ω`: frequency
 - `β`: the inverse temperature 
 """
-@inline function kernelFermiT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
+function kernelFermiT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
     (-β < τ <= β) || error("τ=$τ must be (-β, β] where β=$β")
     # if τ == T(0.0)
     #     τ = -eps(T)
