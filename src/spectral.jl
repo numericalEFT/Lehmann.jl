@@ -7,8 +7,6 @@ using ChainRulesCore
 export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
-include("spectral_derivative.jl")
-
 """
     kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
@@ -556,5 +554,7 @@ f(ω) = 1/(e^{ωβ}-1)
     end
     return n
 end
+
+include("spectral_derivative.jl")
 
 end
