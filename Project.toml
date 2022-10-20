@@ -1,7 +1,7 @@
 name = "Lehmann"
 uuid = "95bf888a-8996-4655-9f35-1c0506bdfefe"
 authors = ["Kun Chen", "Tao Wang", "Xiansheng Cai"]
-version = "0.2.5"
+version = "0.2.6"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -16,7 +16,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 FastGaussQuadrature = "0.4"
 Quadmath = "0.5"
 StaticArrays = "1"
-julia = "1.4"
+julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
