@@ -2,6 +2,8 @@
 Spectral representation related functions
 """
 module Spectral
+using ChainRulesCore
+
 export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
@@ -62,24 +64,24 @@ g(τ>0) = e^{-ωτ}/(1+e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1+e^{ωβ})
 - `ω`: frequency
 - `β`: the inverse temperature 
 """
-@inline function kernelFermiT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
+function kernelFermiT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
     (-β < τ <= β) || error("τ=$τ must be (-β, β] where β=$β")
-    # if τ == T(0.0)
-    #     τ = -eps(T)
-    # end
     if τ >= T(0.0)
+        sign = T(1)
         if ω > T(0.0)
-            return exp(-ω * τ) / (1 + exp(-ω * β))
+            a, b = -τ, -β
         else
-            return exp(ω * (β - τ)) / (1 + exp(ω * β))
+            a, b = β - τ, β
         end
     else
+        sign = -T(1)
         if ω > T(0.0)
-            return -exp(-ω * (τ + β)) / (1 + exp(-ω * β))
+            a, b = -(β + τ), -β
         else
-            return -exp(-ω * τ) / (1 + exp(ω * β))
+            a, b = -τ, β
         end
     end
+    return sign * exp(ω * a) / (1 + exp(ω * b))
 end
 
 """
@@ -552,5 +554,7 @@ f(ω) = 1/(e^{ωβ}-1)
     end
     return n
 end
+
+include("spectral_derivative.jl")
 
 end

@@ -4,6 +4,7 @@ authors = ["Kun Chen", "Tao Wang", "Xiansheng Cai"]
 version = "0.2.5"
 
 [deps]
+ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -12,8 +13,8 @@ Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
-Quadmath = "0.5"
 FastGaussQuadrature = "0.4"
+Quadmath = "0.5"
 StaticArrays = "1"
 julia = "1.4"
 

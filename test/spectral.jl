@@ -1,3 +1,5 @@
+using FiniteDifferences
+
 @testset "Spectral functions" begin
     function testKernelT(isFermi, symmetry, sign, β, τ, ε)
         println("Testing $symmetry  for β=$β, τ=$τ, ε=$ε")
@@ -66,4 +68,35 @@
     maxErr, τ0, ω0, macheps = testAccuracy(true, :none, τGrid, ωGrid, β)
     maxErr, τ0, ω0, macheps = testAccuracy(false, :none, τGrid, ωGrid, β)
     println("kernel accuracy tested")
+end
+
+@testset "Derivative" begin
+    function test_dω(w, tau, beta, atol=1e-10)
+        println("Test kernelFermiT w-derivative with w=$w, tau=$tau, beta=$beta")
+        a = Spectral.kernelFermiT_dω(tau, w, beta)
+        b = central_fdm(5, 1)(w -> Spectral.kernelFermiT(tau, w, beta), w)
+        @test abs(a - b) < atol
+
+        a = Spectral.kernelFermiT_dω2(tau, w, beta)
+        b = central_fdm(5, 1)(w -> Spectral.kernelFermiT_dω(tau, w, beta), w)
+        @test abs(a - b) < atol
+
+        a = Spectral.kernelFermiT_dω3(tau, w, beta)
+        b = central_fdm(5, 1)(w -> Spectral.kernelFermiT_dω2(tau, w, beta), w)
+        @test abs(a - b) < atol
+    end
+
+    test_dω(1.0, 1.0, 1.0)
+
+    beta = 10.0
+    test_dω(1.0, 1.0, beta)
+    test_dω(1.0, 0.0, beta)
+    test_dω(1.0, beta, beta)
+    test_dω(1.0, -beta + 1e-6, beta)
+
+    beta = 100.0
+    test_dω(1.0, 1.0, beta)
+    test_dω(1.0, 0.0, beta)
+    test_dω(1.0, beta, beta)
+    test_dω(1.0, -beta + 1e-6, beta)
 end
