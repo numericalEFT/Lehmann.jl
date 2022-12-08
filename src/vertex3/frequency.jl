@@ -29,7 +29,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
-    function FreqFineMesh{D}(Λ, rtol; sym = 0) where {D}
+    function FreqFineMesh{D}(Λ, rtol; sym=0) where {D}
         # initialize the residual on fineGrid with <g, g>
         _finegrid = Float.(fineGrid(Λ, rtol))
         separationTest(D, _finegrid)
@@ -63,6 +63,18 @@ struct FreqFineMesh{D} <: FQR.FineMesh
                 end
             end
             # elseif D == 3
+        elseif D == 1
+            for (xi, x) in enumerate(_finegrid)
+                coord = (xi,)
+                for sector in 1:color
+                    if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
+                        g = FreqGrid{D}(sector, (x,), coord)
+                        push!(mesh.candidates, g)
+                        push!(mesh.residual, FQR.dot(mesh, g, g))
+                        push!(mesh.selected, false)
+                    end
+                end
+            end
         else
             error("not implemented!")
         end
@@ -76,33 +88,33 @@ composite expoential grid
 """
 function fineGrid(Λ, rtol)
     ############## use composite grid #############################################
-    # degree = 8
-    # ratio = Float(1.4)
-    # N = Int(floor(log(Λ) / log(ratio) + 1))
-    # panel = [Λ / ratio^(N - i) for i in 1:N]
-    # grid = Vector{Float}(undef, 0)
-    # for i in 1:length(panel)-1
-    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
-    #     append!(grid, uniform)
-    # end
-    # append!(grid, Λ)
-    # println(grid)
-    # println("Composite expoential grid size: $(length(grid))")
-    # return grid
-
-    ############# DLR based fine grid ##########################################
-    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
-    # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 4
-    grid = Vector{Double}(undef, 0)
-    panel = Double.(dlr.ω)
+    degree = 8
+    ratio = Float(1.2)
+    N = Int(floor(log(Λ) / log(ratio) + 1))
+    panel = [Λ / ratio^(N - i) for i in 1:N]
+    grid = Vector{Float}(undef, 0)
     for i in 1:length(panel)-1
         uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
         append!(grid, uniform)
     end
-
-    println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+    append!(grid, Λ)
+    println(grid)
+    println("Composite expoential grid size: $(length(grid))")
     return grid
+
+    ############# DLR based fine grid ##########################################
+    # dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
+    # # println("fine basis number: $(dlr.size)\n", dlr.ω)
+    # degree = 4
+    # grid = Vector{Double}(undef, 0)
+    # panel = Double.(dlr.ω)
+    # for i in 1:length(panel)-1
+    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+    #     append!(grid, uniform)
+    # end
+
+    # println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+    # return grid
 end
 
 """
@@ -123,7 +135,7 @@ function separationTest(D, finegrid)
                 end
             end
         end
-    elseif D==1
+    elseif D == 1
         return
     else
         error("not implemented!")
@@ -169,7 +181,9 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     if mesh.symmetry == 0
         return []
     end
-    if D == 2
+    if D==1
+        coords = [(x, ), ]
+    elseif D == 2
         x, y = coord
         coords = unique([(x, y), (y, x),])
         # println(coords)
@@ -191,8 +205,27 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
 end
 
 """
-F(x) = (1-exp(-y))/(x-y)
+F(x, y) = (1-exp(x+y))/(x+y)
 """
+@inline function F1(a::T, b::T) where {T}
+    if abs(a + b) > Tiny
+        return (1 - exp(-(a + b))) / (a + b)
+    else
+        return T(1)
+    end
+end
+
+"""
+G(x, y) = (exp(-x)-exp(-y))/(x-y)
+G(x, x) = -exp(-x)
+"""
+@inline function G1(a::T, b::T) where {T}
+    if abs(a - b) > Tiny
+        return (exp(-a) - exp(-b)) / (b - a)
+    else
+        return (exp(-a) + exp(-b)) / 2
+    end
+end
 # @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
 #     if abs(a - b) > Tiny
 #         return (expa - expb) / (b - a)
@@ -256,6 +289,25 @@ F(a,b,c)
     end
 end
 
+
+"""
+basis dot for 1D
+"""
+function FQR.dot(mesh::FreqFineMesh{1}, g1::FreqGrid{1}, g2::FreqGrid{1})
+    # println("dot: ", g1, ", ", g2)
+    # cache1 = mesh.cache1
+    # cache2 = mesh.cache2
+    s1, s2 = g1.sector, g2.sector
+    # c1, c2 = g1.coord, g2.coord
+    ω1, ω2 = g1.omega[1], g2.omega[1]
+    if s1 == 1 &&  s2 ==1
+        return F1(ω1, ω2)+G1(ω1, ω2)
+    elseif s1==2 && s2==2
+        return F1(ω1, ω2)-G1(ω1, ω2)
+    else  #F21, F32, F13
+        return 0
+    end
+end
 """
 basis dot for 2D
 """
@@ -283,10 +335,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 2
+    D = 1
 
-    lambda, rtol = 10, 1e-4
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
+    # lambda, rtol = 10000, 1e-8
+    lambda, rtol = 10000, 1e-8
+    # mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
 
     # KK = zeros(3, 3)
     # n = (2, 2)
@@ -302,22 +355,59 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # display(KK)
     # println()
 
-    basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
-    FQR.qr!(basis, verbose = 1)
+    # basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
+    # FQR.qr!(basis, verbose=1)
 
-    lambda, rtol = 1000, 1e-8
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
+    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
-    @time FQR.qr!(basis, verbose = 1)
+    @time FQR.qr!(basis, verbose=1)
 
     FQR.test(basis)
 
     mesh = basis.mesh
     grids = basis.grid
+
+    _grids =[]
+    for (i, grid) in enumerate(grids)
+        if grid.sector == 1
+            g1, g2 = grid.omega[1], -grid.omega[1]
+        else #sector = 2
+            g1, g2 = grid.omega[1], -grid.omega[1]
+        end
+        flag1, flag2 = true, true
+        for (j, _g) in enumerate(_grids)
+            if _g ≈ g1
+                flag1 = false
+            end
+            if _g ≈ g2
+                flag2 = false
+            end
+        end
+        if flag1
+            push!(_grids, g1)
+        end
+        if flag2
+            push!(_grids, g2)
+        end
+    end
+    println(_grids)
+    println(length(_grids))
+
     open("basis.dat", "w") do io
         for (i, grid) in enumerate(grids)
-            if grid.sector == 1
-                println(io, grid.omega[1], "   ", grid.omega[2])
+            if D == 1
+                if grid.sector == 1
+                    println(io, grid.omega[1])
+                else #sector = 2
+                    println(io, -grid.omega[1])
+                end
+            elseif D == 2
+                if grid.sector == 1
+                    println(io, grid.omega[1], "   ", grid.omega[2])
+                end
+            else
+                error("not implemented!")
+            end
             end
         end
     end
