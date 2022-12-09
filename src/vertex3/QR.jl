@@ -4,12 +4,13 @@ using LinearAlgebra, Printf
 using StaticArrays
 # using GenericLinearAlgebra
 
-const Float = Float64
+# const Float = Float64
 
 ### faster, a couple of less digits
 using DoubleFloats
-# const Float = Double64
+const Float = Double64
 const Double = Double64
+# const Double = BigFloat
 
 # similar speed as DoubleFloats
 # using MultiFloats
@@ -71,6 +72,7 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
     push!(basis.error, sqrt(maximum(basis.mesh.residual)))
 
     (verbose > 0) && @printf("%3i %s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
+    # println("$(basis.mesh.residual[2])")
 end
 
 function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
@@ -102,13 +104,15 @@ function updateResidual!(basis::Basis{D}) where {D}
     Threads.@threads for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
             candidate = mesh.candidates[idx]
+            # println(basis.N, ", ", basis.grid[1], ", ", q[1], ", ", candidate)
             pp = sum(q[j] * dot(mesh, basis.grid[j], candidate) for j in 1:basis.N)
             _residual = mesh.residual[idx] - pp * pp
             # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
             # println("working on $candidate : $_residual")
             if _residual < 0
-                if _residual < -basis.rtol
+                if _residual < -basis.rtol^2
                     @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual[idx]) - $(pp)^2 = $_residual")
+                    # exit(0)
                 end
                 mesh.residual[idx] = 0
             else
@@ -187,7 +191,7 @@ end
 #     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 # end
 
-function qr!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where {dim,G,M}
+function qr!(basis::Basis{dim,G,M}; initial=[], N=10000, verbose=0) where {dim,G,M}
     #### add the grid in the idx vector first
 
     for i in initial

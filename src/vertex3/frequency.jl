@@ -300,10 +300,10 @@ function FQR.dot(mesh::FreqFineMesh{1}, g1::FreqGrid{1}, g2::FreqGrid{1})
     ω1, ω2 = g1.omega[1], g2.omega[1]
 
     ######### symmetrized kernel ###########
-    # if s1 == 1 &&  s2 ==1
-    #     return F1(ω1, ω2)+G1(ω1, ω2)
-    # elseif s1==2 && s2==2
-    #     return F1(ω1, ω2)-G1(ω1, ω2)
+    # if s1 == 1 && s2 == 1
+    #     return F1(ω1, ω2) + G1(ω1, ω2)
+    # elseif s1 == 2 && s2 == 2
+    #     return F1(ω1, ω2) - G1(ω1, ω2)
     # else  #F21, F32, F13
     #     return 0
     # end
@@ -342,10 +342,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 2
+    D = 1
 
     # lambda, rtol = 10000, 1e-8
-    lambda, rtol = 100, 1e-5
+    lambda, rtol = 1000, 1e-9
     # mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
 
     # KK = zeros(3, 3)
@@ -374,44 +374,44 @@ if abspath(PROGRAM_FILE) == @__FILE__
     mesh = basis.mesh
     grids = basis.grid
 
-    # _grids =[]
-    # for (i, grid) in enumerate(grids)
-    #     if grid.sector == 1
-    #         g1, g2 = grid.omega[1], -grid.omega[1]
-    #     else #sector = 2
-    #         g1, g2 = grid.omega[1], -grid.omega[1]
-    #     end
-    #     flag1, flag2 = true, true
-    #     for (j, _g) in enumerate(_grids)
-    #         if _g ≈ g1
-    #             flag1 = false
-    #         end
-    #         if _g ≈ g2
-    #             flag2 = false
-    #         end
-    #     end
-    #     if flag1
-    #         push!(_grids, g1)
-    #     end
-    #     if flag2
-    #         push!(_grids, g2)
-    #     end
-    # end
-    # println(_grids)
-    # println(length(_grids))
-    # _grids = sort(_grids)
+    _grids =[]
+    for (i, grid) in enumerate(grids)
+        if grid.sector == 1
+            g1, g2 = grid.omega[1], -grid.omega[1]
+        else #sector = 2
+            g1, g2 = grid.omega[1], -grid.omega[1]
+        end
+        flag1, flag2 = true, true
+        for (j, _g) in enumerate(_grids)
+            if _g ≈ g1
+                flag1 = false
+            end
+            if _g ≈ g2
+                flag2 = false
+            end
+        end
+        if flag1
+            push!(_grids, g1)
+        end
+        if flag2
+            push!(_grids, g2)
+        end
+    end
+    println(_grids)
+    println(length(_grids))
+    _grids = sort(_grids)
 
-    # open("basis.dat", "w") do io
-    #     for (i, grid) in enumerate(_grids)
-    #         if D == 1
-    #             println(io, grid)
-    #         else
-    #             error("not implemented!")
-    #         end
-    #         end
-    #     end
-    # end
-    # exit(0)
+    open("basis.dat", "w") do io
+        for (i, grid) in enumerate(_grids)
+            if D == 1
+                println(io, grid)
+            else
+                error("not implemented!")
+            end
+            end
+        end
+    end
+    exit(0)
 
     open("basis.dat", "w") do io
         for (i, grid) in enumerate(grids)
