@@ -145,7 +145,7 @@ end
 function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     fineGrid = mesh.fineGrid
     if dim == 1
-        return fineGrid[coord[1]]
+        return (fineGrid[coord[1]], )
     elseif dim == 2
         return (fineGrid[coord[1]], fineGrid[coord[2]])
     elseif dim == 3
@@ -159,7 +159,9 @@ function irreducible(D, sector, coord, symmetry)
     if symmetry == 0
         return true
     else
-        if D == 2
+        if D == 1
+            return sector == 1
+        elseif D == 2
             # return (coord[1] <= coord[2]) && (sector == 1)
             return (coord[1] <= coord[2])
         elseif D == 3
@@ -182,7 +184,7 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
         return []
     end
     if D==1
-        coords = [(x, ), ]
+        coords = [(coord[1], ), ]
     elseif D == 2
         x, y = coord
         coords = unique([(x, y), (y, x),])
@@ -194,13 +196,13 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
         error("not implemented!")
     end
     newgrids = FreqGrid{D}[]
-    # for s in 1:mesh.color
-    for c in coords
-        if s != grid.sector || c != Tuple(grid.coord)
-            push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
+    for s in 1:mesh.color
+        for c in coords
+            if s != grid.sector || c != Tuple(grid.coord)
+                push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
+            end
         end
     end
-    # end
     return newgrids
 end
 
@@ -358,7 +360,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     # FQR.qr!(basis, verbose=1)
 
-    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
+    mesh = FreqFineMesh{D}(lambda, rtol, sym=1)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose=1)
 
