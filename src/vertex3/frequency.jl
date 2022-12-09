@@ -145,7 +145,7 @@ end
 function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     fineGrid = mesh.fineGrid
     if dim == 1
-        return (fineGrid[coord[1]], )
+        return (fineGrid[coord[1]],)
     elseif dim == 2
         return (fineGrid[coord[1]], fineGrid[coord[2]])
     elseif dim == 3
@@ -183,8 +183,8 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     if mesh.symmetry == 0
         return []
     end
-    if D==1
-        coords = [(coord[1], ), ]
+    if D == 1
+        coords = [(coord[1],),]
     elseif D == 2
         x, y = coord
         coords = unique([(x, y), (y, x),])
@@ -296,18 +296,23 @@ end
 basis dot for 1D
 """
 function FQR.dot(mesh::FreqFineMesh{1}, g1::FreqGrid{1}, g2::FreqGrid{1})
-    # println("dot: ", g1, ", ", g2)
-    # cache1 = mesh.cache1
-    # cache2 = mesh.cache2
     s1, s2 = g1.sector, g2.sector
-    # c1, c2 = g1.coord, g2.coord
     ω1, ω2 = g1.omega[1], g2.omega[1]
-    if s1 == 1 &&  s2 ==1
-        return F1(ω1, ω2)+G1(ω1, ω2)
-    elseif s1==2 && s2==2
-        return F1(ω1, ω2)-G1(ω1, ω2)
-    else  #F21, F32, F13
-        return 0
+
+    ######### symmetrized kernel ###########
+    # if s1 == 1 &&  s2 ==1
+    #     return F1(ω1, ω2)+G1(ω1, ω2)
+    # elseif s1==2 && s2==2
+    #     return F1(ω1, ω2)-G1(ω1, ω2)
+    # else  #F21, F32, F13
+    #     return 0
+    # end
+
+    ######### unsymmetrized kernel ###########
+    if s1 == s2
+        return F1(ω1, ω2)
+    else
+        return G1(ω1, ω2)
     end
 end
 """
@@ -337,10 +342,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 1
+    D = 2
 
     # lambda, rtol = 10000, 1e-8
-    lambda, rtol = 10000, 1e-8
+    lambda, rtol = 100, 1e-5
     # mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
 
     # KK = zeros(3, 3)
@@ -369,31 +374,44 @@ if abspath(PROGRAM_FILE) == @__FILE__
     mesh = basis.mesh
     grids = basis.grid
 
-    _grids =[]
-    for (i, grid) in enumerate(grids)
-        if grid.sector == 1
-            g1, g2 = grid.omega[1], -grid.omega[1]
-        else #sector = 2
-            g1, g2 = grid.omega[1], -grid.omega[1]
-        end
-        flag1, flag2 = true, true
-        for (j, _g) in enumerate(_grids)
-            if _g ≈ g1
-                flag1 = false
-            end
-            if _g ≈ g2
-                flag2 = false
-            end
-        end
-        if flag1
-            push!(_grids, g1)
-        end
-        if flag2
-            push!(_grids, g2)
-        end
-    end
-    println(_grids)
-    println(length(_grids))
+    # _grids =[]
+    # for (i, grid) in enumerate(grids)
+    #     if grid.sector == 1
+    #         g1, g2 = grid.omega[1], -grid.omega[1]
+    #     else #sector = 2
+    #         g1, g2 = grid.omega[1], -grid.omega[1]
+    #     end
+    #     flag1, flag2 = true, true
+    #     for (j, _g) in enumerate(_grids)
+    #         if _g ≈ g1
+    #             flag1 = false
+    #         end
+    #         if _g ≈ g2
+    #             flag2 = false
+    #         end
+    #     end
+    #     if flag1
+    #         push!(_grids, g1)
+    #     end
+    #     if flag2
+    #         push!(_grids, g2)
+    #     end
+    # end
+    # println(_grids)
+    # println(length(_grids))
+    # _grids = sort(_grids)
+
+    # open("basis.dat", "w") do io
+    #     for (i, grid) in enumerate(_grids)
+    #         if D == 1
+    #             println(io, grid)
+    #         else
+    #             error("not implemented!")
+    #         end
+    #         end
+    #     end
+    # end
+    # exit(0)
 
     open("basis.dat", "w") do io
         for (i, grid) in enumerate(grids)
@@ -409,7 +427,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 end
             else
                 error("not implemented!")
-            end
             end
         end
     end
