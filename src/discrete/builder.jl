@@ -112,8 +112,9 @@ function build(dlrGrid, print::Bool = true)
     print && println("ω grid size = $(ω.ngrid)")
 
     kernel = preciseKernelT(dlrGrid, τ, ω, print)
-    testInterpolation(dlrGrid, τ, ω, kernel, print)
-
+    if dlrGrid.symmetry!=:sym
+        testInterpolation(dlrGrid, τ, ω, kernel, print)
+    end
     ωIndex = ωQR(kernel, rtol, print)
     rank = length(ωIndex)
     ωGrid = sort(ω.grid[ωIndex])
@@ -122,7 +123,6 @@ function build(dlrGrid, print::Bool = true)
     τGrid = sort(τ.grid[τIndex])
 
     nFineGrid, nFermiKernel, nBoseKernel = preciseKernelΩn(dlrGrid, ωGrid, print)
-
     nFermiIndex = τnQR(nFermiKernel, rank, print)
     nFermiGrid = sort(nFineGrid[nFermiIndex])
 

@@ -27,6 +27,26 @@ Compute the imaginary-time kernel of different type.
         else
             return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT(τ, ω, β)
         end
+    elseif symmetry == :sym
+        # if ω>0
+        #     return exp(-ω*τ)  #isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
+        # else
+        #     return exp(ω*(β-τ))
+        # end
+        if ω>0
+            if τ<β/2
+                return 0.0  #isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
+            else
+                return isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
+            end
+        else
+            if τ<β/2
+                return isFermi ? kernelFermiT_PHA(τ, -ω, β) : kernelBoseT_PHA(τ, -ω, β)
+            else
+                return 0.0
+            end
+        end
+
     elseif symmetry == :ph
         return isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
     elseif symmetry == :pha
@@ -254,6 +274,38 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
         else
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
         end
+    elseif symmetry == :sym
+        # if regularized
+        #     return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
+        # else
+        #     return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
+        # end
+        if ω>0
+           if n<0
+               return 0
+           else
+               return isFermi ?  kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
+           end
+        else
+           if n<0
+               return isFermi ?  kernelFermiΩ_PHA(n, -ω, β) : kernelBoseΩ_PHA(n, -ω, β)
+           else
+               return 0
+           end
+        end
+        # if ω>0
+        #     if n<0
+        #         return isFermi ?  kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
+        #     else
+        #         return 0 
+        #     end
+        # else
+        #     if n<0
+        #         return 0
+        #     else
+        #         return isFermi ?  kernelFermiΩ_PHA(n, -ω, β) : kernelBoseΩ_PHA(n, -ω, β)
+        #     end
+        # end
     elseif symmetry == :ph
         return isFermi ? kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
     elseif symmetry == :pha
@@ -270,7 +322,7 @@ Compute kernel matrix with given ωn (integer!) and ω grids.
 """
 function kernelΩ(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, nGrid::AbstractVector{Int}, ωGrid::AbstractVector{T}, β::T, regularized::Bool=false) where {T<:AbstractFloat,isFermi,symmetry}
     # println(type)
-    if (symmetry == :none) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
+    if (symmetry == :none) || (symmetry == :sym) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
         kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
     else
         kernel = zeros(T, (length(nGrid), length(ωGrid)))
@@ -391,6 +443,19 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
     return Complex{T}(T(0), K) #purely imaginary!
 end
 
+
+@inline function kernelFermiΩ_PH_sym(n::Int, ω::T, β::T) where {T<:AbstractFloat}
+    # Matsurbara-frequency correlator
+    if ω < T(0.0)
+        throw(DomainError("real frequency should be positive!"))
+    end
+    ω_n = (2n + 1) * π / β
+    K = -(exp(-ω * β)/(im*ω_n-ω) + 1/(im*ω_n+ω))
+    if !isfinite(K)
+        throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
+    end
+    return Complex{T}(K)
+end
 """
     kernelBoseΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
@@ -449,6 +514,20 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
     end
     return K
+end
+
+@inline function kernelFermiΩ_PHA_sym(n::Int, ω::T, β::T) where {T<:AbstractFloat}
+    # Matsurbara-frequency correlator
+    if ω < T(0.0)
+        throw(DomainError("real frequency should be positive!"))
+    end
+
+    ω_n = (2n + 1) * π / β
+    K = (-exp(-ω * β)/(im*ω_n+ω) + 1/(im*ω_n-ω))
+    if !isfinite(K)
+        throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
+    end
+    return Complex{T}(K)
 end
 
 """

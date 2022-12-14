@@ -12,7 +12,7 @@ include("discrete/builder.jl")
 include("functional/builder.jl")
 
 include("dlr.jl")
-export DLRGrid
+export DLRGrid, is_symmetrized
 
 include("sample/sample.jl")
 export Sample
