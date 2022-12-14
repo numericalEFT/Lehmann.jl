@@ -28,14 +28,9 @@ Compute the imaginary-time kernel of different type.
             return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT(τ, ω, β)
         end
     elseif symmetry == :sym
-        # if ω>0
-        #     return exp(-ω*τ)  #isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
-        # else
-        #     return exp(ω*(β-τ))
-        # end
         if ω>0
             if τ<β/2
-                return 0.0  #isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
+                return 0.0 
             else
                 return isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
             end
@@ -275,11 +270,6 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
         end
     elseif symmetry == :sym
-        # if regularized
-        #     return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ_regular(n, ω, β)
-        # else
-        #     return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
-        # end
         if ω>0
            if n<0
                return 0
@@ -293,19 +283,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
                return 0
            end
         end
-        # if ω>0
-        #     if n<0
-        #         return isFermi ?  kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
-        #     else
-        #         return 0 
-        #     end
-        # else
-        #     if n<0
-        #         return 0
-        #     else
-        #         return isFermi ?  kernelFermiΩ_PHA(n, -ω, β) : kernelBoseΩ_PHA(n, -ω, β)
-        #     end
-        # end
+
     elseif symmetry == :ph
         return isFermi ? kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
     elseif symmetry == :pha
