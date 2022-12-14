@@ -443,19 +443,6 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
     return Complex{T}(T(0), K) #purely imaginary!
 end
 
-
-@inline function kernelFermiΩ_PH_sym(n::Int, ω::T, β::T) where {T<:AbstractFloat}
-    # Matsurbara-frequency correlator
-    if ω < T(0.0)
-        throw(DomainError("real frequency should be positive!"))
-    end
-    ω_n = (2n + 1) * π / β
-    K = -(exp(-ω * β)/(im*ω_n-ω) + 1/(im*ω_n+ω))
-    if !isfinite(K)
-        throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
-    end
-    return Complex{T}(K)
-end
 """
     kernelBoseΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
@@ -514,20 +501,6 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
         throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
     end
     return K
-end
-
-@inline function kernelFermiΩ_PHA_sym(n::Int, ω::T, β::T) where {T<:AbstractFloat}
-    # Matsurbara-frequency correlator
-    if ω < T(0.0)
-        throw(DomainError("real frequency should be positive!"))
-    end
-
-    ω_n = (2n + 1) * π / β
-    K = (-exp(-ω * β)/(im*ω_n+ω) + 1/(im*ω_n-ω))
-    if !isfinite(K)
-        throw(DomainError(-1, "Got $K for the parameter $n, $ω and $β"))
-    end
-    return Complex{T}(K)
 end
 
 """
