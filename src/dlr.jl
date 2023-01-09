@@ -94,7 +94,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
     # println("Get $Λ")
     @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
     @assert Λ > 0 "Energy scale $Λ must be positive!"
-    @assert symmetry == :ph || symmetry == :pha || symmetry == :none || symmetry == :sym "symmetry must be :ph, :pha or nothing"
+    @assert symmetry == :ph || symmetry == :pha || symmetry == :none || symmetry == :sym "symmetry must be :ph, :pha , :sym or :none"
     @assert algorithm == :functional || algorithm == :discrete "Algorithm is either :functional or :discrete"
     @assert β > 0.0 "Inverse temperature must be temperature."
     @assert Euv > 0.0 "Energy cutoff must be positive."
