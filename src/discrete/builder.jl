@@ -108,6 +108,9 @@ function build(dlrGrid, print::Bool = true)
     rtol = dlrGrid.rtol
     τ = τChebyGrid(dlrGrid, degree, print)
     ω = ωChebyGrid(dlrGrid, degree, print)
+    print && println("minimal τ = $(minimum([(τ.grid[i]-τ.grid[i-1]) for i in 2:τ.ngrid]))")
+    print && println("minimal ω = $(minimum([(ω.grid[i]-ω.grid[i-1]) for i in 2:ω.ngrid]))")
+
     print && println("τ grid size = $(τ.ngrid)")
     print && println("ω grid size = $(ω.ngrid)")
 

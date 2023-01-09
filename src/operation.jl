@@ -141,6 +141,24 @@ function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::NTuple{dim,Int}, ::
     end
 end
 
+function _left_symmetrize(kernel,symbol)
+    @assert iseven(size(kernel)[1]) "symmetrized kernel has to have even number of points along the axis" 
+    U = zeros(size(kernel)[1], size(kernel)[1])
+    for i in 1:size(kernel)[1]÷2
+        if symbol == :τ
+            U[i,i] = 1
+            U[i,size(kernel)[1]-i+1] = 1
+            U[size(kernel)[1]-i+1, i] = -1
+            U[size(kernel)[1]-i+1,size(kernel)[1]-i+1] = 1
+        elseif symbol == :ω
+            U[i,i] = 1
+            U[i,size(kernel)[1]-i+1] = -1
+            U[size(kernel)[1]-i+1, i] = 1
+            U[size(kernel)[1]-i+1,size(kernel)[1]-i+1] = 1
+        end
+    end
+    return U*kernel
+end
 # function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
 #     # Gτ: (Nτ, N), kernel: (Nτ, Nω)
 #     # error: (Nτ, N), sumrule: (N, 1)
@@ -258,8 +276,27 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-    coeff = B \ C #solve C = B * coeff
+    if dlrGrid.symmetry==:sym
+        Nc = searchsortedfirst(dlrGrid.ω,0.0)
+        coeff1 =B[1:Nτ÷2,1:Nc-1]  \ C[1:Nτ÷2,:]
+        # print("coeff left $(sum(imag(coeff1)))\n")
+        if sum(abs.(real(B[Nτ÷2+1:end,Nc:end]))) < 1e-13
+            coeff2 =(im * B[Nτ÷2+1:end,Nc:end])  \ (im*C[Nτ÷2+1:end,:])
+        else
+            coeff2 = B[Nτ÷2+1:end,Nc:end]  \ C[Nτ÷2+1:end,:]
+        end
+        #coeff2 =(im * B[Nτ÷2+1:end,Nω÷2+1:end])  \ (im*C[Nτ÷2+1:end,:])
+        print("coeff left $(sum(imag(coeff2)))\n")
+        #print("kernel $(sum(real(B[Nτ÷2+1:end,Nω÷2+1:end])))\n")
+        #print("kernel $(sum(real(C[Nτ÷2+1:end,:])))\n")
 
+        coeff = vcat(coeff1,coeff2)
+        #coeff = B \ C #solve C = B * coeff
+    else
+        coeff = B \ C #solve C = B * coeff
+    end
+    # coeff = B \ C #solve C = B * coeff
+     
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
         for i in 1:Nτ
@@ -297,17 +334,6 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     @assert length(size(green)) >= axis "dimension of the Green's function should be larger than axis!"
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
-    green_copy = copy(green)
-    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        for i in 1:length(τGrid)
-            if(i>length(τGrid)/2)
-                green_copy[i] = (green[i]+green[length(τGrid)-i+1])/2
-            else
-                green_copy[i] = (green[i]-green[length(τGrid)-i+1])/2
-            end
-        end
-    end
 
     if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
@@ -318,7 +344,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
 
-    g, partialsize = _tensor2matrix(green_copy, Val(axis))
+    g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
@@ -330,8 +356,13 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     end
 
     if isnothing(error) == false
-        @assert size(error) == size(green_copy)
+        @assert size(error) == size(green)
         error, partialsize = _tensor2matrix(error, Val(axis))
+    end
+
+    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
+        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
+        g = 0.5 .* _left_symmetrize(g, :ω)
     end
 
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
@@ -343,7 +374,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     if isnothing(sumrule) == false
         #check how exact is the sum rule
         coeffsum = sum(coeff, dims=1) .- sumrule
-        if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green_copy)), 1.0), coeffsum) == false
+        if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
     end
@@ -378,28 +409,13 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     else
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
-
+    if dlrGrid.symmetry == :sym
+        kernel = _left_symmetrize(kernel, :τ)
+    end
     # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    # return _matrix2tensor(G, partialsize, axis)
-    if  dlrGrid.symmetry == :sym  # Obtain original Green's function from Symmetrized one.
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        green = _matrix_tensor_dot(kernel, dlrcoeff, axis)
-        green_copy = copy(green)
-        for i in 1:length(τGrid)
-            if(i>length(τGrid)/2)
-                green_copy[i] = green[i]-green[length(τGrid)-i+1]
-            else
-                green_copy[i] = green[i]+green[length(τGrid)-i+1] 
-            end
-        end
-        return green_copy
-    else
-        return _matrix_tensor_dot(kernel, dlrcoeff, axis)
-    end
- 
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis) 
 end
 
 """
@@ -422,30 +438,6 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    green_copy = copy(green)
-    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        if dlrGrid.isFermi 
-            for i in 1:length(nGrid)
-                if(i>length(nGrid)/2)
-                    green_copy[i] = (green[i]-green[length(nGrid)-i+1])/2
-                else
-                    green_copy[i] = (green[i]+green[length(nGrid)-i+1])/2
-                end
-            end
-        else
-            #TODO: Bosonic case still wip
-            for i in 1:length(nGrid)
-                if(i>length(nGrid)/2)
-                    green_copy[i] = (green[i]+green[length(nGrid)-i+1])/2
-                else
-                    green_copy[i] = (green[i]-green[length(nGrid)-i+1])/2
-                end
-            end
-        end
-    end
-    # typ = promote_type(eltype(dlrGrid.kernel_n), eltype(green))
-
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
         if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
@@ -465,7 +457,6 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     end
-
     # if typ != eltype(green)
     #     green = convert.(typ, green)
     # end
@@ -474,7 +465,12 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     #     dlrGrid.kernel_n = convert.(typ, dlrGrid.kernel_n)
     # end
 
-    g, partialsize = _tensor2matrix(green_copy, Val(axis))
+    g, partialsize = _tensor2matrix(green, Val(axis))
+    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
+        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
+        g = 0.5 .* _left_symmetrize(g, :τ)
+    end
+
 
     if isnothing(sumrule) == false
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
@@ -486,7 +482,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     end
 
     if isnothing(error) == false
-        @assert size(error) == size(green_copy)
+        @assert size(error) == size(green)
         error, partialsize = _tensor2matrix(error, Val(axis))
     end
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
@@ -497,7 +493,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     if isnothing(sumrule) == false
         #check how exact is the sum rule
         coeffsum = sum(coeff, dims=1) .- sumrule
-        if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green_copy)), 1.0), coeffsum) == false
+        if verbose && all(x -> abs(x) < 1000 * dlrGrid.rtol * max(maximum(abs.(green)), 1.0), coeffsum) == false
             @warn("Sumrule error $(maximum(abs.(coeffsum))) is larger than the DLRGrid error threshold.")
         end
     end
@@ -541,39 +537,12 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     end
-
-    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
-
-    # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    # return _matrix2tensor(G, partialsize, axis)
-
-    if dlrGrid.symmetry == :sym # Obtain original Green's function from the symmetrized one.
+    if dlrGrid.symmetry == :sym
         @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        green = _matrix_tensor_dot(kernel, dlrcoeff, axis)
-        green_copy = copy(green)
-        if dlrGrid.isFermi 
-            for i in 1:length(nGrid)
-                if(i>length(nGrid)/2)
-                    green_copy[i] = green[length(nGrid)-i+1]+green[i]
-                else
-                    green_copy[i] = green[i]-green[length(nGrid)-i+1]
-                end
-            end
-        else
-            #TODO: Bosonic case still wip
-            for i in 1:length(nGrid)
-                if(i>length(nGrid)/2)
-                    green_copy[i] =  green[length(nGrid)-i+1]-green[i]
-                else
-                    green_copy[i] = green[i]+green[length(nGrid)-i+1]
-                end
-            end
-        end
-        return green_copy
-    else
-        return _matrix_tensor_dot(kernel, dlrcoeff, axis)
+        kernel = _left_symmetrize(kernel,:ω)
     end
+
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """

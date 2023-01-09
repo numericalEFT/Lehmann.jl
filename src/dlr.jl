@@ -136,7 +136,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
         elseif symmetry == :pha
             return "pha_$(lambda)_$(errstr).dlr"
         elseif symmetry == :sym
-            return "sym_$(lambda)_$(errstr).dlr"
+            return "pha_$(lambda)_$(errstr).dlr"
         else
             error("$symmetry is not implemented!")
         end
@@ -207,13 +207,15 @@ function symmetrize_ω(ω)
     zero_idx=searchsortedfirst(ω,0)
     ω_neg=ω[1:zero_idx-1]
     ω_pos=ω[zero_idx:end]
-    ω_sort =sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
+    #ω_sort =sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
+    ω_sort =sort(vcat(ω_pos,-ω_neg))
     ω_final = []
     for i in 1:length(ω_sort)
-        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-16
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
             push!(ω_final,ω_sort[i])
         end
     end
+    ω_final =sort(vcat(-ω_final, ω_final))
     #println(ω_final+reverse(ω_final))
     return ω_final
 end
@@ -223,13 +225,19 @@ function symmetrize_τ(ω)
     zero_idx=searchsortedfirst(ω,1.0/2.0)
     ω_neg=ω[1:zero_idx-1]
     ω_pos=ω[zero_idx:end]
-    ω_sort =sort(vcat(ω_pos,1.0.-ω_neg,ω_neg, 1.0.-ω_pos))
+    #print("size pos $(ω_pos)\n")
+    #print("size neg $(ω_neg)\n")
+    # ω_sort =sort(vcat(ω_pos,1.0.-ω_neg,ω_neg, 1.0.-ω_pos))
+    ω_sort =sort(vcat(ω_pos,1.0.-ω_neg))
     ω_final = []
     for i in 1:length(ω_sort)
-        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-14
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
             push!(ω_final,ω_sort[i])
         end
     end
+    ω_final =sort(vcat(ω_final,1.0.-ω_final))
+    #print("size final $(ω_final)\n")
+
     return ω_final
 end
 
@@ -257,17 +265,17 @@ function symmetrize_n(ω, isFermi)
 end
 
 function is_symmetrized(dlrGrid::DLRGrid)
-    @assert  iseven(length(dlrGrid.n)) && iseven(length(dlrGrid.τ)) && iseven(length(dlrGrid.ω)) && iseven(length(dlrGrid.ωn)) "All grids in symmetrized DlrGrid has to have even number of points"
+    @assert  iseven(length(dlrGrid.n)) && iseven(length(dlrGrid.τ))  && iseven(length(dlrGrid.ωn)) "All grids in symmetrized DlrGrid has to have even number of points"
     n = dlrGrid.n + reverse(dlrGrid.n)
     τ = dlrGrid.τ + reverse(dlrGrid.τ)
-    ω = dlrGrid.ω + reverse(dlrGrid.ω)
+    #ω = dlrGrid.ω + reverse(dlrGrid.ω)
     ωn = dlrGrid.ωn + reverse(dlrGrid.ωn)
     if dlrGrid.isFermi
         n0 = -1
     else
         n0 = 0
     end
-    return maximum(n0.-n)==0 && maximum(abs.(ω))<1e-12 && maximum(abs.(dlrGrid.β.-τ))<1e-8 && maximum(abs.(ωn))<1e-12
+    return maximum(n0.-n)==0  && maximum(abs.(dlrGrid.β.-τ))<1e-8 && maximum(abs.(ωn))<1e-12
 end
 
 function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
