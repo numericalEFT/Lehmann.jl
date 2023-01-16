@@ -88,52 +88,6 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
     end
 end
 
-# function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N}, axis::Int, ::Val{temporal}) where {T,TC,N, temporal}
-#     #calculate \sum_j mat[i, j]*tensor[..., j, ...]  where j is the axis-th dimension of tensor
-#     @assert 0 < axis <= N
-#     _n, _m = size(mat)
-#     _size = collect(size(tensor))
-#     @assert (_m == _size[axis]) "matrix size $(size(mat)) and tensor size ($(_size)) do not match at axis = $axis"
-#     _target_size = _reset_tuple(size(tensor), 2*_n, axis)
-    
-#     if axis == 1
-#         _r = reduce(*, _size[axis+1:end])
-#         _tensor = reshape(tensor, (_m, _r))
-#         res = zeros(promote_type(T, TC), 2*_n, _r)
-#         res[1:_n, :] = mat[1:_n, 1:_m÷2]*_tensor[1:_m÷2, :]
-#         res[_n+1:end, :] = mat[1:_n, _m÷2+1:end]*_tensor[_m÷2+1:end, :]
-        
-#         # _target_size = (_n, _size[2:end]...)::NTuple{N,Int}
-#         return reshape(res, _target_size)
-#     elseif axis == N
-#         # _target_size = (_size[1:end-1]..., _n)::NTuple{N,Int}
-#         _l = reduce(*, _size[1:axis-1])
-#         _tensor = reshape(tensor, (_l, _m))
-#         res = zeros(promote_type(T, TC), _r,  2*_n)
-#         res[:, 1:_n] =_tensor[:, 1:_m÷2]*transpose(mat)[1:_m÷2, 1:_n]
-#         res[:, _n+1:end] = _tensor[:,_m÷2+1:end]*transpose(mat)[_m÷2+1:end, 1:_n]
-#         return reshape(res, _target_size)
-#     else
-#         _l = reduce(*, _size[1:axis-1])
-#         _r = reduce(*, _size[axis+1:end])
-#         _tensor = reshape(tensor, (_l, _m, _r))
-#         res = zeros(promote_type(T, TC), _l, 2*_n, _r)
-#         @inbounds for j = 1:_r
-#             @inbounds for q = 1:_n
-#                 @inbounds for k = 1:_m÷2
-#                     @inbounds for i = 1:_l
-#                         res[i, q, j] += _tensor[i, k, j] * mat[q, k]
-#                         res[i, q+_n, j] += _tensor[i, k+_m÷2, j] * mat[q, k+_m÷2]
-#                     end
-#                 end
-#             end
-#         end
-#         return reshape(res, _target_size)
-#     end
-# end
-
-
-
 
 
 function _tensor2matrix(tensor::AbstractVector{T}, ::Val{axis}) where {T,axis}
@@ -310,11 +264,7 @@ end
 
 function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
-    if dlrGrid.symmetry == :sym
-        @assert size(Gτ)[1] == 2*Nτ
-    else
-        @assert size(Gτ)[1] == Nτ
-    end
+    @assert size(Gτ)[1] == Nτ
     if isnothing(sumrule) == false #require sumrule
         @assert dlrGrid.symmetry == :none && dlrGrid.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
@@ -351,16 +301,16 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-    coeff = zeros(promote_type(eltype(B), eltype(C)) , Nω, size(C)[2])
-    if dlrGrid.symmetry==:sym
-        coeff[1:Nω÷2,:] =B[1:Nτ,1:Nω÷2]  \ C[1:Nτ,:]
-        # print("coeff left $(sum(imag(coeff1)))\n")
-        coeff[Nω÷2+1:end,:] = B[1:Nτ,Nω÷2+1:end]  \ C[Nτ+1:end,:]
-        print("$(coeff[1:10])\n")
-    else
-        coeff = B \ C #solve C = B * coeff
-    end
-    # coeff = B \ C #solve C = B * coeff
+    # coeff = zeros(promote_type(eltype(B), eltype(C)) , Nω, size(C)[2])
+    # if dlrGrid.symmetry==:sym
+    #     coeff[1:Nω÷2,:] =B[1:Nτ,1:Nω÷2]  \ C[1:Nτ,:]
+    #     # print("coeff left $(sum(imag(coeff1)))\n")
+    #     coeff[Nω÷2+1:end,:] = B[1:Nτ,Nω÷2+1:end]  \ C[Nτ+1:end,:]
+    #     print("$(coeff[1:10])\n")
+    # else
+    #     coeff = B \ C #solve C = B * coeff
+    # end
+    coeff = B \ C #solve C = B * coeff
      
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
@@ -479,19 +429,16 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     else
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
-    #if dlrGrid.symmetry == :sym
-        #kernel = _left_symmetrize(kernel, :τ)
-    #    _left_symmetrize!(kernel, :τ)        
-    #end
+    if dlrGrid.symmetry == :sym
+        _left_symmetrize!(kernel, :τ)        
+    end
     # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-    g = _matrix_tensor_dot(kernel, dlrcoeff, axis, Val(S))
+    g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
     if dlrGrid.symmetry == :sym
         @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        #_left_symmetrize!(kernel,:ω)
-
-        _left_symmetrize!(g,:ω)
+        _left_symmetrize!(kernel,:ω)
         #kernel = _left_symmetrize(kernel,:ω)
     end
     return g
@@ -631,7 +578,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
         #kernel = _left_symmetrize(kernel,:ω)
     end
         
-    g = _matrix_tensor_dot(kernel, dlrcoeff, axis, Val(S))
+    g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
     
     
     
