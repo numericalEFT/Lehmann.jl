@@ -55,14 +55,41 @@ end
 
 Compute kernel with given τ and ω grids.
 """
-function kernelT(::Type{T}, isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool=false) where {T<:AbstractFloat}
-    kernel = zeros(T, (length(τGrid), length(ωGrid)))
-    for (τi, τ) in enumerate(τGrid)
+function kernelT(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool=false) where {T<:AbstractFloat,isFermi,symmetry}
+    if symmetry == :sym
+        @assert iseven(length(τGrid)) &&  iseven(length(ωGrid)) #Both τGrid and ωGrid should has even number of points
+        kernel = zeros(T, (length(τGrid)÷2, length(ωGrid)))
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[τi, ωi] = kernelT(isFermi, symmetry, T(τ), T(ω), T(β), regularized)
+            for (τi, τ) in enumerate(τGrid[1:length(τGrid)÷2])
+                if ωi<length(ωGrid)÷2+1
+                    kernel[τi, ωi] = kernelT(Val(isFermi), Val(symmetry), T(τ), T(ω), T(β), regularized)
+                else
+                    τ2 = τGrid[length(τGrid)÷2+τi]
+                    kernel[τi, ωi] = kernelT(Val(isFermi), Val(symmetry), T(τ2), T(ω), T(β), regularized)
+                end
+            end
         end
+
+        kernel2 = zeros(T, (length(τGrid), length(ωGrid)))
+        for (ωi, ω) in enumerate(ωGrid)
+            for (τi, τ) in enumerate(τGrid)
+                kernel2[τi, ωi] = kernelT(Val(isFermi), Val(symmetry), T(τ), T(ω), T(β), regularized)
+            end
+        end
+        @assert kernel[:,1:length(ωGrid)÷2]== kernel2[1:length(τGrid)÷2, 1:length(ωGrid)÷2]
+        @assert kernel[:,length(ωGrid)÷2+1:end]== kernel2[length(τGrid)÷2+1:end, length(ωGrid)÷2+1:end]
+        print("$(size(kernel))\n")
+        return kernel
+    else  
+        kernel = zeros(T, (length(τGrid), length(ωGrid)))
+        for (ωi, ω) in enumerate(ωGrid)
+            for (τi, τ) in enumerate(τGrid)
+                kernel[τi, ωi] = kernelT(Val(isFermi), Val(symmetry), T(τ), T(ω), T(β), regularized)
+            end
+        end
+        return kernel
     end
-    return kernel
+
 end
 
 
@@ -300,15 +327,43 @@ Compute kernel matrix with given ωn (integer!) and ω grids.
 """
 function kernelΩ(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, nGrid::AbstractVector{Int}, ωGrid::AbstractVector{T}, β::T, regularized::Bool=false) where {T<:AbstractFloat,isFermi,symmetry}
     # println(type)
-    if (symmetry == :none) || (symmetry == :sym) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
+    if (symmetry == :none)  || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
         kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
+    elseif symmetry == :sym
+        @assert iseven(length(nGrid)) &&  iseven(length(ωGrid)) #Both nGrid and ωGrid should has even number of points
+        kernel = zeros(Complex{T}, (length(nGrid)÷2, length(ωGrid)))
     else
         kernel = zeros(T, (length(nGrid), length(ωGrid)))
     end
     # println(symmetry, ", ", isFermi)
-    for (ni, n) in enumerate(nGrid)
+
+    if symmetry == :sym
         for (ωi, ω) in enumerate(ωGrid)
-            kernel[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n, T(ω), T(β), regularized)
+            for (ni, n) in enumerate(nGrid[1:length(nGrid)÷2])
+                if ωi<length(ωGrid)÷2+1
+                    kernel[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n, T(ω), T(β), regularized)
+                else
+                    n2 = nGrid[length(nGrid)÷2+ni]
+                    kernel[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n2, T(ω), T(β), regularized)
+                end
+            end
+        end
+
+        
+        kernel2 = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
+        for (ωi, ω) in enumerate(ωGrid)
+            for (ni, n) in enumerate(nGrid)
+                kernel2[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n, T(ω), T(β), regularized)
+            end
+        end
+        @assert kernel[:,1:length(ωGrid)÷2]== kernel2[1:length(nGrid)÷2, 1:length(ωGrid)÷2]
+        @assert kernel[:,length(ωGrid)÷2+1:end]== kernel2[length(nGrid)÷2+1:end, length(ωGrid)÷2+1:end]
+
+    else
+        for (ωi, ω) in enumerate(ωGrid)
+            for (ni, n) in enumerate(nGrid)
+                kernel[ni, ωi] = kernelΩ(Val(isFermi), Val(symmetry), n, T(ω), T(β), regularized)
+            end
         end
     end
     return kernel
