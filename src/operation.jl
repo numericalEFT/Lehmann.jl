@@ -145,122 +145,6 @@ function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::NTuple{dim,Int}, ::
     end
 end
 
-function _left_symmetrize!(kernel,symbol)
-    @assert length(size(kernel))==2 "input Matrix must have dimension 2." 
-    @assert iseven(size(kernel)[1]) "symmetrized kernel has to have even number of points along the axis"
-    factor = 1/sqrt(2)
-    for i in 1:size(kernel)[1]÷2
-        if symbol == :τ 
-            vec1 = kernel[i,:]+ kernel[size(kernel)[1]-i+1,:]
-            vec2 = -kernel[i,:]+ kernel[size(kernel)[1]-i+1,:]
-            kernel[i,:] = vec1*factor
-            kernel[size(kernel)[1]-i+1,:] = vec2*factor
-        elseif symbol == :ω
-            vec1 = kernel[i,:] - kernel[size(kernel)[1]-i+1,:]
-            vec2 = kernel[i,:]+ kernel[size(kernel)[1]-i+1,:]
-            kernel[i,:] = vec1*factor
-            kernel[size(kernel)[1]-i+1,:] = vec2*factor
-        end
-    end
-end
-
-
-# function _left_symmetrize(kernel,symbol)
-#     @assert iseven(size(kernel)[1]) "symmetrized kernel has to have even number of points along the axis" 
-#     U = zeros(size(kernel)[1], size(kernel)[1])
-#     for i in 1:size(kernel)[1]÷2
-#         if symbol == :τ
-#             U[i,i] = 1
-#             U[i,size(kernel)[1]-i+1] = 1
-#             U[size(kernel)[1]-i+1, i] = -1
-#             U[size(kernel)[1]-i+1,size(kernel)[1]-i+1] = 1
-#         elseif symbol == :ω
-#             U[i,i] = 1
-#             U[i,size(kernel)[1]-i+1] = -1
-#             U[size(kernel)[1]-i+1, i] = 1
-#             U[size(kernel)[1]-i+1,size(kernel)[1]-i+1] = 1
-#         end
-#     end
-#     return U*kernel/sqrt(2)
-# end
-
-# function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
-#     # Gτ: (Nτ, N), kernel: (Nτ, Nω)
-#     # error: (Nτ, N), sumrule: (N, 1)
-#     Nτ, Nω = size(kernel)
-#     @assert size(Gτ)[1] == Nτ
-#     N = size(Gτ)[2]
-#     if isnothing(sumrule) == false
-#         @assert dlr.symmetry == :none && dlr.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
-#         # println(size(Gτ))
-#         # M = Int(floor(dlr.size / 2))
-#         M = dlr.size
-
-#         # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
-#         kernelN = kernel[:, M]
-
-#         # sign = dlr.isFermi ? -1 : 1
-#         # ker0 = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [0.0,], dlr.ω, dlr.β, true)
-#         # kerβ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [dlr.β,], dlr.ω, dlr.β, true)
-
-#         # ker = ker0[1:end] .- sign .* kerβ[1:end]
-#         # ker = vcat(ker[1:M-1], ker[M+1:end])
-#         # kerN = ker[M]
-
-#         for i in 1:Nτ
-#             # Gτ[i, :] .-= kernelN[i] * sumrule / kerN
-#             Gτ[i, :] .-= kernelN[i] * sumrule
-#         end
-
-#         # for i = 1:Nω-1
-#         #     kernel[:, i] .-= kernelN * ker[i] / kerN
-#         # end
-#         kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
-#     end
-
-#     if isnothing(error)
-#         B = kernel
-#         C = Gτ
-#     else
-#         @assert size(error) == size(Gτ)
-#         w = 1.0 ./ (error .+ 1e-16)
-
-#         for i = 1:Nτ
-#             w[i, :] /= sum(w[i, :]) / length(w[i, :])
-#         end
-#         B = w .* kernel
-#         C = w .* Gτ
-#     end
-#     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
-#     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-#     coeff = B \ C #solve C = B * coeff
-
-#     # println("size", size(coeff), ", rank,", dlr.size, "...,", size(kernel))
-
-#     if isnothing(sumrule) == false
-#         #make sure Gτ doesn't get modified after the linear fitting
-#         for i in 1:Nτ
-#             # Gτ[i, :] .+= kernelN[i] * sumrule / kerN
-#             Gτ[i, :] .+= kernelN[i] * sumrule
-#         end
-#         #add back the coeff that are fixed by the sum rule
-#         coeffmore = sumrule' .- sum(coeff, dims = 1)
-#         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-#         cnew[1:M-1, :] = coeff[1:M-1, :]
-#         cnew[M+1:end, :] = coeff[M:end, :]
-#         cnew[M, :] = coeffmore
-#         # for j in 1:N
-#         #     cnew[:, j] = sumrule[j]
-#         # end
-#         # println(ker)
-#         # println(coeff)
-#         # println(dot(ker, coeff))
-#         # cnew[M, 1] = (sumrule - dot(ker, coeff)) / kerN
-#         return cnew
-#     else
-#         return coeff
-#     end
-# end
 
 function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
@@ -350,15 +234,15 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
-        if length(dlrGrid.kernel_τ) == 1
-            dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
-        end
-        kernel = dlrGrid.kernel_τ
-    else
-        kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
-    end
-
+    # if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+    #     if length(dlrGrid.kernel_τ) == 1
+    #         dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
+    #     end
+    #     kernel = dlrGrid.kernel_τ
+    # else
+    #     kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
+    # end
+    kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
@@ -375,17 +259,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
         error, partialsize = _tensor2matrix(error, Val(axis))
     end
 
-    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        _left_symmetrize!(g,:ω) #symmetrize g to calculate coeff
-    end
-
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
-
-    if dlrGrid.symmetry == :sym 
-        _left_symmetrize!(g,:τ) #After calculating coeff, return g to original one
-    end
-
 
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
@@ -429,18 +303,9 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     else
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
-    if dlrGrid.symmetry == :sym
-        _left_symmetrize!(kernel, :τ)        
-    end
-    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
     g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
-    if dlrGrid.symmetry == :sym
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        _left_symmetrize!(kernel,:ω)
-        #kernel = _left_symmetrize(kernel,:ω)
-    end
     return g
     #return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 
@@ -495,10 +360,6 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     # end
 
     g, partialsize = _tensor2matrix(green, Val(axis))
-    if dlrGrid.symmetry == :sym # Symmetrized kernel requires the input Green's function to be also symmetrized accordingly.
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        _left_symmetrize!(g,:τ) # symmetrize g to calculate coeff
-    end
 
 
     if isnothing(sumrule) == false
@@ -516,9 +377,6 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     end
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
 
-    if dlrGrid.symmetry == :sym 
-        _left_symmetrize!(g,:ω) #After calculating coeff, return g to original one
-    end
 
 
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
@@ -572,21 +430,11 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     end
-    if dlrGrid.symmetry == :sym
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        _left_symmetrize!(kernel,:ω)
-        #kernel = _left_symmetrize(kernel,:ω)
-    end
         
     g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
     
     
     
-    if dlrGrid.symmetry == :sym
-        @assert is_symmetrized(dlrGrid) "DLR grid is not properly symmetrized!"
-        _left_symmetrize!(kernel,:τ)
-        #kernel = _left_symmetrize(kernel,:ω)
-    end
     return g
     #return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end

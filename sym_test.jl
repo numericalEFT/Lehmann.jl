@@ -1,7 +1,7 @@
 # Use this script to generate grid files and save them into a given folder
 using Lehmann
 using Printf
-
+using Cthulhu
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
 
 function MultiPole(dlr, grid, type)
