@@ -185,8 +185,7 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-    # coeff = zeros(promote_type(eltype(B), eltype(C)) , Nω, size(C)[2])
-    coeff = B \ C
+    coeff = B \ C#solve C = B * coeff
      
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
@@ -297,8 +296,6 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
     return  _matrix_tensor_dot(kernel, dlrcoeff, axis)
-    #return _matrix_tensor_dot(kernel, dlrcoeff, axis)
-
  
 end
 

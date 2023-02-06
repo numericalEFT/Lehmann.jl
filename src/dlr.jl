@@ -207,60 +207,25 @@ Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
 function symmetrize_ω(ω)
-    # for a real frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
-    # zero_idx=searchsortedfirst(ω,0)
-    # ω_neg=ω[1:zero_idx-1]
-    # ω_pos=ω[zero_idx:end]
-    #ω_sort =sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
     ω_final = sort(vcat(-ω,ω))
-    # ω_final = []
-    # for i in 1:length(ω_sort)
-    #     if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
-    #         push!(ω_final,ω_sort[i])
-    #     end
-    # end
-    # ω_final =sort(vcat(-ω_final, ω_final))
     return ω_final
 end
 
 function symmetrize_τ(ω)
-    # for an imaginary time grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
-    # zero_idx=searchsortedfirst(ω,1.0/2.0)
-    # ω_neg=ω[1:zero_idx-1]
-    # ω_pos=ω[zero_idx:end]
-    # ω_sort =sort(vcat(ω_pos,1.0.-ω_neg,ω_neg, 1.0.-ω_pos))
     ω_final = sort(vcat(ω,1.0.-ω))
-    # ω_sort =sort(vcat(ω_pos,1.0.-ω_neg))
-    # ω_final = []
-    # for i in 1:length(ω_sort)
-    #     if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
-    #         push!(ω_final,ω_sort[i])
-    #     end
-    # end
-    # ω_final =sort(vcat(ω_final,1.0.-ω_final))
     return ω_final
 end
 
 function symmetrize_n(ω, isFermi)
     # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
-    #zero_idx=searchsortedfirst(ω,0)
-    print(ω)
     if isFermi
         # for fermionic grid, the sum of symmetric n grid points is -1
-        #ω_sort = sort(vcat(ω_pos,(-1).-ω_neg,ω_neg, (-1).-ω_pos))
         ω_final = sort(vcat(ω,(-1).-ω))
     else
-        # for fermionic grid, the sum of symmetric n grid points is 0
+        # for bosonic grid, the sum of symmetric n grid points is 0
         ω_except0 = ω[2:end]
         ω_final = sort(vcat(-ω_except0,0,ω_except0))
     end        
-    # ω_final = []
-    # for i in 1:length(ω_sort)
-    #     if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-16
-    #         push!(ω_final,ω_sort[i])
-    #     end
-    # end
-    # print(ω_final)
     return ω_final
 end
 
