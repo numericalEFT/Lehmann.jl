@@ -186,15 +186,7 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
     # coeff = zeros(promote_type(eltype(B), eltype(C)) , Nω, size(C)[2])
-    # if dlrGrid.symmetry==:sym
-    #     coeff[1:Nω÷2,:] =B[1:Nτ,1:Nω÷2]  \ C[1:Nτ,:]
-    #     # print("coeff left $(sum(imag(coeff1)))\n")
-    #     coeff[Nω÷2+1:end,:] = B[1:Nτ,Nω÷2+1:end]  \ C[Nτ+1:end,:]
-    #     print("$(coeff[1:10])\n")
-    # else
-    #     coeff = B \ C #solve C = B * coeff
-    # end
-    coeff = B \ C #solve C = B * coeff
+    coeff = B \ C
      
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
@@ -234,15 +226,14 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    # if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
-    #     if length(dlrGrid.kernel_τ) == 1
-    #         dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
-    #     end
-    #     kernel = dlrGrid.kernel_τ
-    # else
-    #     kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
-    # end
-    kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
+    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+        if length(dlrGrid.kernel_τ) == 1
+            dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
+        end
+        kernel = dlrGrid.kernel_τ
+    else
+        kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
+    end
     g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
@@ -305,8 +296,7 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     end
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-    g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
-    return g
+    return  _matrix_tensor_dot(kernel, dlrcoeff, axis)
     #return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 
  
@@ -431,12 +421,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
         end
     end
         
-    g = _matrix_tensor_dot(kernel, dlrcoeff, axis)
-    
-    
-    
-    return g
-    #return _matrix_tensor_dot(kernel, dlrcoeff, axis)
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """

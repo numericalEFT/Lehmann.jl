@@ -49,18 +49,16 @@ for lambda in Λ
         print("SDLR symmetrized is $(is_symmetrized(dlr))\n")
         #Gdlr0 = SemiCircle(dlr_none, dlr_none.τ, :τ)
         #Gfreq0 = SemiCircle(dlr_none,dlr_none.n, :n)
-        Gdlr0 = MultiPole(dlr_none, dlr_none.τ, :τ)
-        Gfreq0 = MultiPole(dlr_none,dlr_none.n, :n)
-        E = 1.0
-        Gdlr0 = bare_G(dlr, E, :τ)
-        #Gdlr0 = Gdlr0 +reverse(Gdlr0)
-        Gfreq0 = bare_G(dlr, E, :n)
-        #Gfreq0 = Gfreq0+reverse(Gfreq0)
+        #Gdlr0 = MultiPole(dlr_none, dlr_none.τ, :τ)
+        #Gfreq0 = MultiPole(dlr_none,dlr_none.n, :n)
         #Gdlr0 = tau2tau(dlr_none, Gdlr0, dlr.τ,dlr_none.τ)
         #Gfreq0 = matfreq2matfreq(dlr_none, Gfreq0, dlr.n, dlr_none.n)
+
+        E = 1.0
+        Gdlr0 = bare_G(dlr, E, :τ)
+        Gfreq0 = bare_G(dlr, E, :n)
         Gdlr = copy(Gdlr0)
         Gfreq = copy(Gfreq0)
-
         Gτ_compare = matfreq2tau(dlr_none, Gfreq, dlr.τ, dlr.n)
         #dlrcoeff =  tau2dlr(dlr_none,dlr.τ,Gdlr)
         
@@ -84,6 +82,10 @@ for lambda in Λ
         #         Gfreq[i] = (Gfreq0[i]+Gfreq0[length(dlr.n)-i+1])/2
         #     end
         # end
+        Gtau_compare = tau2tau(dlr, Gdlr, dlr.τ, dlr.τ)
+        
+        print("τ->τ max error from DLR: $(findmax(abs.(Gdlr-Gtau_compare)))\n")
+
         Gfreq_compare = tau2matfreq(dlr, Gdlr, dlr.n, dlr.τ)
         #dlrcoeff =  tau2dlr(dlr, Gdlr)
         #print("dlr coeff imag $(sum(imag(dlrcoeff)))")
