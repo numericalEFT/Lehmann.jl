@@ -29,7 +29,7 @@ struct FreqFineMesh{D} <: FQR.FineMesh
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
-    function FreqFineMesh{D}(Λ, rtol; sym = 0) where {D}
+    function FreqFineMesh{D}(Λ, rtol; sym=0) where {D}
         # initialize the residual on fineGrid with <g, g>
         _finegrid = Float.(fineGrid(Λ, rtol))
         separationTest(D, _finegrid)
@@ -91,7 +91,7 @@ function fineGrid(Λ, rtol)
     # return grid
 
     ############# DLR based fine grid ##########################################
-    dlr = DLRGrid(Euv = Float64(Λ), beta = 1.0, rtol = Float64(rtol) / 100, isFermi = true, symmetry = :ph, rebuild = true)
+    dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
     # println("fine basis number: $(dlr.size)\n", dlr.ω)
     degree = 4
     grid = Vector{Double}(undef, 0)
@@ -123,7 +123,7 @@ function separationTest(D, finegrid)
                 end
             end
         end
-    elseif D==1
+    elseif D == 1
         return
     else
         error("not implemented!")
@@ -283,10 +283,10 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 2
+    D = 1
 
-    lambda, rtol = 10, 1e-4
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
+    lambda, rtol = 1000, 1e-8
+    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
 
     # KK = zeros(3, 3)
     # n = (2, 2)
@@ -303,12 +303,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # println()
 
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
-    FQR.qr!(basis, verbose = 1)
+    FQR.qr!(basis, verbose=1)
 
     lambda, rtol = 1000, 1e-8
-    mesh = FreqFineMesh{D}(lambda, rtol, sym = 0)
+    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
     basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
-    @time FQR.qr!(basis, verbose = 1)
+    @time FQR.qr!(basis, verbose=1)
 
     FQR.test(basis)
 
