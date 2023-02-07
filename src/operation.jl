@@ -152,8 +152,8 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     if isnothing(sumrule) == false #require sumrule
         @assert dlrGrid.symmetry == :none && dlrGrid.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
-        M = Int(floor(dlrGrid.size / 2))
-        # M = dlrGrid.size
+        M = Int(floor(length(dlrGrid.ω) / 2))
+        # M = length(dlrGrid.ω)
 
         kernel_m0 = kernel[:, M]
         # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
@@ -225,7 +225,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+    if length(τGrid) == length(dlrGrid.τ) && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -285,7 +285,7 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+    if length(τGrid) == length(dlrGrid.τ) && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -320,7 +320,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     ωGrid = dlrGrid.ω
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -329,7 +329,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -399,7 +399,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
     ωGrid = dlrGrid.ω
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -408,7 +408,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end

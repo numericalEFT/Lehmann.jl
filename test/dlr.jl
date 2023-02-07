@@ -135,7 +135,7 @@ end
         # end
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
+        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 5000, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -145,16 +145,17 @@ end
         #=========================================================================================#
 
         # err = 10 * eps
-        atol = eps
-        noise = atol * rand(eltype(Gsample), length(Gsample))
-        GNoisy = Gsample .+ noise
-        compare_atol("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error=abs.(noise)), Gdlr, atol, para)
+        if symmetry!=:sym
+            atol = eps
+            noise = atol * rand(eltype(Gsample), length(Gsample))
+            GNoisy = Gsample .+ noise
+            compare_atol("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error=abs.(noise)), Gdlr, atol, para)
 
-        noise = atol * rand(eltype(Gnsample), length(Gnsample))
-        GnNoisy = Gnsample .+ noise
-        compare_atol("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error=abs.(noise)), Gndlr, atol, para)
+            noise = atol * rand(eltype(Gnsample), length(Gnsample))
+            GnNoisy = Gnsample .+ noise
+            compare_atol("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error=abs.(noise)), Gndlr, atol, para)
+        end
     end
-
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [SemiCircle, MultiPole]
     Λ = [1e3, 1e5, 1e7]
@@ -168,6 +169,8 @@ end
                 test(case, true, :ph, 1.0, l, r)
                 test(case, false, :pha, 1.0, l, r)
                 test(case, true, :pha, 1.0, l, r)
+                test(case, false, :sym, 1.0, l, r)
+                test(case, true, :sym, 1.0, l, r)
             end
         end
     end

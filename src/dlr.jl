@@ -137,7 +137,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
             return "pha_$(lambda)_$(errstr).dlr"
         elseif symmetry == :sym
             if isFermi
-                return "pha_$(lambda)_$(errstr).dlr"
+                return "ph_$(lambda)_$(errstr).dlr"
             else
                 return "ph_$(lambda)_$(errstr).dlr"
             end
@@ -207,7 +207,8 @@ Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
 function symmetrize_ω(ω)
-    ω_final = sort(vcat(-ω,ω))
+    ω_except0 = ω[2:end]
+    ω_final = sort(vcat(-ω_except0,0.0,ω_except0))
     return ω_final
 end
 

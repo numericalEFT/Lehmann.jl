@@ -284,7 +284,6 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
         end
     elseif symmetry == :sym
         return isFermi ?  kernelFermiSymΩ(n, ω, β) : kernelBoseSymΩ(n, ω, β)
-
     elseif symmetry == :ph
         return isFermi ? kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
     elseif symmetry == :pha
@@ -402,7 +401,12 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 @inline function kernelBoseSymΩ(n::Int, ω::T, β::T) where {T<:AbstractFloat}
     # fermionic Matsurbara frequency
     ω_n = (2 * n) * π / β
-    G = -sign(ω)*(1.0 - exp(-abs(ω)*β))/ (ω_n * im - ω)
+    x = abs(ω) * β
+    if n == 0 && x < 1.0e-5
+        G = β * (1 - x / 2 + x^2 / 6) 
+    else
+        G = -sign(ω)*(1.0 - exp(-abs(ω)*β))/ (ω_n * im - ω)
+    end
     if !isfinite(G)
         throw(DomainError(-1, "Got $G for the parameter $n, $ω and $β"))
     end
