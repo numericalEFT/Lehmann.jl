@@ -137,9 +137,9 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
             return "pha_$(lambda)_$(errstr).dlr"
         elseif symmetry == :sym
             if isFermi
-                return "ph_$(lambda)_$(errstr).dlr"
+                return "universal_$(lambda)_$(errstr).dlr"
             else
-                return "ph_$(lambda)_$(errstr).dlr"
+                return "universal_$(lambda)_$(errstr).dlr"
             end
         else
             error("$symmetry is not implemented!")
@@ -206,29 +206,94 @@ Base.size(dlrGrid::DLRGrid) = (length(dlrGrid.ω),) # following the Julia conven
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
+# function symmetrize_ω(ω)
+#     # ω_except0 = ω[2:end]
+#     # ω_final = sort(vcat(-ω_except0,0.0,ω_except0))
+#     ω_final = sort(vcat(-ω,ω))
+#     return ω_final
+# end
+
+# function symmetrize_τ(ω)
+#     ω_final = sort(vcat(ω,1.0.-ω))
+#     return ω_final
+# end
+
+# function symmetrize_n(ω, isFermi)
+#     # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+#     if isFermi
+#         # for fermionic grid, the sum of symmetric n grid points is -1
+#         ω_final = sort(vcat(ω,(-1).-ω))
+#     else
+#         # for bosonic grid, the sum of symmetric n grid points is 0
+#         ω_except0 = ω[2:end]
+#         ω_final = sort(vcat(-ω_except0,0,ω_except0))
+#     end        
+#     return ω_final
+# end
+
 function symmetrize_ω(ω)
-    ω_except0 = ω[2:end]
-    ω_final = sort(vcat(-ω_except0,0.0,ω_except0))
+    # for a real frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+    zero_idx=searchsortedfirst(ω,0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
+    #ω_sort =sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
+    ω_sort =sort(vcat(ω_pos,-ω_neg))
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
+            push!(ω_final,ω_sort[i])
+        end
+    end
+    ω_final =sort(vcat(-ω_final, ω_final))
+    #println(ω_final+reverse(ω_final))
     return ω_final
 end
 
 function symmetrize_τ(ω)
-    ω_final = sort(vcat(ω,1.0.-ω))
+    # for an imaginary time grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+    zero_idx=searchsortedfirst(ω,1.0/2.0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
+    #print("size pos $(ω_pos)\n")
+    #print("size neg $(ω_neg)\n")
+    # ω_sort =sort(vcat(ω_pos,1.0.-ω_neg,ω_neg, 1.0.-ω_pos))
+    ω_sort =sort(vcat(ω_pos,1.0.-ω_neg))
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
+            push!(ω_final,ω_sort[i])
+        end
+    end
+    ω_final =sort(vcat(ω_final,1.0.-ω_final))
+    #print("size final $(ω_final)\n")
+
     return ω_final
 end
 
 function symmetrize_n(ω, isFermi)
     # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+
+    zero_idx=searchsortedfirst(ω,0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
     if isFermi
         # for fermionic grid, the sum of symmetric n grid points is -1
-        ω_final = sort(vcat(ω,(-1).-ω))
+        ω_sort = sort(vcat(ω_pos,(-1).-ω_neg,ω_neg, (-1).-ω_pos))
     else
-        # for bosonic grid, the sum of symmetric n grid points is 0
-        ω_except0 = ω[2:end]
-        ω_final = sort(vcat(-ω_except0,0,ω_except0))
+        # for fermionic grid, the sum of symmetric n grid points is 0
+        ω_sort = sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
     end        
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-16
+            push!(ω_final,ω_sort[i])
+        end
+    end
+
     return ω_final
 end
+
+
 
 function is_symmetrized(dlrGrid::DLRGrid)
     if dlrGrid.isFermi
