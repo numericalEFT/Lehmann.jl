@@ -45,9 +45,9 @@ function ωChebyGrid(dlrGrid, degree, print = true)
         end
         pbpo[1:npo] = -pbpo[2npo+1:-1:npo+2]
     end
+
     return CompositeChebyshevGrid(degree, pbpo)
 end
-
 function τChebyGrid(dlrGrid, degree, print = true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
@@ -184,7 +184,7 @@ function preciseKernelΩn(dlrGrid, ω, print::Bool = true)
             nGrid[(i-1)*degree+1:i*degree] = Freq2Index(isFermi, a .+ (b - a) .* xc)
         end
         unique!(nGrid)
-        return symmetry == :none ? vcat(-nGrid[end:-1:2], nGrid) : nGrid
+        return symmetry == :none || symmetry == :sym ? vcat(-nGrid[end:-1:2], nGrid) : nGrid
     end
 
     ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω

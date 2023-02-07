@@ -94,7 +94,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
     # println("Get $Λ")
     @assert rtol > 0.0 "rtol=$rtol is not positive and nonzero!"
     @assert Λ > 0 "Energy scale $Λ must be positive!"
-    @assert symmetry == :ph || symmetry == :pha || symmetry == :none "symmetry must be :ph, :pha or nothing"
+    @assert symmetry == :ph || symmetry == :pha || symmetry == :none || symmetry == :sym "symmetry must be :ph, :pha , :sym or :none"
     @assert algorithm == :functional || algorithm == :discrete "Algorithm is either :functional or :discrete"
     @assert β > 0.0 "Inverse temperature must be temperature."
     @assert Euv > 0.0 "Energy cutoff must be positive."
@@ -135,6 +135,12 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
             return "ph_$(lambda)_$(errstr).dlr"
         elseif symmetry == :pha
             return "pha_$(lambda)_$(errstr).dlr"
+        elseif symmetry == :sym
+            if isFermi
+                return "universal_$(lambda)_$(errstr).dlr"
+            else
+                return "universal_$(lambda)_$(errstr).dlr"
+            end
         else
             error("$symmetry is not implemented!")
         end
@@ -200,6 +206,114 @@ Base.size(dlrGrid::DLRGrid) = (length(dlrGrid.ω),) # following the Julia conven
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 rank(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
+# function symmetrize_ω(ω)
+#     # ω_except0 = ω[2:end]
+#     # ω_final = sort(vcat(-ω_except0,0.0,ω_except0))
+#     ω_final = sort(vcat(-ω,ω))
+#     return ω_final
+# end
+
+# function symmetrize_τ(ω)
+#     ω_final = sort(vcat(ω,1.0.-ω))
+#     return ω_final
+# end
+
+# function symmetrize_n(ω, isFermi)
+#     # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+#     if isFermi
+#         # for fermionic grid, the sum of symmetric n grid points is -1
+#         ω_final = sort(vcat(ω,(-1).-ω))
+#     else
+#         # for bosonic grid, the sum of symmetric n grid points is 0
+#         ω_except0 = ω[2:end]
+#         ω_final = sort(vcat(-ω_except0,0,ω_except0))
+#     end        
+#     return ω_final
+# end
+
+function symmetrize_ω(ω)
+    # for a real frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+    zero_idx=searchsortedfirst(ω,0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
+    #ω_sort =sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
+    ω_sort =sort(vcat(ω_pos,-ω_neg))
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
+            push!(ω_final,ω_sort[i])
+        end
+    end
+    ω_final =sort(vcat(-ω_final, ω_final))
+    #println(ω_final+reverse(ω_final))
+    return ω_final
+end
+
+function symmetrize_τ(ω)
+    # for an imaginary time grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+    zero_idx=searchsortedfirst(ω,1.0/2.0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
+    #print("size pos $(ω_pos)\n")
+    #print("size neg $(ω_neg)\n")
+    # ω_sort =sort(vcat(ω_pos,1.0.-ω_neg,ω_neg, 1.0.-ω_pos))
+    ω_sort =sort(vcat(ω_pos,1.0.-ω_neg))
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-10
+            push!(ω_final,ω_sort[i])
+        end
+    end
+    ω_final =sort(vcat(ω_final,1.0.-ω_final))
+    #print("size final $(ω_final)\n")
+
+    return ω_final
+end
+
+function symmetrize_n(ω, isFermi)
+    # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
+
+    zero_idx=searchsortedfirst(ω,0)
+    ω_neg=ω[1:zero_idx-1]
+    ω_pos=ω[zero_idx:end]
+    if isFermi
+        # for fermionic grid, the sum of symmetric n grid points is -1
+        ω_sort = sort(vcat(ω_pos,(-1).-ω_neg,ω_neg, (-1).-ω_pos))
+    else
+        # for fermionic grid, the sum of symmetric n grid points is 0
+        ω_sort = sort(vcat(ω_pos,-ω_neg,ω_neg, -ω_pos))
+    end        
+    ω_final = []
+    for i in 1:length(ω_sort)
+        if i==1 || abs(ω_sort[i]-ω_sort[i-1])>1e-16
+            push!(ω_final,ω_sort[i])
+        end
+    end
+
+    return ω_final
+end
+
+
+
+function is_symmetrized(dlrGrid::DLRGrid)
+    if dlrGrid.isFermi
+        @assert  iseven(length(dlrGrid.n)) "Matsubara frequency grids in symmetrized DlrGrid has to have even number of points for fermions"
+    else
+        @assert  isodd(length(dlrGrid.n)) "Matsubara frequency grids in symmetrized DlrGrid has to have odd number of points for bosons"
+    end
+    @assert  iseven(length(dlrGrid.τ)) "Imaginary time grids in symmetrized DlrGrid has to have even number of points"
+    n = dlrGrid.n + reverse(dlrGrid.n)
+    τ = dlrGrid.τ + reverse(dlrGrid.τ)
+    #ω = dlrGrid.ω + reverse(dlrGrid.ω)
+    ωn = dlrGrid.ωn + reverse(dlrGrid.ωn)
+    if dlrGrid.isFermi
+        n0 = -1
+    else
+        n0 = 0
+    end
+    return maximum(n0.-n)==0 && maximum(abs.(dlrGrid.β.-τ))<1e-8
+end
+
 function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
 
     grid = readdlm(dlrfile, comments=true, comment_char='#')
@@ -210,15 +324,28 @@ function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
 
     if dlrGrid.isFermi
         n = Int.(grid[:, 4])
-        ωn = @. (2n + 1.0) * π / β
     else
         n = Int.(grid[:, 5])
+    end
+    if dlrGrid.symmetry==:sym
+        ω = symmetrize_ω(ω)
+        τ = symmetrize_τ(τ)
+        n = symmetrize_n(n,dlrGrid.isFermi)
+    end
+    if dlrGrid.isFermi
+        ωn = @. (2n + 1.0) * π / β
+    else
         ωn = @. 2n * π / β
     end
+
     for r = 1:length(ω)
         push!(dlrGrid.ω, ω[r] / β)
+    end
+    for r = 1:length(τ)
         push!(dlrGrid.τ, τ[r] * β)
-        push!(dlrGrid.n, n[r])
+    end
+    for r = 1:length(n)
+    push!(dlrGrid.n, n[r])
         push!(dlrGrid.ωn, ωn[r])
     end
     verbose && println(dlrGrid)
@@ -227,7 +354,7 @@ end
 function _build!(dlrGrid::DLRGrid, folder, filename, algorithm, verbose=false)
     isFermi = dlrGrid.isFermi
     β = dlrGrid.β
-    if algorithm == :discrete || dlrGrid.symmetry == :none
+    if algorithm == :discrete || dlrGrid.symmetry == :none || dlrGrid.symmetry == :sym
         ω, τ, nF, nB = Discrete.build(dlrGrid, verbose)
     elseif algorithm == :functional && (dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha)
         ω, τ, nF, nB = Functional.build(dlrGrid, verbose)
@@ -258,8 +385,8 @@ function Base.show(io::IO, dlr::DLRGrid)
     title = dlr.isFermi ? "ferminoic" : "bosonic"
     println(io, "rank = $(dlr.size) $title DLR with $(dlr.symmetry) symmetry: Euv = $(dlr.Euv), β = $(dlr.β), rtol = $(dlr.rtol)")
     @printf(io, "# %5s  %28s  %28s  %28s      %20s\n", "index", "freq", "tau", "ωn", "n")
-    for r = 1:dlr.size
-        @printf(io, "%5i  %32.17g  %32.17g  %32.17g  %16i\n", r, dlr.ω[r], dlr.τ[r], dlr.ωn[r], dlr.n[r])
-    end
+    #for r = 1:dlr.size
+    #    @printf(io, "%5i  %32.17g  %32.17g  %32.17g  %16i\n", r, dlr.ω[r], dlr.τ[r], dlr.ωn[r], dlr.n[r])
+    #end
 
 end
