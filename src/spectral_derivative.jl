@@ -93,10 +93,10 @@ function kernelFermiT_dω3(τ::T, ω::T, β::T) where {T<:AbstractFloat}
     end
     expa = exp(ω * a)
     expb = exp(ω * b)
-    expmb = expm1(ω * b) # exp(ω*b) -1
+    expmb2 = expm1(2 * ω * b) # exp(2*ω*b) -1
     exppb = 1 + expb
     return sign * expa / exppb * ((-1 + 4expb - expb^2) * b^3 * expb / exppb^3 +
-                                  3a * b^2 * expb * expmb / exppb^2 -
+                                  3a * b^2 * expb * expmb2 / exppb^2 -
                                   3 * a^2 * b * expb / exppb + a^3)
 end
 
