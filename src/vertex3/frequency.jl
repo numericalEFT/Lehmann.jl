@@ -283,8 +283,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 1
-
+    D = 2
     lambda, rtol = 1000, 1e-8
     mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
 
@@ -302,12 +301,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # display(KK)
     # println()
 
-    basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
+    basis = FQR.Basis{FreqGrid}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose=1)
 
     lambda, rtol = 1000, 1e-8
     mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
-    basis = FQR.Basis{D,FreqGrid{D}}(lambda, rtol, mesh)
+    basis = FQR.Basis{FreqGrid}(lambda, rtol, mesh)
     @time FQR.qr!(basis, verbose=1)
 
     FQR.test(basis)

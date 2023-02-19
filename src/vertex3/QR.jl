@@ -32,7 +32,7 @@ mirror(g) = error("QR.mirror for $(typeof(g)) is not implemented!")
 irreducible(g) = error("QR.irreducible for $(typeof(g)) is not implemented!")
 #################################################################################
 
-mutable struct Basis{D,Grid,Mesh}
+mutable struct Basis{Grid,Mesh}
     ############    fundamental parameters  ##################
     Λ::Float  # UV energy cutoff * inverse temperature
     rtol::Float # error tolerance
@@ -49,14 +49,14 @@ mutable struct Basis{D,Grid,Mesh}
     ############ fine mesh #################
     mesh::Mesh
 
-    function Basis{d,Grid}(Λ, rtol, mesh::Mesh) where {d,Grid,Mesh}
+    function Basis{Grid}(Λ, rtol, mesh::Mesh) where {Grid,Mesh}
         _Q = Matrix{Float}(undef, (0, 0))
         _R = similar(_Q)
-        return new{d,Grid,Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
+        return new{Grid,Mesh}(Λ, rtol, 0, [], [], _Q, _R, mesh)
     end
 end
 
-function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
+function addBasis!(basis::Basis{G,M}, grid, verbose) where {G,M}
     basis.N += 1
     push!(basis.grid, grid)
 
@@ -73,7 +73,7 @@ function addBasis!(basis::Basis{D,G,M}, grid, verbose) where {D,G,M}
     (verbose > 0) && @printf("%3i %s -> error=%16.8g, Rmin=%16.8g\n", basis.N, "$(grid)", basis.error[end], basis.R[end, end])
 end
 
-function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
+function addBasisBlock!(basis::Basis{G,M}, idx, verbose) where {G,M}
     _norm = sqrt(basis.mesh.residual[idx]) # the norm derived from the delta update in updateResidual
     addBasis!(basis, basis.mesh.candidates[idx], verbose)
     _R = basis.R[end, end] # the norm derived from the GramSchmidt
@@ -93,7 +93,7 @@ function addBasisBlock!(basis::Basis{D,G,M}, idx, verbose) where {D,G,M}
     end
 end
 
-function updateResidual!(basis::Basis{D}) where {D}
+function updateResidual!(basis::Basis)
     mesh = basis.mesh
 
     # q = Float.(basis.Q[end, :])
@@ -121,7 +121,7 @@ end
 """
 Gram-Schmidt process to the last grid point in basis.grid
 """
-function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
+function GramSchmidt(basis::Basis{G,M}) where {G,M}
     _Q = zeros(Double, (basis.N, basis.N))
     _Q[1:end-1, 1:end-1] = basis.Q
 
@@ -149,7 +149,7 @@ function GramSchmidt(basis::Basis{D,G,M}) where {D,G,M}
     return _Q, _R
 end
 
-function test(basis::Basis{D}) where {D}
+function test(basis::Basis)
     println("testing orthognalization...")
     KK = zeros(Double, (basis.N, basis.N))
     Threads.@threads for i in 1:basis.N
@@ -187,7 +187,7 @@ end
 #     println("Max deviation from zero residual on the DLR grids: ", maximum(abs.(basis.residualFineGrid[basis.gridIdx])))
 # end
 
-function qr!(basis::Basis{dim,G,M}; initial = [], N = 10000, verbose = 0) where {dim,G,M}
+function qr!(basis::Basis{G,M}; initial = [], N = 10000, verbose = 0) where {G,M}
     #### add the grid in the idx vector first
 
     for i in initial
