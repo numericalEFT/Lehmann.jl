@@ -4,13 +4,14 @@ using LinearAlgebra, Printf
 using StaticArrays
 # using GenericLinearAlgebra
 
-const Float = Float64
+# const Float = BigFloat
 
 ### faster, a couple of less digits
 using DoubleFloats
-# const Float = Double64
-const Double = Double64
-
+#const Float = Double64
+#const Double = Double64
+const Float = BigFloat
+const Double = BigFloat
 # similar speed as DoubleFloats
 # using MultiFloats
 # const Float = Float64x2
@@ -56,6 +57,7 @@ mutable struct Basis{Grid,Mesh}
     end
 end
 
+
 function addBasis!(basis::Basis{G,M}, grid, verbose) where {G,M}
     basis.N += 1
     push!(basis.grid, grid)
@@ -87,7 +89,7 @@ function addBasisBlock!(basis::Basis{G,M}, idx, verbose) where {G,M}
     basis.mesh.selected[idx] = true
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
 
-    # println(mirror(basis.mesh, idx))
+    println(mirror(basis.mesh, idx))
     for grid in mirror(basis.mesh, idx)
         addBasis!(basis, grid, verbose)
     end
@@ -165,6 +167,7 @@ function test(basis::Basis)
     println("Max R*R^{-1} Error: ", maxerr)
 
     II = basis.Q' * KK * basis.Q
+    #print([II[i,i] for i in 1:length(II[1,:])])
     maxerr = maximum(abs.(II - I))
     println("Max Orthognalization Error: ", maxerr)
 
@@ -198,6 +201,7 @@ function qr!(basis::Basis{G,M}; initial = [], N = 10000, verbose = 0) where {G,M
     maxResidual, idx = findmax(basis.mesh.residual)
     while sqrt(maxResidual) > basis.rtol && basis.N < N
         addBasisBlock!(basis, idx, verbose)
+        # test(basis)
         maxResidual, idx = findmax(basis.mesh.residual)
     end
     @printf("rtol = %.16e\n", sqrt(maxResidual))
