@@ -1,15 +1,11 @@
-include("QR.jl")
 # using QR
 using Lehmann
 using StaticArrays, Printf
 using CompositeGrids
 using LinearAlgebra
-const Float = FQR.Float
-const Double = FQR.Double
-const DotF = FQR.Float
-const Tiny = DotF(1e-5)
+using DelimitedFiles
 
-struct MatsuGrid <: FQR.Grid
+struct MatsuGrid{Float} <: FQR.Grid
     n::Int             # actual location of the grid point   
     coord::Int         # integer coordinate of the grid point on the fine meshes
     vec::Vector{Complex{Float}}
@@ -17,20 +13,21 @@ end
 
 Base.show(io::IO, grid::MatsuGrid) = print(io, "n = ($(@sprintf("%d", grid.n[1])))")
 
-struct MatsuFineMesh <: FQR.FineMesh
+struct MatsuFineMesh{Float} <: FQR.FineMesh
     isFermi::Bool                   #Fermion or Bosonic Matsubara Frequency
     symmetry::Int                         # symmetrize (omega1, omega2) <-> (omega2, omega1)
-    candidates::Vector{MatsuGrid}       # vector of grid points
+    candidates::Vector{MatsuGrid{Float}}       # vector of grid points
     selected::Vector{Bool}
-    residual::Vector{Double}
+    residual::Vector{Float}
 
     ## for frequency mesh only ###
-    fineGrid::Vector{Float}         # fine grid for each dimension
-    function MatsuFineMesh(Λ, FreqMesh, isFermi; sym=1)
+    fineGrid::Vector{Int}         # fine grid for each dimension
+    function MatsuFineMesh{Float}(Λ, FreqMesh, isFermi; sym=1) where {Float}
         # initialize the residual on fineGrid with <g, g>
 
         #_finegrid = Float.(fineGrid(Λ, rtol))
         _finegrid = Int.(nGrid(isFermi,Λ))
+        #print("ngrid $(_finegrid)\n")
         # separationTest(_finegrid)
         mesh = new(isFermi, sym, [], [], [], _finegrid)
 
@@ -44,7 +41,7 @@ struct MatsuFineMesh <: FQR.FineMesh
             end
             g = MatsuGrid(x, coord, vec)
             push!(mesh.candidates, g)
-            push!(mesh.residual, FQR.dot(mesh, g, g))
+            push!(mesh.residual, FQR.dot(mesh, g, g) )
             push!(mesh.selected, false)
             #end
         end
@@ -66,7 +63,7 @@ end
 
 function nGrid(isFermi, Λ,degree = 100)
     # generate n grid from a logarithmic fine grid
-    np = Int(round(log(10 * Λ) / log(2)))
+    np = Int(round(log(10*10 * Λ) / log(2)))
     xc = [(i - 1) / degree for i = 1:degree]
     panel = [2^(i - 1) - 1 for i = 1:(np+1)]
     nGrid = zeros(Int, np * degree)
@@ -75,7 +72,11 @@ function nGrid(isFermi, Λ,degree = 100)
         nGrid[(i-1)*degree+1:i*degree] = Freq2Index(isFermi, a .+ (b - a) .* xc)
     end
     unique!(nGrid)
-    return vcat(-nGrid[end:-1:2], nGrid)
+    if isFermi
+        return vcat(-nGrid[end:-1:1] .-1.0, nGrid)
+    else
+        return  vcat(-nGrid[end:-1:2], nGrid)
+    end
 end
 
 # """
@@ -100,46 +101,26 @@ end
 #     return grid
 # end
 
-"""
-Test the finegrids do not overlap
-"""
-function separationTest(finegrid)
-    epsilon = eps(DotF(1)) * 10
-    for (i, f) in enumerate(finegrid)
-        # either zero, or sufficiently large
-        @assert abs(f) < epsilon || abs(f) > Tiny "$i: $f should either smaller than $epsilon or larger than $Tiny"
-        for (j, g) in enumerate(finegrid)
-            # two frequencies are either the same, or well separated
-            @assert abs(f - g) < epsilon || abs(f - g) > Tiny "$i: $f and $j: $g should either closer than $epsilon or further than $Tiny"
-            fg = f + g
-            for (k, l) in enumerate(finegrid)
-                @assert abs(l - fg) < epsilon || abs(l - fg) > Tiny "$i: $f + $j: $g = $fg and $k: $l should either closer than $epsilon or further than $Tiny"
-            end
-        end
-    end
-    return
-end
+# function irreducible(coord, symmetry,length)
+#     @assert iseven(length) "The fineGrid should have even number of points"
+#     if symmetry == 0
+#         return true
+#     else
+#         return coord<length÷2+1
+#     end
+# end
 
-function irreducible(coord, symmetry,length)
-    @assert iseven(length) "The fineGrid should have even number of points"
-    if symmetry == 0
-        return true
-    else
-        return coord<length÷2+1
-    end
-end
+# function FQR.irreducible(grid::MatsuGrid)
+#     return irreducible(grid.coord, mesh.symmetry, length(mesh.fineGrid))
+# end
 
-function FQR.irreducible(grid::MatsuGrid)
-    return irreducible(grid.coord, mesh.symmetry, length(mesh.fineGrid))
-end
-
-function FQR.mirror(mesh::MatsuFineMesh, idx)
+function FQR.mirror(mesh::MatsuFineMesh{Float}, idx) where {Float}
     grid = mesh.candidates[idx]
     meshsize = length(mesh.candidates)
     if mesh.symmetry == 0
         return []
     else
-        newgrids = MatsuGrid[]
+        newgrids = MatsuGrid{Float}[]
         #coords = unique([(idx), (meshsize - idx)])
         if !mesh.isFermi && grid.n==0 #For boson, n==0 do not have mirror point
             return newgrids
@@ -165,11 +146,18 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     
-    lambda, β, rtol = 1000000, 1.0,1e-12
-    dlr = DLRGrid(Euv=Float64(lambda), beta=β, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:sym, rebuild=false)
-    FreqGrid = Float.(dlr.ω)
+    lambda, β, rtol = 100000, 1.0,1e-8
+    dlr = DLRGrid(Euv=Float64(lambda), beta=β, rtol=Float64(rtol), isFermi=true, symmetry=:sym, rebuild=false)
+    print("rtol $(dlr.rtol)")
+    dlrfile = "basis.dat"
+    data = readdlm(dlrfile,'\n')
+    FreqGrid = Float.(data[:,1])
+    #FreqGrid = Float.(dlr.ω)
+    #print("$(FreqGrid)\n")
     mesh = MatsuFineMesh(lambda,FreqGrid, true, sym=1)
-
+    size = length(mesh.candidates)
+    size2 = length(mesh.candidates[1].vec)
+    println("$(mesh.candidates[size÷2].n),$(mesh.candidates[size÷2].vec[size2÷2]),$(mesh.candidates[size÷2+1].vec[size2÷2])")
     # KK = zeros(3, 3)
     # n = (2, 2)
     # o = (mesh.fineGrid[n[1]], mesh.fineGrid[n[2]])
@@ -184,7 +172,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # display(KK)
     # println()
 
-    basis = FQR.Basis{MatsuGrid}(lambda, rtol, mesh)
+    basis = FQR.Basis{MatsuGrid,Float, Complex{Double}}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose=1)
 
     # lambda, rtol = 1000, 1e-8
@@ -207,6 +195,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             println(io, n_grid[i])
         end
     end
+
     # Nfine = length(mesh.fineGrid)
     # open("finegrid.dat", "w") do io
     #     for i in 1:Nfine

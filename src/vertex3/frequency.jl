@@ -1,14 +1,13 @@
-include("QR.jl")
-# using QR
+#include("QR.jl")
 using Lehmann
 using StaticArrays, Printf
-
-const Float = FQR.Float
-const Double = FQR.Double
-const DotF = FQR.Float
+using CompositeGrids
+# const Float = BigFloat
+# const Double = BigFloat
+const DotF = BigFloat
 const Tiny = DotF(1e-5)
 
-struct FreqGrid{D} <: FQR.Grid
+struct FreqGrid{D,Float} <: FQR.Grid
     sector::Int                       # sector
     omega::SVector{D,Float}             # actual location of the grid point   
     coord::SVector{D,Int}         # integer coordinate of the grid point on the fine meshes
@@ -16,23 +15,24 @@ end
 
 Base.show(io::IO, grid::FreqGrid{2}) = print(io, "ω$(grid.sector) = ($(@sprintf("%12.4f", grid.omega[1])), $(@sprintf("%12.4f", grid.omega[2])))")
 
-struct FreqFineMesh{D} <: FQR.FineMesh
+struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
     color::Int                            # D+1 sectors
     symmetry::Int                         # symmetrize colors and (omega1, omega2) <-> (omega2, omega1)
-    candidates::Vector{FreqGrid{D}}       # vector of grid points
+    candidates::Vector{FreqGrid{D,Float}}       # vector of grid points
     selected::Vector{Bool}
     residual::Vector{Double}
 
     ## for frequency mesh only ###
-    fineGrid::Vector{Float}         # fine grid for each dimension
+    fineGrid::CompositeG.Composite    # fine grid for each dimension
     cache1::Vector{DotF}            # cache for exp(-x)
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
-    function FreqFineMesh{D}(Λ, rtol; sym=0) where {D}
+    function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=0) where {D,Float,Double}
         # initialize the residual on fineGrid with <g, g>
-        _finegrid = Float.(fineGrid(Λ, rtol))
-        separationTest(D, _finegrid)
+        _finegrid =fineGrid(Float(Λ))
+
+        #separationTest(D, _finegrid)
         Nfine = length(_finegrid)
 
         _cache1 = zeros(DotF, Nfine)
@@ -46,23 +46,33 @@ struct FreqFineMesh{D} <: FQR.FineMesh
 
         color = D + 1
         # color = 1
-        mesh = new{D}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
+        mesh = new{D,Float,Double}(color, sym, [], [], [], _finegrid, _cache1, _cache2)
 
         if D == 2
             for (xi, x) in enumerate(_finegrid)
                 for (yi, y) in enumerate(_finegrid)
                     coord = (xi, yi)
                     for sector in 1:color
-                        if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
-                            g = FreqGrid{D}(sector, (x, y), coord)
-                            push!(mesh.candidates, g)
-                            push!(mesh.residual, FQR.dot(mesh, g, g))
-                            push!(mesh.selected, false)
-                        end
+                        #if irreducible(D, sector, coord, sym)  # if grid point is in the reducible zone, then skip residual initalization
+                        g = FreqGrid{D,Float}(sector, (x, y), coord)
+                        push!(mesh.candidates, g)
+                        push!(mesh.residual, FQR.dot(mesh, g, g))
+                        push!(mesh.selected, false)
+                        #end
                     end
                 end
             end
             # elseif D == 3
+        elseif D == 1
+            for (xi, x) in enumerate(_finegrid)
+                coord = (xi,)
+                for sector in 1:color
+                    g = FreqGrid{D,Float}(sector, (x,), coord)
+                    push!(mesh.candidates, g)
+                    push!(mesh.residual, FQR.dot(mesh, g, g))
+                    push!(mesh.selected, false)
+                end
+            end
         else
             error("not implemented!")
         end
@@ -74,11 +84,11 @@ end
 """
 composite expoential grid
 """
-function fineGrid(Λ, rtol)
+function fineGrid(Λ::Float) where {Float}
     ############## use composite grid #############################################
-    # degree = 8
-    # ratio = Float(1.4)
-    # N = Int(floor(log(Λ) / log(ratio) + 1))
+    degree = 8
+    ratio = 1.2
+    N = Int(floor(log(Λ) / log(ratio) + 1))
     # panel = [Λ / ratio^(N - i) for i in 1:N]
     # grid = Vector{Float}(undef, 0)
     # for i in 1:length(panel)-1
@@ -86,23 +96,34 @@ function fineGrid(Λ, rtol)
     #     append!(grid, uniform)
     # end
     # append!(grid, Λ)
-    # println(grid)
-    # println("Composite expoential grid size: $(length(grid))")
-    # return grid
+
+    grid = CompositeGrid.LogDensedGrid(
+        :cheb,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
+        [0.0, Λ],# The grid is defined on [0.0, β]
+        [0.0,],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
+        N,# N of log grid
+        Λ / ratio^(N-1), # minimum interval length of log grid
+        degree, # N of bottom layer
+        Float
+    )
+
+    #println(grid)
+    println("Composite expoential grid size: $(length(grid))")
+    return grid
 
     ############# DLR based fine grid ##########################################
-    dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
-    # println("fine basis number: $(dlr.size)\n", dlr.ω)
-    degree = 4
-    grid = Vector{Double}(undef, 0)
-    panel = Double.(dlr.ω)
-    for i in 1:length(panel)-1
-        uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
-        append!(grid, uniform)
-    end
+    # dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
+    # # println("fine basis number: $(dlr.size)\n", dlr.ω)
+    # degree = 4
+    # grid = Vector{Double}(undef, 0)
+    # panel = Double.(dlr.ω)
+    # for i in 1:length(panel)-1
+    #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+    #     append!(grid, uniform)
+    # end
 
-    println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
-    return grid
+    # println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+    # return grid
 end
 
 """
@@ -133,7 +154,7 @@ end
 function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     fineGrid = mesh.fineGrid
     if dim == 1
-        return fineGrid[coord[1]]
+        return (fineGrid[coord[1]],)
     elseif dim == 2
         return (fineGrid[coord[1]], fineGrid[coord[2]])
     elseif dim == 3
@@ -143,33 +164,35 @@ function coord2omega(mesh::FreqFineMesh{dim}, coord) where {dim}
     end
 end
 
-function irreducible(D, sector, coord, symmetry)
-    if symmetry == 0
-        return true
-    else
-        if D == 2
-            # return (coord[1] <= coord[2]) && (sector == 1)
-            return (coord[1] <= coord[2])
-        elseif D == 3
-            # return (coord[1] <= coord[2] <= coord[3]) && (sector == 1)
-            return (coord[1] <= coord[2] <= coord[3])
-        else
-            error("not implemented!")
-        end
-    end
-end
+# function irreducible(D, sector, coord, symmetry)
+#     if symmetry == 0
+#         return true
+#     else
+#         if D == 2
+#             # return (coord[1] <= coord[2]) && (sector == 1)
+#             return (coord[1] <= coord[2])
+#         elseif D == 3
+#             # return (coord[1] <= coord[2] <= coord[3]) && (sector == 1)
+#             return (coord[1] <= coord[2] <= coord[3])
+#         else
+#             error("not implemented!")
+#         end
+#     end
+# end
 
-function FQR.irreducible(grid::FreqGrid{D}) where {D}
-    return irreducible(D, grid.sector, grid.coord, mesh.symmetry)
-end
+# function FQR.irreducible(grid::FreqGrid{D}) where {D}
+#     return irreducible(D, grid.sector, grid.coord, mesh.symmetry)
+# end
 
-function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
+function FQR.mirror(mesh::FreqFineMesh{D,Float}, idx) where {D,Float}
     grid = mesh.candidates[idx]
     coord, s = grid.coord, grid.sector
     if mesh.symmetry == 0
         return []
     end
-    if D == 2
+    if D == 1
+        coords = [(coord[1],),]
+    elseif D == 2
         x, y = coord
         coords = unique([(x, y), (y, x),])
         # println(coords)
@@ -179,16 +202,42 @@ function FQR.mirror(mesh::FreqFineMesh{D}, idx) where {D}
     else
         error("not implemented!")
     end
-    newgrids = FreqGrid{D}[]
-    # for s in 1:mesh.color
-    for c in coords
-        if s != grid.sector || c != Tuple(grid.coord)
-            push!(newgrids, FreqGrid{D}(s, coord2omega(mesh, c), c))
+    newgrids = FreqGrid{D,Float}[]
+    for s in 1:mesh.color
+        for c in coords
+            if s != grid.sector || c != Tuple(grid.coord)
+                push!(newgrids, FreqGrid{D, Float}(s, coord2omega(mesh, c), c))
+            end
         end
     end
-    # end
     return newgrids
 end
+
+
+"""
+F(x, y) = (1-exp(x+y))/(x+y)
+"""
+@inline function F1(a::T, b::T) where {T}
+    if abs(a + b) > Tiny
+        return (1 - exp(-(a + b))) / (a + b)
+    else
+        return T(1)
+    end
+end
+
+"""
+G(x, y) = (exp(-x)-exp(-y))/(x-y)
+G(x, x) = -exp(-x)
+"""
+@inline function G1(a::T, b::T) where {T}
+    if abs(a - b) > Tiny
+        return (exp(-a) - exp(-b)) / (b - a)
+    else
+        return (exp(-a) + exp(-b)) / 2
+    end
+end
+
+
 
 """
 F(x) = (1-exp(-y))/(x-y)
@@ -257,6 +306,30 @@ F(a,b,c)
 end
 
 """
+basis dot for 1D
+"""
+function FQR.dot(mesh::FreqFineMesh{1}, g1::FreqGrid{1}, g2::FreqGrid{1})
+    s1, s2 = g1.sector, g2.sector
+    ω1, ω2 = g1.omega[1], g2.omega[1]
+
+    ######### symmetrized kernel ###########
+    # if s1 == 1 && s2 == 1
+    #     return F1(ω1, ω2) + G1(ω1, ω2)
+    # elseif s1 == 2 && s2 == 2
+    #     return F1(ω1, ω2) - G1(ω1, ω2)
+    # else  #F21, F32, F13
+    #     return 0
+    # end
+
+    ######### unsymmetrized kernel ###########
+    if s1 == s2
+        return F1(ω1, ω2)
+    else
+        return G1(ω1, ω2)
+    end
+end
+
+"""
 basis dot for 2D
 """
 function FQR.dot(mesh::FreqFineMesh{2}, g1::FreqGrid{2}, g2::FreqGrid{2})
@@ -283,9 +356,8 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 
-    D = 2
-    lambda, rtol = 1000, 1e-8
-    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
+    D = 1
+    lambda, rtol = 100000, 1e-8
 
     # KK = zeros(3, 3)
     # n = (2, 2)
@@ -300,26 +372,52 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # end
     # display(KK)
     # println()
-
-    basis = FQR.Basis{FreqGrid}(lambda, rtol, mesh)
+    mesh = FreqFineMesh{D,BigFloat, BigFloat}(lambda, rtol, sym=1)
+    basis = FQR.Basis{FreqGrid, BigFloat ,BigFloat}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose=1)
 
-    lambda, rtol = 1000, 1e-8
-    mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
-    basis = FQR.Basis{FreqGrid}(lambda, rtol, mesh)
-    @time FQR.qr!(basis, verbose=1)
+    # lambda, rtol = 1000, 1e-8
+    # mesh = FreqFineMesh{D}(lambda, rtol, sym=0)
+    # basis = FQR.Basis{FreqGrid}(lambda, rtol, mesh)
+    # @time FQR.qr!(basis, verbose=1)
 
     FQR.test(basis)
 
     mesh = basis.mesh
     grids = basis.grid
+    _grids =[]
+    for (i, grid) in enumerate(grids)
+        g1, g2 = grid.omega[1], -grid.omega[1]
+        flag1, flag2 = true, true
+        for (j, _g) in enumerate(_grids)
+            if _g ≈ g1
+                flag1 = false
+            end
+            if _g ≈ g2
+                flag2 = false
+            end
+        end
+        if flag1
+            push!(_grids, g1)
+        end
+        if flag2
+            push!(_grids, g2)
+        end
+    end
+    _grids = sort(_grids)
+    println(_grids)
+    println(length(_grids))
     open("basis.dat", "w") do io
-        for (i, grid) in enumerate(grids)
-            if grid.sector == 1
-                println(io, grid.omega[1], "   ", grid.omega[2])
+        for (i, grid) in enumerate(_grids)
+            if D == 1
+                println(io, grid)
+            else
+                error("not implemented!")
             end
         end
     end
+    exit(0)
+
     Nfine = length(mesh.fineGrid)
     open("finegrid.dat", "w") do io
         for i in 1:Nfine

@@ -136,11 +136,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
         elseif symmetry == :pha
             return "pha_$(lambda)_$(errstr).dlr"
         elseif symmetry == :sym
-            if isFermi
-                return "universal_$(lambda)_$(errstr).dlr"
-            else
-                return "universal_$(lambda)_$(errstr).dlr"
-            end
+            return "sym_$(lambda)_$(errstr).dlr"
         else
             error("$symmetry is not implemented!")
         end
@@ -316,22 +312,35 @@ end
 
 function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
 
-    grid = readdlm(dlrfile, comments=true, comment_char='#')
+    β = dlrGrid.β    
+    if dlrGrid.symmetry == :sym
+        grid = readdlm(dlrfile, skipstart = 1)
+        ω = Float64.(filter(x->!isnan(x), grid[:,2]))
+        τ = Float64.(filter(x->!isnan(x), grid[:,3]))
+        if dlrGrid.isFermi
+            n = Int.(filter(x->!isnan(x), grid[:,4]))
+        else
+            n = Int.(filter(x->!isnan(x), grid[:,5]))
+        end
+        #print("$(ω) $(τ) $(n)")
+    else
+        grid = readdlm(dlrfile, comments=true, comment_char='#')
+        ω, τ = grid[:, 2], grid[:, 3]
+
+        if dlrGrid.isFermi
+            n = Int.(grid[:, 4])
+        else
+            n = Int.(grid[:, 5])
+        end
+
+    end
     # println("reading $filename")
 
-    β = dlrGrid.β
-    ω, τ = grid[:, 2], grid[:, 3]
-
-    if dlrGrid.isFermi
-        n = Int.(grid[:, 4])
-    else
-        n = Int.(grid[:, 5])
-    end
-    if dlrGrid.symmetry==:sym
-        ω = symmetrize_ω(ω)
-        τ = symmetrize_τ(τ)
-        n = symmetrize_n(n,dlrGrid.isFermi)
-    end
+    # if dlrGrid.symmetry==:sym
+    #     ω = symmetrize_ω(ω)
+    #     τ = symmetrize_τ(τ)
+    #     n = symmetrize_n(n,dlrGrid.isFermi)
+    # end
     if dlrGrid.isFermi
         ωn = @. (2n + 1.0) * π / β
     else
