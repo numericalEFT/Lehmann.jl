@@ -7,7 +7,7 @@ using StaticArrays, Printf
 using CompositeGrids
 using LinearAlgebra
 using DelimitedFiles
-
+using DoubleFloats
 function L2Residual(mesh::MatsuFineMesh)
     return FQR.matsu_sum(mesh.residual, mesh.fineGrid)
 end
@@ -67,10 +67,13 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 1
-    Err = [-6]
-    Λ = [1e5]
-    Float = BigFloat
-    Double = BigFloat
+    Err = [-10]
+    Λ = [1e14]
+    # Float = BigFloat
+    # Double = BigFloat
+    Float = Double64
+    Double = Double64
+    
     for lambda in Λ
         for err in Err
             rtol = 10.0^err
@@ -105,18 +108,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             end
             omega_grid = sort(_grids)
             #println(_grids)
-            #println(length(_grids))
-
-            # open("basis.dat", "w") do io
-            #     for (i, grid) in enumerate(_grids)
-            #         if D == 1
-            #             println(io, grid)
-            #         else
-            #             error("not implemented!")
-            #         end
-            #     end
-            # end
-   
+            #println(length(_grids))  
             ### generating tau grid
             freqgrid = Float.(omega_grid[:,1])
             mesh = TauFineMesh{Float}(lambda, freqgrid, sym=1)
@@ -132,12 +124,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
                 push!(tau_grid, grid.tau)           
             end
             tau_grid = sort(Float.(tau_grid))
-            #print(tau_grid)
-            # open("basis_τ.dat", "w") do io
-            #     for i in 1:length(tau_grid)
-            #         println(io, tau_grid[i])
-            #     end
-            # end
+
 
             ### generate Fermionic n grid
             mesh = MatsuFineMesh{Float}(lambda,freqgrid, true, sym=1)
@@ -172,7 +159,9 @@ if abspath(PROGRAM_FILE) == @__FILE__
             # tau_grid = [1.0]
             # fermi_ngrid = [1]
             # bose_ngrid = [1]
-            folder="../../basis"
+            # folder="../../basis"
+            folder="."
+            
             filename = "sym_$(Int(lambda))_1e$(err).dlr"
             rank = maximum([length(omega_grid),length(tau_grid),length(fermi_ngrid),length(bose_ngrid) ])
             nan = "NAN"

@@ -41,7 +41,7 @@ struct MatsuFineMesh{Float} <: FQR.FineMesh
             end
             g = MatsuGrid(x, coord, vec)
             push!(mesh.candidates, g)
-            push!(mesh.residual, FQR.dot(mesh, g, g) )
+            push!(mesh.residual, real.(FQR.dot(mesh, g, g)) )
             push!(mesh.selected, false)
             #end
         end
@@ -61,7 +61,7 @@ function Freq2Index(isFermi, ωnList)
     end
 end
 
-function nGrid(isFermi, Λ,degree = 100)
+function nGrid(isFermi, Λ,degree = 25)
     # generate n grid from a logarithmic fine grid
     np = Int(round(log(10*10 * Λ) / log(2)))
     xc = [(i - 1) / degree for i = 1:degree]
