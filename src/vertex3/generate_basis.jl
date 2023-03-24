@@ -67,8 +67,8 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 1
-    Err = [-10]
-    Λ = [1e14]
+    Err = [-4, -6, -8,-10]
+    Λ = [1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14]
     # Float = BigFloat
     # Double = BigFloat
     Float = Double64
