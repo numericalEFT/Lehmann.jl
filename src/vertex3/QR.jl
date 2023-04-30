@@ -89,8 +89,9 @@ function addBasisBlock!(basis::Basis, idx, verbose)
     end
 
     ## set the residual of the selected grid point to be zero
-    basis.mesh.selected[idx] = true
+    basis.mesh.selected[idx] = true        
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
+    #print("$(mirror(basis.mesh, idx))\n")
     for grid in mirror(basis.mesh, idx)
         addBasis!(basis, grid, verbose)
     end
@@ -106,13 +107,13 @@ function updateResidual!(basis::Basis{Grid, Mesh, F, D}) where {Grid,Mesh,F,D}
     Threads.@threads for idx in 1:length(mesh.candidates)
         if mesh.selected[idx] == false
             candidate = mesh.candidates[idx]
-            pp = sum(q[j] * dot(mesh, basis.grid[j], candidate) for j in 1:basis.N)
+            pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
             _residual = mesh.residual[idx] - abs(pp) * abs(pp)
             # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
             # println("working on $candidate : $_residual")
             if _residual < 0
                 if _residual < -basis.rtol
-                    @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual[idx]) - $(pp)^2 = $_residual")
+                    @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual[idx]) - $(abs(pp)^2) = $_residual")
                 end
                 mesh.residual[idx] = 0
             else

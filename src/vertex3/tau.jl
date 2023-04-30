@@ -24,11 +24,11 @@ struct TauFineMesh{Float} <: FQR.FineMesh
 
     ## for frequency mesh only ###
     fineGrid::CompositeG.Composite        # fine grid for each dimension
-    function TauFineMesh{Float}(Λ, FreqMesh; sym=1) where {Float}
+    function TauFineMesh{Float}(Λ, FreqMesh; sym=1, degree = 12, ratio = 2.0) where {Float}
         # initialize the residual on fineGrid with <g, g>
 
         #_finegrid = Float.(fineGrid(Λ, 24, rtol))
-        _finegrid = (fineGrid(Float(Λ), 24))
+        _finegrid = (fine_τGrid(Float(Λ), degree, Float(ratio) ))
 
         println(_finegrid.bound)
         #_finegrid = Float.(τChebyGrid(Λ))
@@ -70,16 +70,16 @@ end
 """
 composite expoential grid
 """
-function fineGrid(Λ::Float,degree) where {Float}
+function fine_τGrid(Λ::Float,degree,ratio::Float) where {Float}
     ############## use composite grid #############################################
     # Generating a log densed composite grid with LogDensedGrid()
-    npo = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
+    npo = Int(ceil(log(Λ) / log(ratio))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
     grid = CompositeGrid.LogDensedGrid(
         :cheb,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
         [0.0, 1.0],# The grid is defined on [0.0, β]
         [0.0, 1.0],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
         npo,# N of log grid
-        0.5 / 2^(npo-1), # minimum interval length of log grid
+        0.5 / ratio^(npo-1), # minimum interval length of log grid
         degree, # N of bottom layer
         Float
     )

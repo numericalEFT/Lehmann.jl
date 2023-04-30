@@ -22,11 +22,11 @@ struct MatsuFineMesh{Float} <: FQR.FineMesh
 
     ## for frequency mesh only ###
     fineGrid::Vector{Int}         # fine grid for each dimension
-    function MatsuFineMesh{Float}(Λ, FreqMesh, isFermi; sym=1) where {Float}
+    function MatsuFineMesh{Float}(Λ, FreqMesh, isFermi; sym=1, degree = 12, ratio = 2.0) where {Float}
         # initialize the residual on fineGrid with <g, g>
 
         #_finegrid = Float.(fineGrid(Λ, rtol))
-        _finegrid = Int.(nGrid(isFermi,Λ))
+        _finegrid = Int.(nGrid(isFermi, Float(Λ), degree, Float(ratio) ))
         #print("ngrid $(_finegrid)\n")
         # separationTest(_finegrid)
         mesh = new(isFermi, sym, [], [], [], _finegrid)
@@ -45,8 +45,7 @@ struct MatsuFineMesh{Float} <: FQR.FineMesh
             push!(mesh.selected, false)
             #end
         end
-       
-        println("fine mesh initialized.")
+        
         return mesh
     end
 end
@@ -61,11 +60,11 @@ function Freq2Index(isFermi, ωnList)
     end
 end
 
-function nGrid(isFermi, Λ,degree = 25)
+function nGrid(isFermi, Λ::Float, degree, ratio::Float) where {Float}
     # generate n grid from a logarithmic fine grid
-    np = Int(round(log(10*10 * Λ) / log(2)))
+    np = Int(round(log(10*10 * Λ) / log(ratio)))
     xc = [(i - 1) / degree for i = 1:degree]
-    panel = [2^(i - 1) - 1 for i = 1:(np+1)]
+    panel = [ratio^(i - 1) - 1 for i = 1:(np+1)]
     nGrid = zeros(Int, np * degree)
     for i = 1:np
         a, b = panel[i], panel[i+1]
@@ -73,7 +72,7 @@ function nGrid(isFermi, Λ,degree = 25)
     end
     unique!(nGrid)
     if isFermi
-        return vcat(-nGrid[end:-1:1] .-1.0, nGrid)
+        return vcat(-nGrid[end:-1:1] .-1, nGrid)
     else
         return  vcat(-nGrid[end:-1:2], nGrid)
     end

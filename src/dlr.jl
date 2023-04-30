@@ -99,13 +99,13 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
     @assert β > 0.0 "Inverse temperature must be temperature."
     @assert Euv > 0.0 "Energy cutoff must be positive."
 
-    if Λ > 1e8 && symmetry == :none
-        @warn("Current DLR without symmetry may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
-    end
+    # if Λ > 1e8 && symmetry == :none
+    #     @warn("Current DLR without symmetry may cause ~ 3-4 digits loss for Λ ≥ 1e8!")
+    # end
 
-    if rtol > 1e-6
-        @warn("Current implementation may cause ~ 3-4 digits loss for rtol > 1e-6!")
-    end
+    # if rtol > 1e-6
+    #     @warn("Current implementation may cause ~ 3-4 digits loss for rtol > 1e-6!")
+    # end
 
     rtolpower = Int(floor(log10(rtol))) # get the biggest n so that rtol>1e-n
     if abs(rtolpower) < 4
@@ -310,13 +310,13 @@ function is_symmetrized(dlrGrid::DLRGrid)
     return maximum(n0.-n)==0 && maximum(abs.(dlrGrid.β.-τ))<1e-8
 end
 
-function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
+function _load!(dlrGrid::DLRGrid{T,S}, dlrfile, verbose=false) where {T,S}
 
     β = dlrGrid.β    
     if dlrGrid.symmetry == :sym
-        grid = readdlm(dlrfile, skipstart = 1)
-        ω = Float64.(filter(x->!isnan(x), grid[:,2]))
-        τ = Float64.(filter(x->!isnan(x), grid[:,3]))
+        grid = readdlm(dlrfile, T, skipstart = 1)
+        ω = T.(filter(x->!isnan(x), grid[:,2]))
+        τ = T.(filter(x->!isnan(x), grid[:,3]))
         if dlrGrid.isFermi
             n = Int.(filter(x->!isnan(x), grid[:,4]))
         else
@@ -353,6 +353,7 @@ function _load!(dlrGrid::DLRGrid, dlrfile, verbose=false)
     for r = 1:length(τ)
         push!(dlrGrid.τ, τ[r] * β)
     end
+    
     for r = 1:length(n)
     push!(dlrGrid.n, n[r])
         push!(dlrGrid.ωn, ωn[r])

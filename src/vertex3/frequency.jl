@@ -28,9 +28,9 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
-    function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=0) where {D,Float,Double}
+    function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=1, degree = 12, ratio = 2.0) where {D,Float,Double}
         # initialize the residual on fineGrid with <g, g>
-        _finegrid =fineGrid(Float(Λ))
+        _finegrid =fine_ωGrid(Float(Λ), degree, Float(ratio) )
 
         #separationTest(D, _finegrid)
         Nfine = length(_finegrid)
@@ -84,10 +84,8 @@ end
 """
 composite expoential grid
 """
-function fineGrid(Λ::Float) where {Float}
+function fine_ωGrid(Λ::Float, degree, ratio::Float) where {Float}
     ############## use composite grid #############################################
-    degree = 8
-    ratio = 1.2
     N = Int(floor(log(Λ) / log(ratio) + 1))
     # panel = [Λ / ratio^(N - i) for i in 1:N]
     # grid = Vector{Float}(undef, 0)
@@ -108,7 +106,7 @@ function fineGrid(Λ::Float) where {Float}
     )
 
     #println(grid)
-    println("Composite expoential grid size: $(length(grid))")
+    println("Composite expoential grid size: $(length(grid)), $(grid[1]), $(grid[end])")
     return grid
 
     ############# DLR based fine grid ##########################################
