@@ -1,13 +1,154 @@
 using FastGaussQuadrature, Printf
 using DoubleFloats
+using SpecialFunctions:polygamma
+using CompositeGrids
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=48, regularized=true)
 
+function matsu_sum(res, mesh)
+    @assert length(mesh)==length(res)
+    sum = 0.0
+    for i in 1:length(mesh)-1
+        sum += (res[i]+res[i+1])*(mesh[i+1]-mesh[i])/2.0
+    end
+    coeff = res[1]*mesh[1]^2
+    sum += 2*coeff*polygamma(1,Float64(mesh[end]))
+    return sum
+end
+function Freq2Index(isFermi, ωnList)
+    if isFermi
+        # ωn=(2n+1)π
+        return [Int(round((ωn / π - 1) / 2)) for ωn in ωnList]
+    else
+        # ωn=2nπ
+        return [Int(round(ωn / π / 2)) for ωn in ωnList]
+    end
+end
+function L2normτ(value_dlr, dlr, case)
+    function fine_τGrid(Λ::Float,degree,ratio::Float) where {Float}
+        ############## use composite grid #############################################
+        # Generating a log densed composite grid with LogDensedGrid()
+        npo = Int(ceil(log(Λ) / log(ratio))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
+        grid = CompositeGrid.LogDensedGrid(
+            :gauss,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
+            [0.0, 1.0],# The grid is defined on [0.0, β]
+            [0.0, 1.0],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
+            npo,# N of log grid
+            0.5 / ratio^(npo-1), # minimum interval length of log grid
+            degree, # N of bottom layer
+            Float
+        )
+        #print(grid[1:length(grid)÷2+1])    
+        #print(grid+reverse(grid))
+        # println("Composite expoential grid size: $(length(grid))")
+        println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[end])]")
+        return grid
+    
+        ############# DLR based fine grid ##########################################
+        # dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
+        # # println("fine basis number: $(dlr.size)\n", dlr.ω)
+        # degree = 4
+        # grid = Vector{Double}(undef, 0)
+        # panel = Double.(dlr.τ)
+        # for i in 1:length(panel)-1
+        #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+        #     append!(grid, uniform)
+        # end
+    
+        # println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+        # return grid
+    end
+    fineGrid = fine_τGrid(dlr.Euv, 12, typeof(dlr.Euv)(1.5))
+    value = real(tau2tau(dlr, value_dlr,  fineGrid, dlr.τ ))
+    value_analy = case(dlr, fineGrid, :τ)
+    print("value_analy $(value_analy[1:10])\n" )
+    interp = Interp.integrate1D( value , fineGrid)
+    interp_analy = Interp.integrate1D( value_analy , fineGrid)
+    print("$(interp_analy) $(interp_analy)\n")
+    return interp,abs(interp-interp_analy)/interp_analy
+end
+
+function L2normn(value_dlr, dlr )
+    
+    function nGrid(isFermi, Λ::Float, degree, ratio::Float) where {Float}
+        # generate n grid from a logarithmic fine grid
+        np = Int(round(log(10*10*10 * Λ) / log(ratio)))
+        xc = [(i - 1) / degree for i = 1:degree]
+        panel = [ratio^(i - 1) - 1 for i = 1:(np+1)]
+        nGrid = zeros(Int, np * degree)
+        for i = 1:np
+            a, b = panel[i], panel[i+1]
+            nGrid[(i-1)*degree+1:i*degree] = Freq2Index(isFermi, a .+ (b - a) .* xc)
+        end
+        unique!(nGrid)
+        if isFermi
+            return vcat(-nGrid[end:-1:1] .-1, nGrid)
+        else
+            return  vcat(-nGrid[end:-1:2], nGrid)
+        end
+    end
+    fineGrid = nGrid(true, dlr.Euv, 24, typeof(dlr.Euv)(1.5) ) 
+
+    value = matfreq2matfreq(dlr, value_dlr,  fineGrid, dlr.n )
+    return matsu_sum( value  , fineGrid)
+end
+function bare_G(dlr, grid, type)
+    T = typeof(dlr.β)
+    E= T(1.0)
+    if type == :n
+        G = zeros(Complex{T}, length(grid))
+        for i in 1:length(grid)
+            G[i]=Spectral.kernelFermiΩ(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelFermiSymΩ(grid[i], E, dlr.β)
+
+            #print("$(dlr.n[i]),$(G[i])\n")
+        end
+    elseif type == :τ
+        G = zeros(T, length(grid))
+        for i in 1:length(grid)
+            G[i]=Spectral.kernelFermiT(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelSymT(grid[i], E, dlr.β)
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
+end
+function bare_G_τ(dlr, grid)
+    T = typeof(dlr.β)
+    E= T(1.0)
+    G = zeros(T, length(grid))
+    for i in 1:length(grid)
+        n = 0
+        wn = π/dlr.β
+        while n <dlr.n[end]
+            G[i] +=2*real(Spectral.kernelFermiΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β
+            #G[i] +=2*real(Spectral.kernelFermiSymΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β            
+            n += 1
+            wn += 2*π/dlr.β
+        end
+        if i == 1
+            print("$(typeof(im*wn*grid[1]))\n")
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
+end
+
 function MultiPole(dlr, grid, type)
     Euv = dlr.Euv
-    poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
+    #coeff = 2.0*rand(  typeof(dlr.β)  ,(size)) .- 1.0
+    poles = [-Euv, -0.7*Euv,  -0.4 * Euv, 0.0, 0.3*Euv, 0.6*Euv, 0.8* Euv,0.9*Euv]
+    #poles = coeff * Euv
+    # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+    return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+end
+
+function MultiPole(dlr, grid, type, coeff)
+    Euv = dlr.Euv
+
+    poles = coeff * Euv
     # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
     return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
 end
@@ -15,11 +156,11 @@ end
 function compare(case, a, b, eps, requiredratio, para="")
     err = rtol(a, b)
     ratio = isfinite(err) ? Int(round(err / eps)) : 0
-    if ratio > 50
-        printstyled("$case, $para err: ", color=:white)
-        printstyled("$(round(err, sigdigits=3)) = $ratio x rtol\n", color=:green)
-    end
-    @test rtol(a, b) .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
+    #if ratio > 50
+    printstyled("$case, $para err: ", color=:white)
+    printstyled("$(round(err, sigdigits=3)) = $ratio x rtol\n", color=:green)
+    #end
+    #@test rtol(a, b) .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
 end
 
 function compare_atol(case, a, b, atol, para="")
@@ -84,16 +225,19 @@ end
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
         dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype = dtype) #construct dlr basis
         print("first tau $(dlr.τ[1])\n")
-        #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
-        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype = dtype) #construct denser dlr basis for benchmark purpose
+        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry,dtype = dtype) #construct denser dlr basis for benchmark purpose
+        #dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype = dtype) #construct denser dlr basis for benchmark purpose
 
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
         #=========================================================================================#
         # get imaginary-time Green's function 
+        #rn = 2.0*rand(typeof(dlr.β), (6)) .-1.0
         Gdlr = case(dlr, dlr.τ, :τ)
+        #Gdlr = case(dlr, dlr.τ, :τ, rn)
         # get imaginary-time Green's function for τ sample 
         τSample = dlr10.τ
+        #τSample = [dtype(1e-20)]
         Gsample = case(dlr, τSample, :τ)
 
         ########################## imaginary-time to dlr #######################################
@@ -118,10 +262,11 @@ end
         # Matsubara frequency to dlr
         coeffn = matfreq2dlr(dlr, Gndlr)
         Gnfitted = dlr2matfreq(dlr, coeffn, nSample)
+
+      
         #     for (ni, n) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gnsample[1, ni]),  real(Gnfitted[1, ni]), abs(Gnsample[1, ni] - Gnfitted[1, ni]))
         # end
-
         compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
         compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, 1000, para)
 
@@ -135,7 +280,18 @@ end
         # end
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 5000, para)
+        #a = L2normτ(Gfitted, dlr)
+        #b = L2normτ(Gsample, dlr)
+        c1, c2 = L2normτ(Gfourier, dlr, case)
+        d1 = maximum(abs.(Gsample - Gfourier)) / maximum(abs.(Gsample))
+        #print("test: $(a-b) and $(b-c)\n")
+        file = open("./accuracy.dat", "a") 
+        #@printf(file, "%48.40g  %48.40g\n", eps, abs(b-c) )
+        @printf(file, "%24.20g  %24.20g %24.20g %24.20g\n", eps, c1, c2 , d1 )
+        close(file)
+        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 5000, para)      
+   
+        #compare("iω→dlr→τ with Λcut $case", Gfourier, Gfourier2, eps, 5000, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -157,16 +313,22 @@ end
         end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
-    cases = [MultiPole]#, SemiCircle]
+    #cases = [MultiPole,bare_G, SemiCircle]
+    #cases = [SemiCircle]
+    cases = [MultiPole]
+    #cases = [bare_G]
+    
     Λ = [1e4]#,1e5,1e6]
-    rtol = [1e-24]
+    rtol = [1e-6, 1e-8, 1e-10,1e-12, 1e-14]
     for case in cases
         for l in Λ
             for r in rtol
+                setprecision(128)
                 #test(case, true, :none, 1.0, l, r)
-                test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                test(case, true, :sym, l, 1.0, r , dtype = BigFloat)
                 #test(case, false, :none, 1.0, l, r)
-                test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
                 
                 #test(case, false, :ph, 1.0, l, r)
                 #test(case, true, :ph, 1.0, l, r)

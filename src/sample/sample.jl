@@ -231,9 +231,9 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
             end
 
             if IsMatFreq == false
-                g[τi] += Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                g[τi] += Spectral.kernelT(Val(isFermi), Val(:none), τ, ω, β, regularized)
             else
-                g[τi] += Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                g[τi] += Spectral.kernelΩ(Val(isFermi), Val(:none), τ, ω, β, regularized)
             end
         end
     end
