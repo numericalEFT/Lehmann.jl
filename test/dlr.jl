@@ -1,5 +1,5 @@
 using FastGaussQuadrature, Printf
-using DoubleFloats
+#using DoubleFloats
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
