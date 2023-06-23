@@ -186,7 +186,7 @@ function FQR.mirror(mesh::FreqFineMesh{D,Float}, idx) where {D,Float}
     grid = mesh.candidates[idx]
     coord, s = grid.coord, grid.sector
     if mesh.symmetry == 0
-        return []
+        return [],[]
     end
     if D == 1
         coords = [(coord[1],),]
@@ -201,14 +201,16 @@ function FQR.mirror(mesh::FreqFineMesh{D,Float}, idx) where {D,Float}
         error("not implemented!")
     end
     newgrids = FreqGrid{D,Float}[]
+    idxmirror = []
     for s in 1:mesh.color
         for c in coords
             if s != grid.sector || c != Tuple(grid.coord)
                 push!(newgrids, FreqGrid{D, Float}(s, coord2omega(mesh, c), c))
+                push!(idxmirror,  coord[1]*2-s%2)
             end
         end
     end
-    return newgrids
+    return newgrids, idxmirror
 end
 
 

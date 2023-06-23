@@ -62,7 +62,7 @@ end
 
 function nGrid(isFermi, Λ::Float, degree, ratio::Float) where {Float}
     # generate n grid from a logarithmic fine grid
-    np = Int(round(log(10*10 * Λ) / log(ratio)))
+    np = Int(round(log(10*10*10 * Λ) / log(ratio)))
     xc = [(i - 1) / degree for i = 1:degree]
     panel = [ratio^(i - 1) - 1 for i = 1:(np+1)]
     nGrid = zeros(Int, np * degree)
@@ -117,18 +117,20 @@ function FQR.mirror(mesh::MatsuFineMesh{Float}, idx) where {Float}
     grid = mesh.candidates[idx]
     meshsize = length(mesh.candidates)
     if mesh.symmetry == 0
-        return []
+        return [],[]
     else
+        idxmirror =[]
         newgrids = MatsuGrid{Float}[]
         #coords = unique([(idx), (meshsize - idx)])
         if !mesh.isFermi && grid.n==0 #For boson, n==0 do not have mirror point
-            return newgrids
+            return newgrids,idxmirror
         else
             g = deepcopy(mesh.candidates[meshsize - idx+1])
         end
         #print("\n$(mesh.candidates[meshsize - idx+1].tau+mesh.candidates[idx].tau)\n")
         push!(newgrids, g)
-        return newgrids
+        push!(idxmirror,meshsize - idx+1 )
+        return newgrids,idxmirror
     end
     # end
 end

@@ -140,14 +140,16 @@ end
 function FQR.mirror(mesh::TauFineMesh{Float}, idx) where {Float}
     meshsize = length(mesh.candidates)
     if mesh.symmetry == 0
-        return []
+        return [],[-1]
     else
         newgrids = TauGrid{Float}[]
+        idxmirror = []
         #coords = unique([(idx), (meshsize - idx)])
         g = deepcopy(mesh.candidates[meshsize - idx+1])
         #print("\n$(mesh.candidates[meshsize - idx+1].tau+mesh.candidates[idx].tau)\n")
         push!(newgrids, g)
-        return newgrids
+        push!(idxmirror,meshsize - idx+1)
+        return newgrids,idxmirror
     end
     # end
 end

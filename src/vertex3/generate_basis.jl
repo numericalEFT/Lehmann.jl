@@ -8,6 +8,7 @@ using CompositeGrids
 using LinearAlgebra
 using DelimitedFiles
 using DoubleFloats
+using Plots
 function L2Residual(mesh::MatsuFineMesh)
     return FQR.matsu_sum(mesh.residual, mesh.fineGrid)
 end
@@ -23,7 +24,7 @@ function L2Residual(mesh::FreqFineMesh)
     return (Interp.integrate1D(res[1,:], mesh.fineGrid) + Interp.integrate1D(res[2,:], mesh.fineGrid))/2/π
 end
 
-function qr!(basis::FQR.Basis{G,M,F,D}; initial = [], N = 1, verbose = 0) where {G,M,F,D}
+function qr!(basis::FQR.Basis{G,M,F,D}; isFermi =true, initial = [], N = 1, verbose = 0) where {G,M,F,D}
     #### add the grid in the idx vector first
 
     for i in initial
@@ -45,22 +46,46 @@ function qr!(basis::FQR.Basis{G,M,F,D}; initial = [], N = 1, verbose = 0) where 
         L2Res = L2Residual(basis.mesh)
         println("L2 norm $(L2Res)")
         # end
-        # if num % 5 == 0
-        #     pic = plot(ylabel = "residual")
+        if num % 5 == 0 &&  typeof(basis.mesh)<: TauFineMesh#MatsuFineMesh
+            pic = plot(ylabel = "residual")
+            #pic = plot!(Tlist, (eiglist .- 1)./Tlist,linestyle = :dash)
+            #pic = plot!(basis.mesh.fineGrid, basis.mesh.residual .* abs.(basis.mesh.fineGrid).^2, linestyle = :dash)
+            pic = plot!(basis.mesh.fineGrid, basis.mesh.residual, linestyle = :dash)
+            #pic = plot!(Tlist, Tlist.^γ*(eiglist[end]-1)/(Tlist.^γ)[end] ,linestyle = :dash)
+            #pic = plot!(Tlist, coefflist, linestyle = :dashdot)
+            savefig(pic, "residual_$(num).pdf")
+        
 
-        #     #pic = plot!(Tlist, (eiglist .- 1)./Tlist,linestyle = :dash)
-        #     pic = plot!(basis.mesh.fineGrid, basis.mesh.residual .* abs.(basis.mesh.fineGrid).^2, linestyle = :dash)
-        #     #pic = plot!(Tlist, Tlist.^γ*(eiglist[end]-1)/(Tlist.^γ)[end] ,linestyle = :dash)
-        #     #pic = plot!(Tlist, coefflist, linestyle = :dashdot)
-        #     savefig(pic, "residual_$(num).pdf")
-        #     open("residual_$(num).dat", "w") do io
-        #         for i in 1:length(basis.mesh.candidates)
-        #             println(io,basis.mesh.fineGrid[i],"\t",basis.mesh.residual[i])
-        #         end
-        #     end
-
-        # end
+        end
         num = num+1
+    end
+    if typeof(basis.mesh)<:FreqFineMesh
+        res0 = reshape(basis.mesh.residual, 2, :)
+        res1 = res0[1,:]
+        res = res0[2,:]
+        #print("$(res1)\n$(res)")
+        name = "res_freq.dat"
+    elseif  typeof(basis.mesh)<:TauFineMesh
+        res = basis.mesh.residual
+        name = "res_tau.dat"
+    else
+        res = basis.mesh.residual
+        name = "res_matsu.dat"
+    end
+    if  isFermi
+        filename = name
+        folder="./"
+        file = open(joinpath(folder, filename), "w") 
+        #max_res = maximum((res[:]))
+        for i in 1:length(basis.mesh.fineGrid)                 
+            if typeof(basis.mesh)<:FreqFineMesh
+                @printf(file, "%32.30g %32.30g %32.30g\n", basis.mesh.fineGrid[i], res1[i],res[i])
+                #println(io,basis.mesh.fineGrid[i],"\t",(res[i]) )
+            else
+                @printf(file, "%32.30g %32.30g\n", basis.mesh.fineGrid[i], res[i])
+            end
+        end
+        close(file)
     end
     @printf("rtol = %.16e\n", sqrt(maxResidual))
 
@@ -71,13 +96,13 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 1
-    Err = [-24]
-    Λ = [1e4]
-    #setprecision(128)
+    Err = [-6, -8, -10, -12, -14]
+    Λ = [1e5]
+    setprecision(128)
     Float = BigFloat
     Double = BigFloat
-    #Float = Double64
-    #Double = Double64
+    #Float = Float64
+    #Double = Float64
     degree1 = 12
     degree2 = 12
     degree3 = 12
@@ -174,7 +199,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             ### generate Bosonic n grid
             mesh = MatsuFineMesh{Float}(lambda,freqgrid, false, sym=sym, degree =  degree3, ratio = ratio3)
             basis = FQR.Basis{MatsuGrid,Float, Complex{Double}}(lambda, rtol, mesh)
-            qr!(basis, verbose=1, N=length(freqgrid))
+            qr!(basis, isFermi = false, verbose=1, N=length(freqgrid))
 
             FQR.test(basis)
 

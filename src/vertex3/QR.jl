@@ -92,8 +92,12 @@ function addBasisBlock!(basis::Basis, idx, verbose)
     basis.mesh.selected[idx] = true        
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
     #print("$(mirror(basis.mesh, idx))\n")
-    for grid in mirror(basis.mesh, idx)
+    gridmirror , idxmirror = mirror(basis.mesh, idx)
+    print(idxmirror)
+    for (gi,grid) in enumerate(gridmirror)
         addBasis!(basis, grid, verbose)
+        basis.mesh.selected[idxmirror[gi]] = true        
+        basis.mesh.residual[idxmirror[gi]] = 0 # the selected mesh grid has zero residual
     end
 end
 
