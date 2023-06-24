@@ -152,7 +152,7 @@ end
 function _Green(::Type{T}, ::Val{false}, Euv::T, β::T, ::Val{isFermi}, Grid::AbstractVector, ::Val{sym}, n, pbp, npo, regularized) where {T<:Real,IsMatFreq,isFermi,sym}
     #n: polynomial order
     xl, wl = gausslegendre(n)
-    xj, wj = gaussjacobi(n, 1 / 2, T(0))
+    xj, wj = gaussjacobi(n,T(1 / 2), T(0))
 
     xl, wl = T.(xl), T.(wl)
     xj, wj = T.(xj), T.(wj)
@@ -221,8 +221,7 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
     else
         error("$type is not implemented!")
     end
-
-    g = IsMatFreq ? zeros(ComplexF64, length(Grid)) : zeros(Float64, length(Grid))
+    g = IsMatFreq ? zeros(Complex{typeof(β)}, length(Grid)) : zeros(typeof(β), length(Grid))
     for (τi, τ) in enumerate(Grid)
         for ω in poles
 
@@ -232,9 +231,9 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
             end
 
             if IsMatFreq == false
-                g[τi] += Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                g[τi] += Spectral.kernelT(Val(isFermi), Val(:none), τ, ω, β, regularized)
             else
-                g[τi] += Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                g[τi] += Spectral.kernelΩ(Val(isFermi), Val(:none), τ, ω, β, regularized)
             end
         end
     end
