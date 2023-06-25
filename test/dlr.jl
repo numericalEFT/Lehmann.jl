@@ -1,5 +1,5 @@
 using FastGaussQuadrature, Printf
-using DoubleFloats
+#using DoubleFloats
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
@@ -79,13 +79,13 @@ end
 
 @testset "Correlator Representation" begin
 
-    function test(case, isFermi, symmetry, Euv, β, eps; dtype = Float64)
+    function test(case, isFermi, symmetry, Euv, β, eps; dtype=Float64)
         # println("Test $case with isFermi=$isFermi, Symmetry = $symmetry, Euv=$Euv, β=$β, rtol=$eps")
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
-        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype = dtype) #construct dlr basis
+        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct dlr basis
         print("first tau $(dlr.τ[1])\n")
         #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
-        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype = dtype) #construct denser dlr basis for benchmark purpose
+        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
 
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
@@ -145,7 +145,7 @@ end
         #=========================================================================================#
 
         # err = 10 * eps
-        if symmetry!=:sym
+        if symmetry != :sym
             atol = eps
             noise = atol * rand(eltype(Gsample), length(Gsample))
             GNoisy = Gsample .+ noise
@@ -163,16 +163,19 @@ end
     for case in cases
         for l in Λ
             for r in rtol
-                #test(case, true, :none, 1.0, l, r)
-                test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
-                #test(case, false, :none, 1.0, l, r)
-                test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
-                
-                #test(case, false, :ph, 1.0, l, r)
-                #test(case, true, :ph, 1.0, l, r)
-                # test(case, false, :pha, 1.0, l, r)
-                # test(case, true, :pha, 1.0, l, r)
-                
+                test(case, true, :none, 1.0, l, r)
+                test(case, false, :none, 1.0, l, r)
+                # test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                # test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+
+                test(case, false, :sym, l, 1.0, r, dtype=Float64)
+                test(case, true, :sym, l, 1.0, r, dtype=Float64)
+
+                test(case, false, :ph, 1.0, l, r)
+                test(case, true, :ph, 1.0, l, r)
+                test(case, false, :pha, 1.0, l, r)
+                test(case, true, :pha, 1.0, l, r)
+
             end
         end
     end
