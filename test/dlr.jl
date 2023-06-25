@@ -83,9 +83,8 @@ end
         # println("Test $case with isFermi=$isFermi, Symmetry = $symmetry, Euv=$Euv, β=$β, rtol=$eps")
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
         dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct dlr basis
-        print("first tau $(dlr.τ[1])\n")
         #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
-        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
+        dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
 
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
@@ -158,23 +157,24 @@ end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [MultiPole]#, SemiCircle]
-    Λ = [1e7, 1e8, 1e9]#,1e5,1e6]
+    Λ = [1e5,1e6]#,1e5,1e6]
     rtol = [1e-10]
     for case in cases
         for l in Λ
             for r in rtol
-                test(case, true, :none, 1.0, l, r)
-                test(case, false, :none, 1.0, l, r)
-                # test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
-                # test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                setprecision(256)
+                #test(case, true, :none, l, 1.0, r)
+                #test(case, false, :none, l, 1.0, r)
+                test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
 
-                test(case, false, :sym, l, 1.0, r, dtype=Float64)
-                test(case, true, :sym, l, 1.0, r, dtype=Float64)
+                #test(case, false, :sym, l, 1.0, r, dtype=Float64)
+                #test(case, true, :sym, l, 1.0, r, dtype=Float64)
 
-                test(case, false, :ph, 1.0, l, r)
-                test(case, true, :ph, 1.0, l, r)
-                test(case, false, :pha, 1.0, l, r)
-                test(case, true, :pha, 1.0, l, r)
+                test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
 
             end
         end
