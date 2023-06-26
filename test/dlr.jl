@@ -3,13 +3,108 @@ using FastGaussQuadrature, Printf
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
-SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=48, regularized=true)
+SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
+
+function L2normτ(value_dlr, dlr, case)
+    function fine_τGrid(Λ::Float,degree,ratio::Float) where {Float}
+        ############## use composite grid #############################################
+        # Generating a log densed composite grid with LogDensedGrid()
+        npo = Int(ceil(log(Λ) / log(ratio))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
+        grid = CompositeGrid.LogDensedGrid(
+            :gauss,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
+            [0.0, 1.0],# The grid is defined on [0.0, β]
+            [0.0, 1.0],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
+            npo,# N of log grid
+            0.5 / ratio^(npo-1), # minimum interval length of log grid
+            degree, # N of bottom layer
+            Float
+        )
+        #print(grid[1:length(grid)÷2+1])    
+        #print(grid+reverse(grid))
+        # println("Composite expoential grid size: $(length(grid))")
+        println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[end])]")
+        return grid
+    
+        ############# DLR based fine grid ##########################################
+        # dlr = DLRGrid(Euv=Float64(Λ), beta=1.0, rtol=Float64(rtol) / 100, isFermi=true, symmetry=:ph, rebuild=true)
+        # # println("fine basis number: $(dlr.size)\n", dlr.ω)
+        # degree = 4
+        # grid = Vector{Double}(undef, 0)
+        # panel = Double.(dlr.τ)
+        # for i in 1:length(panel)-1
+        #     uniform = [panel[i] + (panel[i+1] - panel[i]) / degree * j for j in 0:degree-1]
+        #     append!(grid, uniform)
+        # end
+    
+        # println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
+        # return grid
+    end
+    fineGrid = fine_τGrid(dlr.Euv, 12, typeof(dlr.Euv)(1.5))
+    value = real(tau2tau(dlr, value_dlr,  fineGrid, dlr.τ ))
+    value_analy = case(dlr, fineGrid, :τ)
+    print("value_analy $(value_analy[1:10])\n" )
+    interp = Interp.integrate1D( value , fineGrid)
+    interp_analy = Interp.integrate1D( value_analy , fineGrid)
+    print("$(interp_analy) $(interp_analy)\n")
+    return interp,abs(interp-interp_analy)/interp_analy
+end
+
 
 function MultiPole(dlr, grid, type)
     Euv = dlr.Euv
     poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
     return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+end
+
+function MultiPole(dlr, grid, type, coeff)
+    Euv = dlr.Euv
+    poles = coeff * Euv
+    # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+    return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+end
+
+
+function bare_G(dlr, grid, type)
+    T = typeof(dlr.β)
+    E= T(1.0)
+    if type == :n
+        G = zeros(Complex{T}, length(grid))
+        for i in 1:length(grid)
+            G[i]=Spectral.kernelFermiΩ(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelFermiSymΩ(grid[i], E, dlr.β)
+
+            #print("$(dlr.n[i]),$(G[i])\n")
+        end
+    elseif type == :τ
+        G = zeros(T, length(grid))
+        for i in 1:length(grid)
+            G[i]=Spectral.kernelFermiT(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelSymT(grid[i], E, dlr.β)
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
+end
+function bare_G_τ(dlr, grid)
+    T = typeof(dlr.β)
+    E= T(1.0)
+    G = zeros(T, length(grid))
+    for i in 1:length(grid)
+        n = 0
+        wn = π/dlr.β
+        while n <dlr.n[end]
+            G[i] +=2*real(Spectral.kernelFermiΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β
+            #G[i] +=2*real(Spectral.kernelFermiSymΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β            
+            n += 1
+            wn += 2*π/dlr.β
+        end
+        if i == 1
+            print("$(typeof(im*wn*grid[1]))\n")
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
 end
 
 function compare(case, a, b, eps, requiredratio, para="")
@@ -128,13 +223,13 @@ end
         #                            Fourier Transform Test                                     #
         #=========================================================================================#
         Gnfourier = tau2matfreq(dlr, Gdlr, nSample)
-        compare("τ→dlr→iω $case", Gnsample, Gnfourier, eps, 5000, para)
+        compare("τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
         # for (ti, t) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, imag(Gnsample[2, ti]), imag(Gnfourier[2, ti]), abs(Gnsample[2, ti] - Gnfourier[2, ti]))
         # end
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 5000, para)
+        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -156,26 +251,31 @@ end
         end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
-    cases = [MultiPole]#, SemiCircle]
-    Λ = [1e5,1e6]#,1e5,1e6]
-    rtol = [1e-10]
+    cases = [MultiPole, SemiCircle]
+    Λ = [1e4,1e5]
+    rtol = [1e-6, 1e-8, 1e-10]
     for case in cases
         for l in Λ
             for r in rtol
-                setprecision(256)
-                #test(case, true, :none, l, 1.0, r)
-                #test(case, false, :none, l, 1.0, r)
-                test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
-                test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
-
-                #test(case, false, :sym, l, 1.0, r, dtype=Float64)
-                #test(case, true, :sym, l, 1.0, r, dtype=Float64)
-
-                test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
-                test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
-                test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
-                test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
-
+                if case == MultiPole
+                    setprecision(256)
+                    test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                    test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                    test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                    test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                    test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                    test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                    test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                    test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                end
+                test(case, true, :none, l, 1.0, r, dtype = Float64)
+                test(case, false, :none, l, 1.0, r, dtype= Float64)
+                test(case, true, :sym, l, 1.0, r, dtype = Float64)
+                test(case, false, :sym, l, 1.0, r, dtype = Float64)
+                test(case, false, :ph, l, 1.0, r, dtype = Float64)
+                test(case, true, :ph, l, 1.0, r, dtype= Float64)
+                test(case, false, :pha, l, 1.0, r,dtype=Float64)
+                test(case, true, :pha, l, 1.0, r, dtype= Float64)
             end
         end
     end
