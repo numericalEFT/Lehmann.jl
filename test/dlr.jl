@@ -1,11 +1,12 @@
 using FastGaussQuadrature, Printf
+using CompositeGrids
 #using DoubleFloats
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
 
-function L2normτ(value_dlr, dlr, case)
+function L2normτ(value_dlr, dlr, case, poles=nothing)
     function fine_τGrid(Λ::Float,degree,ratio::Float) where {Float}
         ############## use composite grid #############################################
         # Generating a log densed composite grid with LogDensedGrid()
@@ -22,7 +23,7 @@ function L2normτ(value_dlr, dlr, case)
         #print(grid[1:length(grid)÷2+1])    
         #print(grid+reverse(grid))
         # println("Composite expoential grid size: $(length(grid))")
-        println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[end])]")
+        #println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[end])]")
         return grid
     
         ############# DLR based fine grid ##########################################
@@ -41,12 +42,16 @@ function L2normτ(value_dlr, dlr, case)
     end
     fineGrid = fine_τGrid(dlr.Euv, 12, typeof(dlr.Euv)(1.5))
     value = real(tau2tau(dlr, value_dlr,  fineGrid, dlr.τ ))
-    value_analy = case(dlr, fineGrid, :τ)
-    print("value_analy $(value_analy[1:10])\n" )
+    if isnothing(poles)
+        value_analy = case(dlr, fineGrid, :τ)
+    else
+        value_analy = case(dlr, fineGrid, :τ, poles)
+    end
+    #print("value_analy $(value_analy[1:10])\n" )
     interp = Interp.integrate1D( value , fineGrid)
     interp_analy = Interp.integrate1D( value_analy , fineGrid)
-    print("$(interp_analy) $(interp_analy)\n")
-    return interp,abs(interp-interp_analy)/interp_analy
+    #print("$(interp_analy) $(interp_analy)\n")
+    return interp_analy,abs(interp-interp_analy)
 end
 
 
@@ -252,35 +257,99 @@ end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [MultiPole, SemiCircle]
-    Λ = [1e4,1e5]
-    rtol = [1e-6, 1e-8, 1e-10]
+    Λ = [1e3,1e5, 1e7]
+    rtol = [1e-8, 1e-10]
     for case in cases
         for l in Λ
             for r in rtol
-                if case == MultiPole
-                    setprecision(256)
-                    test(case, true, :none, l, 1.0, r, dtype = BigFloat)
-                    test(case, false, :none, l, 1.0, r, dtype= BigFloat)
-                    test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
-                    test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
-                    test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
-                    test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
-                    test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
-                    test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
-                end
                 test(case, true, :none, l, 1.0, r, dtype = Float64)
                 test(case, false, :none, l, 1.0, r, dtype= Float64)
                 test(case, true, :sym, l, 1.0, r, dtype = Float64)
-                test(case, false, :sym, l, 1.0, r, dtype = Float64)
+                test(case, false, :sym, l, 1.0, r, dtype= Float64)
                 test(case, false, :ph, l, 1.0, r, dtype = Float64)
                 test(case, true, :ph, l, 1.0, r, dtype= Float64)
                 test(case, false, :pha, l, 1.0, r,dtype=Float64)
                 test(case, true, :pha, l, 1.0, r, dtype= Float64)
+                # if case == MultiPole
+                #     setprecision(128)
+                #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                #     test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                #     test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                #     test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                #     test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                # end
             end
         end
     end
 
+
+
+   
 end
+
+@testset "SDLR error estimate" begin
+
+    function test_err(case, isFermi, symmetry, Euv, β, eps; dtype=Float64, output = false)
+        # println("Test $case with isFermi=$isFermi, Symmetry = $symmetry, Euv=$Euv, β=$β, rtol=$eps")
+        N_poles = 100
+        para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
+        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct dlr basis
+        #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
+        dlr10 = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
+       
+        
+        N = 100
+        value_sum = 0.0
+        err_sum = 0.0
+        for i in 1:100
+            eff_poles = rand(dtype, N_poles)
+            Gndlr = case(dlr, dlr.n, :n, eff_poles)
+            τSample = dlr10.τ
+            Gsample = case(dlr, τSample, :τ, eff_poles)
+
+            Gfourier = matfreq2tau(dlr, Gndlr, τSample)
+            value, err= L2normτ(Gfourier, dlr, case, eff_poles)
+            #print("test: $(a-b) and $(b-c)\n")
+            value_sum += value
+            err_sum += err
+        end
+        if output
+            file = open("./accuracy.dat", "a") 
+            #@printf(file, "%48.40g  %48.40g\n", eps, abs(b-c) )
+            @printf(file, "%24.20g  %24.20g %24.20g\n", eps, value_sum/N, err_sum/N)
+            close(file)
+        end
+    end
+
+    cases = [MultiPole]
+    Λ = [1e4]
+    rtol = [1e-6, 1e-8, 1e-10]
+    for case in cases
+        for l in Λ
+            for r in rtol
+                # if case == MultiPole
+                #     setprecision(256)
+                #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                #     test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                #     test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                #     test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                #     test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                # end
+                test_err(case, true, :none, l, 1.0, r, dtype = Float64)
+                test_err(case, true, :sym, l, 1.0, r, dtype = Float64)
+            end
+        end
+    end
+    
+end
+
+
 
 @testset "Tensor ↔ Matrix Mapping" begin
     a = rand(3)
