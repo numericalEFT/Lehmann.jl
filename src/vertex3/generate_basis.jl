@@ -92,8 +92,11 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 1
-    Err = [-6, -8]
-    Λ = [1e7]
+    #Err = [-4, ]
+    #Λ = [1e2, ]
+    #Err = [-6, -8, -10, -12, -14, -16, -20, -24]
+    Err = [-12, -14, ]
+    Λ = [1e2, 1e3, 1e4, 1e5, 1e6,1e7]
     setprecision(128)
     Float = BigFloat
     Double = BigFloat
