@@ -1,5 +1,5 @@
 """
-    kernelFermiT_dω(τ, ω, β)
+    function kernelFermiT_dω(τ, ω, β)
 
 Compute the first derivative of the imaginary-time fermionic kernel with respect to ω.
 
@@ -31,7 +31,7 @@ function kernelFermiT_dω(τ::T, ω::T, β::T) where {T<:AbstractFloat}
 end
 
 """
-    kernelFermiT_dω2(τ, ω, β)
+    function kernelFermiT_dω2(τ, ω, β)
 
 Compute the second derivative of the imaginary-time fermionic kernel with respect to ω.
 
@@ -65,7 +65,7 @@ function kernelFermiT_dω2(τ::T, ω::T, β::T) where {T<:AbstractFloat}
 end
 
 """
-    kernelFermiT_dω3(τ, ω, β)
+    function kernelFermiT_dω3(τ, ω, β)
 
 Compute the third derivative of the imaginary-time fermionic kernel with respect to ω.
 

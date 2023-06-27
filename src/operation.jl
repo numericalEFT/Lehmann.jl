@@ -186,7 +186,7 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
     coeff = B \ C#solve C = B * coeff
-     
+
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
         for i in 1:Nτ
@@ -207,9 +207,9 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
 end
 
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    imaginary-time domain to DLR representation
+imaginary-time domain to DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid struct.
@@ -267,9 +267,9 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
 end
 
 """
-function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
+    function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
 
-    DLR representation to imaginary-time representation
+DLR representation to imaginary-time representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -295,14 +295,14 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     end
 
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-    return  _matrix_tensor_dot(kernel, dlrcoeff, axis)
- 
+    return _matrix_tensor_dot(kernel, dlrcoeff, axis)
+
 end
 
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Matsubara-frequency representation to DLR representation
+Matsubara-frequency representation to DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid struct.
@@ -381,9 +381,9 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
 end
 
 """
-function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
+    function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
 
-    DLR representation to Matsubara-frequency representation
+DLR representation to Matsubara-frequency representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -417,14 +417,14 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     end
-        
+
     return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
+Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -443,9 +443,9 @@ function tau2matfreq(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nNewGrid
 end
 
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
+Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -463,9 +463,9 @@ function matfreq2tau(dlrGrid, green, τNewGrid=dlrGrid.τ, nGrid=dlrGrid.n; erro
 end
 
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Interpolation from the old imaginary-time grid to a new grid using the DLR representation
+Interpolation from the old imaginary-time grid to a new grid using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -483,9 +483,9 @@ function tau2tau(dlrGrid, green, τNewGrid, τGrid=dlrGrid.τ; error=nothing, ax
 end
 
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
+Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid

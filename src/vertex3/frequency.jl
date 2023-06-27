@@ -28,9 +28,9 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
     cache2::Matrix{DotF}            # cache for exp(-x-y)
 
 
-    function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=1, degree = 12, ratio = 2.0) where {D,Float,Double}
+    function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=1, degree=12, ratio=2.0) where {D,Float,Double}
         # initialize the residual on fineGrid with <g, g>
-        _finegrid =fine_ωGrid(Float(Λ), degree, Float(ratio) )
+        _finegrid = fine_ωGrid(Float(Λ), degree, Float(ratio))
 
         #separationTest(D, _finegrid)
         Nfine = length(_finegrid)
@@ -100,7 +100,7 @@ function fine_ωGrid(Λ::Float, degree, ratio::Float) where {Float}
         [0.0, Λ],# The grid is defined on [0.0, β]
         [0.0,],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
         N,# N of log grid
-        Λ / ratio^(N-1), # minimum interval length of log grid
+        Λ / ratio^(N - 1), # minimum interval length of log grid
         degree, # N of bottom layer
         Float
     )
@@ -186,7 +186,7 @@ function FQR.mirror(mesh::FreqFineMesh{D,Float}, idx) where {D,Float}
     grid = mesh.candidates[idx]
     coord, s = grid.coord, grid.sector
     if mesh.symmetry == 0
-        return [],[]
+        return [], []
     end
     if D == 1
         coords = [(coord[1],),]
@@ -205,8 +205,8 @@ function FQR.mirror(mesh::FreqFineMesh{D,Float}, idx) where {D,Float}
     for s in 1:mesh.color
         for c in coords
             if s != grid.sector || c != Tuple(grid.coord)
-                push!(newgrids, FreqGrid{D, Float}(s, coord2omega(mesh, c), c))
-                push!(idxmirror,  coord[1]*2-s%2)
+                push!(newgrids, FreqGrid{D,Float}(s, coord2omega(mesh, c), c))
+                push!(idxmirror, coord[1] * 2 - s % 2)
             end
         end
     end
@@ -215,7 +215,7 @@ end
 
 
 """
-F(x, y) = (1-exp(x+y))/(x+y)
+``F(x, y) = (1-exp(x+y))/(x+y)``
 """
 @inline function F1(a::T, b::T) where {T}
     if abs(a + b) > Tiny
@@ -226,8 +226,8 @@ F(x, y) = (1-exp(x+y))/(x+y)
 end
 
 """
-G(x, y) = (exp(-x)-exp(-y))/(x-y)
-G(x, x) = -exp(-x)
+``G(x, y) = (exp(-x)-exp(-y))/(x-y)``
+``G(x, x) = -exp(-x)``
 """
 @inline function G1(a::T, b::T) where {T}
     if abs(a - b) > Tiny
@@ -240,7 +240,7 @@ end
 
 
 """
-F(x) = (1-exp(-y))/(x-y)
+``F(x) = (1-exp(-y))/(x-y)``
 """
 # @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
 #     if abs(a - b) > Tiny
@@ -251,8 +251,8 @@ F(x) = (1-exp(-y))/(x-y)
 # end
 
 """
-G(x, y) = (exp(-x)-exp(-y))/(x-y)
-G(x, x) = -exp(-x)
+``G(x, y) = (exp(-x)-exp(-y))/(x-y)``
+``G(x, x) = -exp(-x)``
 """
 @inline function G2d(a::T, b::T, expa::T, expb::T) where {T}
     if abs(a - b) > Tiny
@@ -263,16 +263,13 @@ G(x, x) = -exp(-x)
 end
 
 """
-F(a, b, c) = (G(a, c)-G(a, c))/(a-b) where a != b, but a or b could be equal to c
+``F(a, b, c) = (G(a, c)-G(a, c))/(a-b)`` where a != b, but a or b could be equal to c
 """
 @inline function F2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
     @assert abs(a - b) > Tiny "$a - $c > $Tiny"
     return (G2d(a, c, expa, expc) - G2d(b, c, expb, expc)) / (b - a)
 end
 
-"""
-F(any, any, 0)
-"""
 @inline function Fii2d(ω1::T, ω2::T, expω1::T, expω2::T) where {T}
     if ω1 < Tiny && ω2 < Tiny
         return T(1) / 2
@@ -290,9 +287,6 @@ F(any, any, 0)
     end
 end
 
-"""
-F(a,b,c)
-"""
 @inline function Fij2d(a::T, b::T, c::T, expa::T, expb::T, expc::T) where {T}
     if abs(a - b) > Tiny #a!=b
         return F2d(a, b, c, expa, expb, expc)
@@ -372,8 +366,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
     # end
     # display(KK)
     # println()
-    mesh = FreqFineMesh{D,BigFloat, BigFloat}(lambda, rtol, sym=1)
-    basis = FQR.Basis{FreqGrid, BigFloat ,BigFloat}(lambda, rtol, mesh)
+    mesh = FreqFineMesh{D,BigFloat,BigFloat}(lambda, rtol, sym=1)
+    basis = FQR.Basis{FreqGrid,BigFloat,BigFloat}(lambda, rtol, mesh)
     FQR.qr!(basis, verbose=1)
 
     # lambda, rtol = 1000, 1e-8
@@ -385,7 +379,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     mesh = basis.mesh
     grids = basis.grid
-    _grids =[]
+    _grids = []
     for (i, grid) in enumerate(grids)
         g1, g2 = grid.omega[1], -grid.omega[1]
         flag1, flag2 = true, true

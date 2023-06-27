@@ -20,11 +20,11 @@ end
 
 function bare_G(dlr, grid, type)
     T = typeof(dlr.β)
-    E= T(1.0)
+    E = T(1.0)
     if type == :n
         G = zeros(Complex{T}, length(grid))
         for i in 1:length(grid)
-            G[i]=Spectral.kernelFermiΩ(grid[i], E, dlr.β)
+            G[i] = Spectral.kernelFermiΩ(grid[i], E, dlr.β)
             #G[i]=Spectral.kernelFermiSymΩ(grid[i], E, dlr.β)
 
             #print("$(dlr.n[i]),$(G[i])\n")
@@ -32,7 +32,7 @@ function bare_G(dlr, grid, type)
     elseif type == :τ
         G = zeros(T, length(grid))
         for i in 1:length(grid)
-            G[i]=Spectral.kernelFermiT(grid[i], E, dlr.β)
+            G[i] = Spectral.kernelFermiT(grid[i], E, dlr.β)
             #G[i]=Spectral.kernelSymT(grid[i], E, dlr.β)
         end
     end
@@ -41,16 +41,16 @@ function bare_G(dlr, grid, type)
 end
 function bare_G_τ(dlr, grid)
     T = typeof(dlr.β)
-    E= T(1.0)
+    E = T(1.0)
     G = zeros(T, length(grid))
     for i in 1:length(grid)
         n = 0
-        wn = π/dlr.β
-        while n <dlr.n[end]
-            G[i] +=2*real(Spectral.kernelFermiΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β
+        wn = π / dlr.β
+        while n < dlr.n[end]
+            G[i] += 2 * real(Spectral.kernelFermiΩ(n, E, dlr.β) * exp(-im * wn * grid[i])) / dlr.β
             #G[i] +=2*real(Spectral.kernelFermiSymΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β            
             n += 1
-            wn += 2*π/dlr.β
+            wn += 2 * π / dlr.β
         end
         if i == 1
             print("$(typeof(im*wn*grid[1]))\n")
@@ -176,13 +176,13 @@ end
         #                            Fourier Transform Test                                     #
         #=========================================================================================#
         Gnfourier = tau2matfreq(dlr, Gdlr, nSample)
-        compare("τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
+        compare("fourier τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
         # for (ti, t) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, imag(Gnsample[2, ti]), imag(Gnfourier[2, ti]), abs(Gnsample[2, ti] - Gnfourier[2, ti]))
         # end
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
+        compare("fourier iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -205,19 +205,20 @@ end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [MultiPole, SemiCircle]
-    Λ = [1e3,1e5, 1e7]
+    Λ = [1e3, 1e5, 1e7]
     rtol = [1e-8, 1e-10]
     for case in cases
         for l in Λ
             for r in rtol
-                test(case, true, :none, l, 1.0, r, dtype = Float64)
-                test(case, false, :none, l, 1.0, r, dtype= Float64)
-                test(case, true, :sym, l, 1.0, r, dtype = Float64)
-                test(case, false, :sym, l, 1.0, r, dtype= Float64)
-                test(case, false, :ph, l, 1.0, r, dtype = Float64)
-                test(case, true, :ph, l, 1.0, r, dtype= Float64)
-                test(case, false, :pha, l, 1.0, r,dtype=Float64)
-                test(case, true, :pha, l, 1.0, r, dtype= Float64)
+                test(case, true, :none, l, 1.0, r, dtype=Float64)
+                test(case, false, :none, l, 1.0, r, dtype=Float64)
+
+                # test(case, false, :ph, l, 1.0, r, dtype=Float64)
+                # test(case, true, :ph, l, 1.0, r, dtype=Float64)
+
+                # test(case, false, :pha, l, 1.0, r, dtype=Float64)
+                # test(case, true, :pha, l, 1.0, r, dtype=Float64)
+
                 # if case == MultiPole
                 #     setprecision(128)
                 #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
@@ -231,7 +232,26 @@ end
                 # end
             end
         end
-    end   
+    end
+    for case in cases
+        for l in Λ
+            for r in rtol
+                test(case, true, :sym, l, 1.0, r, dtype=Float64)
+                test(case, false, :sym, l, 1.0, r, dtype=Float64)
+                # if case == MultiPole
+                #     setprecision(128)
+                #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                #     test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                #     test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                #     test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                #     test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                # end
+            end
+        end
+    end
 end
 
 

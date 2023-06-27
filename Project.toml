@@ -1,7 +1,7 @@
 name = "Lehmann"
 uuid = "95bf888a-8996-4655-9f35-1c0506bdfefe"
 authors = ["Kun Chen", "Tao Wang", "Xiansheng Cai"]
-version = "0.2.6"
+version = "0.2.7"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"

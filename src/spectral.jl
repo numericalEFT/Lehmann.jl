@@ -8,7 +8,7 @@ export kernelT, kernelΩ, density, freq2Tau, freq2MatFreq
 export kernelFermiT, kernelFermiΩ, kernelBoseT, kernelBoseΩ, fermiDirac, boseEinstein
 
 """
-    kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    function kernelT(::Val{isFermi}, ::Val{symmetry}, τ::T, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type.
 
@@ -28,7 +28,7 @@ Compute the imaginary-time kernel of different type.
             return isFermi ? kernelFermiT(τ, ω, β) : kernelBoseT(τ, ω, β)
         end
     elseif symmetry == :sym
-        return  kernelSymT(τ, ω, β)
+        return kernelSymT(τ, ω, β)
     elseif symmetry == :ph
         return isFermi ? kernelFermiT_PH(τ, ω, β) : kernelBoseT_PH(τ, ω, β)
     elseif symmetry == :pha
@@ -38,7 +38,7 @@ Compute the imaginary-time kernel of different type.
     end
 end
 """
-    kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
+    function kernelT(isFermi, symmetry, τGrid::AbstractVector{T}, ωGrid::AbstractVector{T}, β::T, regularized::Bool = false; type = T) where {T<:AbstractFloat}
 
 Compute kernel with given τ and ω grids.
 """
@@ -54,7 +54,7 @@ end
 
 
 """
-    kernelSymT(τ, ω, β)
+    function kernelSymT(τ, ω, β)
 
 Compute the symmetrized imaginary-time kernel, which applies for both fermions and bosons.  Machine accuracy ~eps(g) is guaranteed``
 ```math
@@ -68,11 +68,11 @@ g(ω>0) = e^{-ωτ}, g(ω≤0) = e^{ω(β-τ)}
 """
 function kernelSymT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
     (0 <= τ <= β) || error("τ=$τ must be (0, β] where β=$β")
-    
+
     if ω > T(0.0)
-        a= τ
+        a = τ
     else
-        a= β - τ
+        a = β - τ
     end
     return exp(-abs(ω) * a)
 end
@@ -80,7 +80,7 @@ end
 
 
 """
-    kernelFermiT(τ, ω, β)
+    function kernelFermiT(τ, ω, β)
 
 Compute the imaginary-time fermionic kernel.  Machine accuracy ~eps(g) is guaranteed``
 ```math
@@ -113,7 +113,7 @@ function kernelFermiT(τ::T, ω::T, β::T) where {T<:AbstractFloat}
 end
 
 """
-    kernelBoseT(τ, ω, β)
+    function kernelBoseT(τ, ω, β)
 
 Compute the imaginary-time bosonic kernel. Machine accuracy ~eps(g) is guaranteed``
 ```math
@@ -148,7 +148,7 @@ g(τ>0) = e^{-ωτ}/(1-e^{-ωβ}), g(τ≤0) = -e^{-ωτ}/(1-e^{ωβ})
 end
 
 """
-    kernelBoseT_regular(τ, ω, β)
+    function kernelBoseT_regular(τ, ω, β)
 
 Compute the imaginary-time bosonic kernel with a regulator near ω=0. Machine accuracy ~eps(g) is guaranteed``
 ```math
@@ -182,7 +182,7 @@ g(τ>0) = e^{-ωτ}/(1+e^{-ωβ}), g(τ≤0) = e^{-ωτ}/(1+e^{ωβ})
 end
 
 """
-    kernelFermiT_PH(τ, ω, β)
+    function kernelFermiT_PH(τ, ω, β)
 
 Compute the imaginary-time kernel for correlation function ``⟨O(τ)O(0)⟩``. Machine accuracy ~eps(C) is guaranteed``
 ```math
@@ -202,7 +202,7 @@ K(τ) = e^{-ω|τ|}+e^{-ω(β-|τ|)}
 end
 
 """
-    kernelBoseT_PH(τ, ω, β)
+    function kernelBoseT_PH(τ, ω, β)
 
 Compute the imaginary-time kernel for correlation function ``⟨O(τ)O(0)⟩``. Machine accuracy ~eps(C) is guaranteed``
 ```math
@@ -222,7 +222,7 @@ K(τ) = e^{-ω|τ|}+e^{-ω(β-|τ|)}
 end
 
 """
-    kernelFermiT_PHA(τ, ω, β)
+    function kernelFermiT_PHA(τ, ω, β)
 
 Compute the imaginary-time kernel for correlation function ``⟨O(τ)O(0)⟩``. Machine accuracy ~eps(C) is guaranteed``
 ```math
@@ -242,7 +242,7 @@ K(τ) = e^{-ω|τ|}-e^{-ω(β-|τ|)}
 end
 
 """
-    kernelBoseT_PHA(τ, ω, β)
+    function kernelBoseT_PHA(τ, ω, β)
 
 Compute the imaginary-time kernel for correlation function ``⟨O(τ)O(0)⟩``. Machine accuracy ~eps(C) is guaranteed``
 ```math
@@ -263,7 +263,7 @@ end
 
 
 """
-    kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
+    function kernelΩ(::Val{isFermi}, ::Val{symmetry}, n::Int, ω::T, β::T, regularized::Bool = false) where {T<:AbstractFloat}
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
@@ -283,7 +283,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
             return isFermi ? kernelFermiΩ(n, ω, β) : kernelBoseΩ(n, ω, β)
         end
     elseif symmetry == :sym
-        return isFermi ?  kernelFermiSymΩ(n, ω, β) : kernelBoseSymΩ(n, ω, β)
+        return isFermi ? kernelFermiSymΩ(n, ω, β) : kernelBoseSymΩ(n, ω, β)
     elseif symmetry == :ph
         return isFermi ? kernelFermiΩ_PH(n, ω, β) : kernelBoseΩ_PH(n, ω, β)
     elseif symmetry == :pha
@@ -294,13 +294,13 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 end
 
 """
-    kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
+    function kernelΩ(isFermi, symmetry, nGrid::Vector{Int}, ωGrid::Vector{T}, β::T, regularized::Bool = false; type = Complex{T}) where {T<:AbstractFloat}
 
 Compute kernel matrix with given ωn (integer!) and ω grids.
 """
 function kernelΩ(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, nGrid::AbstractVector{Int}, ωGrid::AbstractVector{T}, β::T, regularized::Bool=false) where {T<:AbstractFloat,isFermi,symmetry}
     # println(type)
-    if (symmetry == :none)  || (symmetry == :sym) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
+    if (symmetry == :none) || (symmetry == :sym) || (symmetry == :ph && isFermi == true) || (symmetry == :pha && isFermi == false)
         kernel = zeros(Complex{T}, (length(nGrid), length(ωGrid)))
     else
         kernel = zeros(T, (length(nGrid), length(ωGrid)))
@@ -316,7 +316,7 @@ function kernelΩ(::Type{T}, ::Val{isFermi}, ::Val{symmetry}, nGrid::AbstractVec
 end
 
 """
-    kernelFermiΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelFermiΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the fermionic kernel with Matsubara frequency.
 ```math
@@ -337,7 +337,7 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
 end
 
 """
-    kernelFermiSymΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelFermiSymΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the symmetrized fermionic kernel with Matsubara frequency.
 ```math
@@ -353,14 +353,14 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
 @inline function kernelFermiSymΩ(n::Int, ω::T, β::T) where {T<:AbstractFloat}
     # fermionic Matsurbara frequency
     ω_n = (2 * n + 1) * π / β
-    G =  -(1.0 + exp(-abs(ω)*β))/ (ω_n * im - ω)
+    G = -(1.0 + exp(-abs(ω) * β)) / (ω_n * im - ω)
     return Complex{T}(G)
 end
 
 
 
 """
-    kernelBoseΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelBoseΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the bosonic kernel with Matsubara frequency.
 ```math
@@ -385,7 +385,7 @@ end
 
 
 """
-    kernelBoseSymΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelBoseSymΩ(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the bosonic kernel with Matsubara frequency.
 ```math
@@ -403,9 +403,9 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
     ω_n = (2 * n) * π / β
     x = abs(ω) * β
     if n == 0 && x < 1.0e-5
-        G = β * (1 - x / 2 + x^2 / 6) 
+        G = β * (1 - x / 2 + x^2 / 6)
     else
-        G = -sign(ω)*(1.0 - exp(-abs(ω)*β))/ (ω_n * im - ω)
+        G = -sign(ω) * (1.0 - exp(-abs(ω) * β)) / (ω_n * im - ω)
     end
     if !isfinite(G)
         throw(DomainError(-1, "Got $G for the parameter $n, $ω and $β"))
@@ -417,7 +417,7 @@ end
 
 
 """
-    kernelBoseΩ_regular(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelBoseΩ_regular(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the bosonic kernel in Matsubara frequency with a regulartor near ω=0
 ```math
@@ -452,7 +452,7 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 end
 
 """
-    kernelFermiΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelFermiΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the Matsubara-frequency kernel for a correlator ``⟨O(τ)O(0)⟩_{iω_n}``.
 ```math
@@ -479,7 +479,7 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
 end
 
 """
-    kernelBoseΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelBoseΩ_PH(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the Matsubara-frequency kernel for a correlator ``⟨O(τ)O(0)⟩_{iω_n}``.
 ```math
@@ -512,7 +512,7 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 end
 
 """
-    kernelFermiΩ_PHA(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelFermiΩ_PHA(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the Matsubara-frequency kernel for a anormalous fermionic correlator with particle-hole symmetry.
 ```math
@@ -539,7 +539,7 @@ where ``ω_n=(2n+1)π/β``. The convention here is consist with the book "Quantu
 end
 
 """
-    kernelBoseΩ_PHA(n::Int, ω::T, β::T) where {T <: AbstractFloat}
+    function kernelBoseΩ_PHA(n::Int, ω::T, β::T) where {T <: AbstractFloat}
 
 Compute the Matsubara-frequency kernel for a anormalous fermionic correlator with particle-hole symmetry.
 ```math
@@ -575,7 +575,7 @@ where ``ω_n=2nπ/β``. The convention here is consist with the book "Quantum Ma
 end
 
 """
-    density(isFermi::Bool, ω, β)
+    function density(isFermi::Bool, ω, β)
 
 Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 
@@ -589,7 +589,7 @@ Compute the imaginary-time kernel of different type. Assume ``k_B T/\\hbar=1``
 end
 
 """
-fermiDirac(ω)
+    function fermiDirac(ω)
 
 Compute the Fermi Dirac function. Assume ``k_B T/\\hbar=1``
 ```math
@@ -612,7 +612,7 @@ f(ω) = 1/(e^{ωβ}+1)
 end
 
 """
-boseEinstein(ω)
+    function boseEinstein(ω)
 
 Compute the Fermi Dirac function. Assume ``k_B T/\\hbar=1``
 ```math
