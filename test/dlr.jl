@@ -205,19 +205,19 @@ end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
     cases = [MultiPole, SemiCircle]
-    Λ = [1e3, 1e5, 1e7]
-    rtol = [1e-8, 1e-10]
+    Λ = [1e3, 1e5]
+    rtol = [1e-6, 1e-8, 1e-12, 1e-14]
     for case in cases
         for l in Λ
             for r in rtol
                 test(case, true, :none, l, 1.0, r, dtype=Float64)
                 test(case, false, :none, l, 1.0, r, dtype=Float64)
 
-                # test(case, false, :ph, l, 1.0, r, dtype=Float64)
-                # test(case, true, :ph, l, 1.0, r, dtype=Float64)
+                test(case, false, :ph, l, 1.0, r, dtype=Float64)
+                test(case, true, :ph, l, 1.0, r, dtype=Float64)
 
-                # test(case, false, :pha, l, 1.0, r, dtype=Float64)
-                # test(case, true, :pha, l, 1.0, r, dtype=Float64)
+                test(case, false, :pha, l, 1.0, r, dtype=Float64)
+                test(case, true, :pha, l, 1.0, r, dtype=Float64)
 
                 # if case == MultiPole
                 #     setprecision(128)
