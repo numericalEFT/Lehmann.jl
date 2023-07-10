@@ -202,31 +202,6 @@ Base.size(dlrGrid::DLRGrid) = (length(dlrGrid.ω),) # following the Julia conven
 # Base.size(dlrGrid::DLRGrid) = length(dlrGrid.ω) # following the Julia convention: size(vector) returns (length(vector),)
 Base.length(dlrGrid::DLRGrid) = length(dlrGrid.ω)
 
-# function symmetrize_ω(ω)
-#     # ω_except0 = ω[2:end]
-#     # ω_final = sort(vcat(-ω_except0,0.0,ω_except0))
-#     ω_final = sort(vcat(-ω,ω))
-#     return ω_final
-# end
-
-# function symmetrize_τ(ω)
-#     ω_final = sort(vcat(ω,1.0.-ω))
-#     return ω_final
-# end
-
-# function symmetrize_n(ω, isFermi)
-#     # for a Matsubara frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
-#     if isFermi
-#         # for fermionic grid, the sum of symmetric n grid points is -1
-#         ω_final = sort(vcat(ω,(-1).-ω))
-#     else
-#         # for bosonic grid, the sum of symmetric n grid points is 0
-#         ω_except0 = ω[2:end]
-#         ω_final = sort(vcat(-ω_except0,0,ω_except0))
-#     end        
-#     return ω_final
-# end
-
 function symmetrize_ω(ω)
     # for a real frequency grid \omega, make it symmetric with respect to 0 by adding missing symmetric grid points.
     zero_idx = searchsortedfirst(ω, 0)
@@ -336,11 +311,6 @@ function _load!(dlrGrid::DLRGrid{T,S}, dlrfile, verbose=false) where {T,S}
     end
     # println("reading $filename")
 
-    # if dlrGrid.symmetry==:sym
-    #     ω = symmetrize_ω(ω)
-    #     τ = symmetrize_τ(τ)
-    #     n = symmetrize_n(n,dlrGrid.isFermi)
-    # end
     if dlrGrid.isFermi
         ωn = @. (2n + 1.0) * π / β
     else
