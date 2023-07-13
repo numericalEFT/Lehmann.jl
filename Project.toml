@@ -1,11 +1,12 @@
 name = "Lehmann"
 uuid = "95bf888a-8996-4655-9f35-1c0506bdfefe"
 authors = ["Kun Chen", "Tao Wang", "Xiansheng Cai"]
-version = "0.2.6"
+version = "0.2.7"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -13,14 +14,18 @@ Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+ChainRulesCore = "1"
 FastGaussQuadrature = "0.4"
 Quadmath = "0.5"
 StaticArrays = "1"
-ChainRulesCore = "1"
 julia = "1.6"
 
 [extras]
+CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "CodecZlib", "FiniteDifferences", "JLD2", "Printf"]

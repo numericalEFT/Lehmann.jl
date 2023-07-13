@@ -21,7 +21,7 @@ struct CompositeChebyshevGrid
     end
 end
 
-function ωChebyGrid(dlrGrid, degree, print = true)
+function ωChebyGrid(dlrGrid, degree, print=true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
     npo = Int(ceil(log(Λ) / log(2.0))) # subintervals on [0,lambda] in omega space (subintervals on [-lambda,lambda] is 2*npo)
@@ -45,10 +45,10 @@ function ωChebyGrid(dlrGrid, degree, print = true)
         end
         pbpo[1:npo] = -pbpo[2npo+1:-1:npo+2]
     end
+
     return CompositeChebyshevGrid(degree, pbpo)
 end
-
-function τChebyGrid(dlrGrid, degree, print = true)
+function τChebyGrid(dlrGrid, degree, print=true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
     npt = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
@@ -79,16 +79,16 @@ function τChebyGrid(dlrGrid, degree, print = true)
 end
 
 """
-function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
+    function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
 
-    Calculate the kernel matrix(τ, ω) for given τ, ω grids
+Calculate the kernel matrix(τ, ω) for given τ, ω grids
 
 # Arguments
 - τ: a CompositeChebyshevGrid struct or a simple one-dimensional array
 - ω: a CompositeChebyshevGrid struct or a simple one-dimensional array
 - print: print information or not
 """
-function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
+function preciseKernelT(dlrGrid, τ, ω, print::Bool=true)
     # Assume τ.grid is particle-hole symmetric!!!
     # if (τ isa CompositeChebyshevGrid)
     #     @assert (τ.np - 1) * τ.degree == τ.ngrid
@@ -116,7 +116,7 @@ function preciseKernelT(dlrGrid, τ, ω, print::Bool = true)
     return kernel
 end
 
-function testInterpolation(dlrGrid, τ, ω, kernel, print = true)
+function testInterpolation(dlrGrid, τ, ω, kernel, print=true)
     ############# test interpolation accuracy in τ #######
     τGrid = (τ isa CompositeChebyshevGrid) ? τ.grid : τ
     ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω
@@ -161,7 +161,7 @@ function testInterpolation(dlrGrid, τ, ω, kernel, print = true)
     end
 end
 
-function preciseKernelΩn(dlrGrid, ω, print::Bool = true)
+function preciseKernelΩn(dlrGrid, ω, print::Bool=true)
     function Freq2Index(isFermi, ωnList)
         if isFermi
             # ωn=(2n+1)π
@@ -184,7 +184,7 @@ function preciseKernelΩn(dlrGrid, ω, print::Bool = true)
             nGrid[(i-1)*degree+1:i*degree] = Freq2Index(isFermi, a .+ (b - a) .* xc)
         end
         unique!(nGrid)
-        return symmetry == :none ? vcat(-nGrid[end:-1:2], nGrid) : nGrid
+        return symmetry == :none || symmetry == :sym ? vcat(-nGrid[end:-1:2], nGrid) : nGrid
     end
 
     ωGrid = (ω isa CompositeChebyshevGrid) ? ω.grid : ω

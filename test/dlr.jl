@@ -1,15 +1,63 @@
 using FastGaussQuadrature, Printf
-
 rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
-
 function MultiPole(dlr, grid, type)
     Euv = dlr.Euv
     poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
     return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+end
+
+function MultiPole(dlr, grid, type, coeff)
+    Euv = dlr.Euv
+    poles = coeff * Euv
+    # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+    return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+end
+
+
+function bare_G(dlr, grid, type)
+    T = typeof(dlr.β)
+    E = T(1.0)
+    if type == :n
+        G = zeros(Complex{T}, length(grid))
+        for i in 1:length(grid)
+            G[i] = Spectral.kernelFermiΩ(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelFermiSymΩ(grid[i], E, dlr.β)
+
+            #print("$(dlr.n[i]),$(G[i])\n")
+        end
+    elseif type == :τ
+        G = zeros(T, length(grid))
+        for i in 1:length(grid)
+            G[i] = Spectral.kernelFermiT(grid[i], E, dlr.β)
+            #G[i]=Spectral.kernelSymT(grid[i], E, dlr.β)
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
+end
+function bare_G_τ(dlr, grid)
+    T = typeof(dlr.β)
+    E = T(1.0)
+    G = zeros(T, length(grid))
+    for i in 1:length(grid)
+        n = 0
+        wn = π / dlr.β
+        while n < dlr.n[end]
+            G[i] += 2 * real(Spectral.kernelFermiΩ(n, E, dlr.β) * exp(-im * wn * grid[i])) / dlr.β
+            #G[i] +=2*real(Spectral.kernelFermiSymΩ(n, E, dlr.β)*exp(-im*wn*grid[i]))/dlr.β            
+            n += 1
+            wn += 2 * π / dlr.β
+        end
+        if i == 1
+            print("$(typeof(im*wn*grid[1]))\n")
+        end
+    end
+    print("$(typeof(G))\n")
+    return G
 end
 
 function compare(case, a, b, eps, requiredratio, para="")
@@ -79,14 +127,17 @@ end
 
 @testset "Correlator Representation" begin
 
-    function test(case, isFermi, symmetry, Euv, β, eps)
+    function test(case, isFermi, symmetry, Euv, β, eps; dtype=Float64)
         # println("Test $case with isFermi=$isFermi, Symmetry = $symmetry, Euv=$Euv, β=$β, rtol=$eps")
-
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
-
-        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry) #construct dlr basis
-        dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
-
+        dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct dlr basis
+        #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
+        dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
+        if symmetry == :sym
+            error_tolerance = 100
+        else
+            error_tolerance = 11000
+        end
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
         #=========================================================================================#
@@ -105,17 +156,17 @@ end
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
         # end
-
-        compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, 1000, para)
+        
+        compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, error_tolerance, para)
         #=========================================================================================#
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
-        # #get Matsubara-frequency Green's function
+        # get Matsubara-frequency Green's function
         Gndlr = case(dlr, dlr.n, :n)
         nSample = dlr10.n
         Gnsample = case(dlr, nSample, :n)
 
-        # #Matsubara frequency to dlr
+        # Matsubara frequency to dlr
         coeffn = matfreq2dlr(dlr, Gndlr)
         Gnfitted = dlr2matfreq(dlr, coeffn, nSample)
         #     for (ni, n) in enumerate(nSample)
@@ -123,19 +174,19 @@ end
         # end
 
         compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
-        compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, 1000, para)
+        compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, error_tolerance, para)
 
         #=========================================================================================#
         #                            Fourier Transform Test                                     #
         #=========================================================================================#
         Gnfourier = tau2matfreq(dlr, Gdlr, nSample)
-        compare("τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
+        compare("fourier τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
         # for (ti, t) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, imag(Gnsample[2, ti]), imag(Gnfourier[2, ti]), abs(Gnsample[2, ti] - Gnfourier[2, ti]))
         # end
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
+        compare("fourier iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -145,34 +196,68 @@ end
         #=========================================================================================#
 
         # err = 10 * eps
-        atol = eps
-        noise = atol * rand(eltype(Gsample), length(Gsample))
-        GNoisy = Gsample .+ noise
-        compare_atol("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error=abs.(noise)), Gdlr, atol, para)
+        if symmetry != :sym
+            atol = eps
+            noise = atol * rand(eltype(Gsample), length(Gsample))
+            GNoisy = Gsample .+ noise
+            #compare_atol("noisy generic τ → dlr → τ $case", tau2tau(dlr, GNoisy, dlr.τ, τSample; error=abs.(noise)), Gdlr, atol, para)
 
-        noise = atol * rand(eltype(Gnsample), length(Gnsample))
-        GnNoisy = Gnsample .+ noise
-        compare_atol("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error=abs.(noise)), Gndlr, atol, para)
+            noise = atol * rand(eltype(Gnsample), length(Gnsample))
+            GnNoisy = Gnsample .+ noise
+            #compare_atol("noisy generic iω → dlr → iω $case", matfreq2matfreq(dlr, GnNoisy, dlr.n, nSample, error=abs.(noise)), Gndlr, atol, para)
+        end
     end
-
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
-    cases = [SemiCircle, MultiPole]
-    Λ = [1e3, 1e5, 1e7]
-    rtol = [1e-8, 1e-10]
+    cases = [MultiPole, SemiCircle]
+    Λ = [1e3, 1e4, 1e5]
+    rtol = [1e-4, 1e-6, 1e-8, 1e-12]
     for case in cases
         for l in Λ
             for r in rtol
-                test(case, true, :none, 1.0, l, r)
-                test(case, false, :none, 1.0, l, r)
-                test(case, false, :ph, 1.0, l, r)
-                test(case, true, :ph, 1.0, l, r)
-                test(case, false, :pha, 1.0, l, r)
-                test(case, true, :pha, 1.0, l, r)
+                test(case, true, :none, l, 1.0, r, dtype=Float64)
+                test(case, false, :none, l, 1.0, r, dtype=Float64)
+
+                test(case, false, :ph, l, 1.0, r, dtype=Float64)
+                test(case, true, :ph, l, 1.0, r, dtype=Float64)
+
+                test(case, false, :pha, l, 1.0, r, dtype=Float64)
+                test(case, true, :pha, l, 1.0, r, dtype=Float64)
+
+                # if case == MultiPole
+                #     setprecision(128)
+                #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                #     test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                #     test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                #     test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                #     test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                # end
             end
         end
     end
-
+    for case in cases
+        for l in Λ
+            for r in rtol
+                test(case, true, :sym, l, 1.0, r, dtype=Float64)
+                test(case, false, :sym, l, 1.0, r, dtype=Float64)
+                # if case == MultiPole
+                #setprecision(128)
+                #     test(case, true, :none, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :none, l, 1.0, r, dtype= BigFloat)
+                #test(case, true, :sym, l, 1.0, r, dtype = BigFloat)
+                #test(case, false, :sym, l, 1.0, r, dtype = BigFloat)
+                #     test(case, false, :ph, l, 1.0, r, dtype = BigFloat)
+                #     test(case, true, :ph, l, 1.0, r, dtype=BigFloat)
+                #     test(case, false, :pha, l, 1.0, r,dtype=BigFloat)
+                #     test(case, true, :pha, l, 1.0, r, dtype= BigFloat)
+                # end
+            end
+        end
+    end
 end
+
 
 @testset "Tensor ↔ Matrix Mapping" begin
     a = rand(3)

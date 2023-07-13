@@ -56,10 +56,12 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
     _size = collect(size(tensor))
     @assert (_m == _size[axis]) "matrix size $(size(mat)) and tensor size ($(_size)) do not match at axis = $axis"
     _target_size = _reset_tuple(size(tensor), _n, axis)
+
     if axis == 1
         _r = reduce(*, _size[axis+1:end])
         _tensor = reshape(tensor, (_m, _r))
         res = mat * _tensor
+
         # _target_size = (_n, _size[2:end]...)::NTuple{N,Int}
         return reshape(res, _target_size)
     elseif axis == N
@@ -85,6 +87,8 @@ function _matrix_tensor_dot(mat::AbstractMatrix{TC}, tensor::AbstractArray{T,N},
         return reshape(res, _target_size)
     end
 end
+
+
 
 function _tensor2matrix(tensor::AbstractVector{T}, ::Val{axis}) where {T,axis}
     return reshape(tensor, length(tensor), 1), nothing
@@ -141,83 +145,6 @@ function _matrix2tensor(mat::AbstractMatrix{T}, partialsize::NTuple{dim,Int}, ::
     end
 end
 
-# function _weightedLeastSqureFit(dlr, Gτ, error, kernel, sumrule)
-#     # Gτ: (Nτ, N), kernel: (Nτ, Nω)
-#     # error: (Nτ, N), sumrule: (N, 1)
-#     Nτ, Nω = size(kernel)
-#     @assert size(Gτ)[1] == Nτ
-#     N = size(Gτ)[2]
-#     if isnothing(sumrule) == false
-#         @assert dlr.symmetry == :none && dlr.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
-#         # println(size(Gτ))
-#         # M = Int(floor(dlr.size / 2))
-#         M = dlr.size
-
-#         # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
-#         kernelN = kernel[:, M]
-
-#         # sign = dlr.isFermi ? -1 : 1
-#         # ker0 = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [0.0,], dlr.ω, dlr.β, true)
-#         # kerβ = Spectral.kernelT(Val(dlr.isFermi), Val(dlr.symmetry), [dlr.β,], dlr.ω, dlr.β, true)
-
-#         # ker = ker0[1:end] .- sign .* kerβ[1:end]
-#         # ker = vcat(ker[1:M-1], ker[M+1:end])
-#         # kerN = ker[M]
-
-#         for i in 1:Nτ
-#             # Gτ[i, :] .-= kernelN[i] * sumrule / kerN
-#             Gτ[i, :] .-= kernelN[i] * sumrule
-#         end
-
-#         # for i = 1:Nω-1
-#         #     kernel[:, i] .-= kernelN * ker[i] / kerN
-#         # end
-#         kernel = hcat(kernel[:, 1:M-1], kernel[:, M+1:end])
-#     end
-
-#     if isnothing(error)
-#         B = kernel
-#         C = Gτ
-#     else
-#         @assert size(error) == size(Gτ)
-#         w = 1.0 ./ (error .+ 1e-16)
-
-#         for i = 1:Nτ
-#             w[i, :] /= sum(w[i, :]) / length(w[i, :])
-#         end
-#         B = w .* kernel
-#         C = w .* Gτ
-#     end
-#     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
-#     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-#     coeff = B \ C #solve C = B * coeff
-
-#     # println("size", size(coeff), ", rank,", dlr.size, "...,", size(kernel))
-
-#     if isnothing(sumrule) == false
-#         #make sure Gτ doesn't get modified after the linear fitting
-#         for i in 1:Nτ
-#             # Gτ[i, :] .+= kernelN[i] * sumrule / kerN
-#             Gτ[i, :] .+= kernelN[i] * sumrule
-#         end
-#         #add back the coeff that are fixed by the sum rule
-#         coeffmore = sumrule' .- sum(coeff, dims = 1)
-#         cnew = zeros(eltype(coeff), size(coeff)[1] + 1, size(coeff)[2])
-#         cnew[1:M-1, :] = coeff[1:M-1, :]
-#         cnew[M+1:end, :] = coeff[M:end, :]
-#         cnew[M, :] = coeffmore
-#         # for j in 1:N
-#         #     cnew[:, j] = sumrule[j]
-#         # end
-#         # println(ker)
-#         # println(coeff)
-#         # println(dot(ker, coeff))
-#         # cnew[M, 1] = (sumrule - dot(ker, coeff)) / kerN
-#         return cnew
-#     else
-#         return coeff
-#     end
-# end
 
 function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     Nτ, Nω = size(kernel)
@@ -225,8 +152,8 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     if isnothing(sumrule) == false #require sumrule
         @assert dlrGrid.symmetry == :none && dlrGrid.isFermi "only unsymmetrized ferminoic sum rule has been implemented!"
         # println(size(Gτ))
-        M = Int(floor(dlrGrid.size / 2))
-        # M = dlrGrid.size
+        M = Int(floor(length(dlrGrid.ω) / 2))
+        # M = length(dlrGrid.ω)
 
         kernel_m0 = kernel[:, M]
         # kernel = kernel[:, 1:Nω-1] #a copy of kernel submatrix will be created
@@ -258,7 +185,7 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
     end
     # ker, ipiv, info = LAPACK.getrf!(B) # LU factorization
     # coeff = LAPACK.getrs!('N', ker, ipiv, C) # LU linear solvor for green=kernel*coeff
-    coeff = B \ C #solve C = B * coeff
+    coeff = B \ C#solve C = B * coeff
 
     if isnothing(sumrule) == false
         #make sure Gτ doesn't get modified after the linear fitting
@@ -280,9 +207,9 @@ function _weightedLeastSqureFit(dlrGrid, Gτ, error, kernel, sumrule)
 end
 
 """
-function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2dlr(dlrGrid::DLRGrid, green, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    imaginary-time domain to DLR representation
+imaginary-time domain to DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid struct.
@@ -298,7 +225,7 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     @assert size(green)[axis] == length(τGrid)
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+    if length(τGrid) == length(dlrGrid.τ) && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -306,7 +233,6 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
     else
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
-
     g, partialsize = _tensor2matrix(green, Val(axis))
 
     if isnothing(sumrule) == false
@@ -341,9 +267,9 @@ function tau2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, τGrid=dlrGr
 end
 
 """
-function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
+    function dlr2tau(dlrGrid::DLRGrid, dlrcoeff, τGrid = dlrGrid.τ; axis = 1, verbose = true)
 
-    DLR representation to imaginary-time representation
+DLR representation to imaginary-time representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -359,7 +285,7 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
     β = dlrGrid.β
     ωGrid = dlrGrid.ω
 
-    if length(τGrid) == dlrGrid.size && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
+    if length(τGrid) == length(dlrGrid.τ) && isapprox(τGrid, dlrGrid.τ; rtol=10 * eps(T))
         if length(dlrGrid.kernel_τ) == 1
             dlrGrid.kernel_τ = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
         end
@@ -368,18 +294,15 @@ function dlr2tau(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, τGrid=dl
         kernel = Spectral.kernelT(T, Val(dlrGrid.isFermi), Val(S), τGrid, ωGrid, dlrGrid.β, true)
     end
 
-    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
-
     # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    # return _matrix2tensor(G, partialsize, axis)
     return _matrix_tensor_dot(kernel, dlrcoeff, axis)
+
 end
 
 """
-function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2dlr(dlrGrid::DLRGrid, green, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Matsubara-frequency representation to DLR representation
+Matsubara-frequency representation to DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid struct.
@@ -396,10 +319,8 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     @assert eltype(nGrid) <: Integer
     ωGrid = dlrGrid.ω
 
-    # typ = promote_type(eltype(dlrGrid.kernel_n), eltype(green))
-
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -408,7 +329,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -417,7 +338,6 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     end
-
     # if typ != eltype(green)
     #     green = convert.(typ, green)
     # end
@@ -427,6 +347,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
     # end
 
     g, partialsize = _tensor2matrix(green, Val(axis))
+
 
     if isnothing(sumrule) == false
         # if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
@@ -442,6 +363,9 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
         error, partialsize = _tensor2matrix(error, Val(axis))
     end
     coeff = _weightedLeastSqureFit(dlrGrid, g, error, kernel, sumrule)
+
+
+
     if verbose && all(x -> abs(x) < 1e16, coeff) == false
         @warn("Some of the DLR coefficients are larger than 1e16. The quality of DLR fitting could be bad.")
     end
@@ -457,9 +381,9 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
 end
 
 """
-function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
+    function dlr2matfreq(dlrGrid::DLRGrid, dlrcoeff, nGrid = dlrGrid.n; axis = 1, verbose = true)
 
-    DLR representation to Matsubara-frequency representation
+DLR representation to Matsubara-frequency representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -475,7 +399,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
     ωGrid = dlrGrid.ω
 
     if (S == :ph && dlrGrid.isFermi == false) || (S == :pha && dlrGrid.isFermi == true)
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_n = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -484,7 +408,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
             kernel = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
         end
     else
-        if length(nGrid) == dlrGrid.size && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
+        if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
             if length(dlrGrid.kernel_n) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
@@ -494,19 +418,13 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
         end
     end
 
-    # coeff, partialsize = _tensor2matrix(dlrcoeff, axis)
-
-    # G = kernel * coeff # tensor dot product: \sum_i kernel[..., i]*coeff[i, ...]
-
-    # return _matrix2tensor(G, partialsize, axis)
-
     return _matrix_tensor_dot(kernel, dlrcoeff, axis)
 end
 
 """
-function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2matfreq(dlrGrid, green, nNewGrid = dlrGrid.n, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
+Fourier transform from imaginary-time to Matsubara-frequency using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -525,9 +443,9 @@ function tau2matfreq(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nNewGrid
 end
 
 """
-function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2tau(dlrGrid, green, τNewGrid = dlrGrid.τ, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
+Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -545,9 +463,9 @@ function matfreq2tau(dlrGrid, green, τNewGrid=dlrGrid.τ, nGrid=dlrGrid.n; erro
 end
 
 """
-function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function tau2tau(dlrGrid, green, τNewGrid, τGrid = dlrGrid.τ; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Interpolation from the old imaginary-time grid to a new grid using the DLR representation
+Interpolation from the old imaginary-time grid to a new grid using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid
@@ -565,9 +483,9 @@ function tau2tau(dlrGrid, green, τNewGrid, τGrid=dlrGrid.τ; error=nothing, ax
 end
 
 """
-function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
+    function matfreq2matfreq(dlrGrid, green, nNewGrid, nGrid = dlrGrid.n; error = nothing, axis = 1, sumrule = nothing, verbose = true)
 
-    Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
+Fourier transform from Matsubara-frequency to imaginary-time using the DLR representation
 
 #Members:
 - `dlrGrid`  : DLRGrid

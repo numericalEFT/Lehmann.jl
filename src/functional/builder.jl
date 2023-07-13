@@ -107,7 +107,7 @@ function printCandidate(basis, idx)
     @printf("%3i : ω=%24.8f ∈ (%24.8f, %24.8f) -> error=%24.16g\n", basis.N, basis.grid[idx], lower, upper, basis.residual[idx])
 end
 
-function QR(Λ, rtol, proj, g0; N = nothing, verbose = false)
+function QR(Λ, rtol, proj, g0; N=nothing, verbose=false)
     basis = Basis(Λ, rtol)
     # println(g0)
     for g in g0
@@ -144,14 +144,17 @@ function QR(Λ, rtol, proj, g0; N = nothing, verbose = false)
 end
 
 """
-q1=sum_j c_j K_j
-q2=sum_k d_k K_k
-return <q1, q2> = sum_jk c_j*d_k <K_j, K_k>
+    projqq(basis, q1::Vector{Float}, q2::Vector{Float})
+
+return ``\\left<q1, q2\\right> = \\sum_{jk} c_j d_k \\left<K_j, K_k\\right>``
+where ``q_1=\\sum_j c_j K_j`` and ``q_2=\\sum_k d_k K_k``
 """
 projqq(basis, q1::Vector{Float}, q2::Vector{Float}) = q1' * basis.proj * q2
 
 """
-<K(g_i), K(g_j)>
+    function projKernel(basis, proj)
+
+``\\left<K(g_i), K(g_j)\\right>``
 """
 function projKernel(basis, proj)
     K = zeros(Float, (basis.N, basis.N))
@@ -223,27 +226,28 @@ function testOrthgonal(basis, verbose)
 end
 
 """
-function build(dlrGrid, print::Bool = true)
-    Construct discrete Lehmann representation
+    function build(dlrGrid, print::Bool = true)
+
+Construct discrete Lehmann representation
 
 #Arguments:
 - `dlrGrid`: struct that contains the information to construct the DLR grid. The following entries are required:
    Λ: the dimensionless scale β*Euv, rtol: the required relative accuracy, isFermi: fermionic or bosonic, symmetry: particle-hole symmetry/antisymmetry or none
 - `print`: print the internal information or not
 """
-function build(dlrGrid, print::Bool = true)
+function build(dlrGrid, print::Bool=true)
     print && println("Using the functional algorithm to build DLR ...")
     Λ = Float(dlrGrid.Λ)
     rtol = Float(dlrGrid.rtol)
     symmetry = dlrGrid.symmetry
     if symmetry == :ph
         print && println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)], verbose = print)
+        ωBasis = QR(Λ, rtol, projPH_ω, [Float(0), Float(Λ)], verbose=print)
         ωGrid = ωBasis.grid
         rank = ωBasis.N
     elseif symmetry == :pha
         print && println("Building ω grid ... ")
-        ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),], verbose = print)
+        ωBasis = QR(Λ, rtol, projPHA_ω, [Float(Λ),], verbose=print)
         ωGrid = ωBasis.grid
         rank = ωBasis.N
     else
