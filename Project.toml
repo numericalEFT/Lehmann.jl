@@ -19,6 +19,7 @@ FastGaussQuadrature = "0.4"
 Quadmath = "0.5"
 StaticArrays = "1"
 julia = "1.6"
+DoubleFloats = "1.2"
 
 [extras]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
