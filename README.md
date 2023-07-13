@@ -6,9 +6,9 @@
 [![codecov](https://codecov.io/gh/numericaleft/Lehmann.jl/branch/main/graph/badge.svg?token=Uia7j4DnR9)](https://codecov.io/gh/numericaleft/Lehmann.jl)
 <!-- [![Coverage](https://codecov.io/gh/kunyuan/Lehmann.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/kunyuan/Lehmann.jl) -->
 
-This package provides subroutines to represent and manipulate Green's functions in the imaginary time or the Matsubara-frequency domain. 
+This package provides subroutines representing and manipulating Green's functions in the imaginary time or the Matsubara-frequency domain. 
 
-Imaginary-time Green's functions encode the thermodynamic properties of quantum many-body systems. They are typically very singular and hard to deal with at low temperatures in numerical calculations. 
+Imaginary-time Green's functions encode the thermodynamic properties of quantum many-body systems. They are typically singular and hard to deal with at low temperatures in numerical calculations. 
 
 ## Features
 We provide the following components to ease the numerical manipulation of the Green's functions:
@@ -19,7 +19,7 @@ We provide the following components to ease the numerical manipulation of the Gr
 
 - Fast and accurate Fourier transform between the imaginary-time domain and the Matsubara-frequency domain with a cost $O(\\log(1/T)log(1/\\epsilon))$ and an accuracy $\\sim 100\epsilon$.
 
-- Fast and accurate Green's function interpolation with a cost $O(\\log(1/T)log(1/\\epsilon))$ and accuracy $\\sim 100\\epsilon$.
+- Fast and accurate Green's function interpolation with a cost $O(\\log(1/T)\\log(1/\\epsilon))$ and accuracy $\\sim 100\\epsilon$.
 
 - Fit a Green's function with noise.
 
