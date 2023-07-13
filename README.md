@@ -17,7 +17,7 @@ We provide the following components to ease the numerical manipulation of the Gr
 
 - Dedicated DLR for Green's functions with the particle-hole symmetry (e.g., phonon propagator) or particle-hole antisymmetry (e.g., superconductor gap function).
 
-- Fast and accurate Fourier transform between the imaginary-time domain and the Matsubara-frequency domain with a cost $O(\\log(1/T)log(1/\\epsilon))$ and an accuracy $\\sim 100\epsilon$.
+- Fast and accurate Fourier transform between the imaginary-time domain and the Matsubara-frequency domain with a cost $O(\\log(1/T)\\log(1/\\epsilon))$ and an accuracy $\\sim 100\epsilon$.
 
 - Fast and accurate Green's function interpolation with a cost $O(\\log(1/T)\\log(1/\\epsilon))$ and accuracy $\\sim 100\\epsilon$.
 
