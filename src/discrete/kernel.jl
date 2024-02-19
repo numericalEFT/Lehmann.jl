@@ -52,6 +52,9 @@ function τChebyGrid(dlrGrid, degree, print=true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
     npt = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
+    if npt < 2
+        npt = 2
+    end
 
     if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
         ############# Tau discretization ##############
@@ -74,7 +77,6 @@ function τChebyGrid(dlrGrid, degree, print=true)
         end
         pbpt[npt+2:2npt+1] = 1 .- pbpt[npt:-1:1]
     end
-
     return CompositeChebyshevGrid(degree, pbpt)
 end
 
