@@ -25,7 +25,9 @@ function ωChebyGrid(dlrGrid, degree, print=true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
     npo = Int(ceil(log(Λ) / log(2.0))) # subintervals on [0,lambda] in omega space (subintervals on [-lambda,lambda] is 2*npo)
-
+    if npo < 1
+        npo = 1
+    end
     if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha
         # Panel break points for the real frequency ∈ [0, Λ]
         # get exponentially dense near 0⁺
@@ -52,8 +54,8 @@ function τChebyGrid(dlrGrid, degree, print=true)
     Λ, rtol = dlrGrid.Λ, dlrGrid.rtol
 
     npt = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
-    if npt < 2
-        npt = 2
+    if npt < 1
+        npt = 1
     end
 
     if dlrGrid.symmetry == :ph || dlrGrid.symmetry == :pha

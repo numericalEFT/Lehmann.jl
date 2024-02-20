@@ -63,9 +63,11 @@ function τnQR(kernel, rank, print::Bool=true)
     @assert rank == size(kernel)[2] #the ω dimension of the τkernel should be the effective rank
 
     τnqr = qr(transpose(kernel), Val(true)) # julia qr has a strange, Val(true) will do a pivot QR
-
-    return τnqr.p[1:rank]
-
+    if rank > length(τnqr.p)
+        return τnqr.p
+    else
+        return τnqr.p[1:rank]
+    end
 end
 
 function buildωn(dlrGrid, print::Bool=true)
@@ -120,7 +122,6 @@ function build(dlrGrid, print::Bool=true)
     print && println("ω grid size = $(ω.ngrid)")
 
     kernel = preciseKernelT(dlrGrid, τ, ω, print)
-    println("test $(size(kernel))  $(length(τ.grid)) $(length(ω.grid ))\n")
     if dlrGrid.symmetry != :sym
         testInterpolation(dlrGrid, τ, ω, kernel, print)
     end
