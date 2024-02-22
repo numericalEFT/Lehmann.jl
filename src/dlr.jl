@@ -343,20 +343,40 @@ function _build!(dlrGrid::DLRGrid, folder, filename, algorithm, verbose=false)
     end
     rank = length(ω)
     if isnothing(folder) == false
-        open(joinpath(folder, filename), "w") do io
-            @printf(io, "# %5s  %25s  %25s  %25s  %20s\n", "index", "freq", "tau", "fermi n", "bose n")
-            for r = 1:rank
-                @printf(io, "%5i  %32.17g  %32.17g  %16i  %16i\n", r, ω[r], τ[r], nF[r], nB[r])
-            end
+        nan = "NAN"
+        print("$(filename)\n")
+        file = open(joinpath(folder, filename), "w")
+        #open(joinpath(folder, filename), "w") do io
+        @printf(file, "# %5s  %25s  %25s  %25s  %20s\n", "index", "freq", "tau", "fermi n", "bose n")
+        for r = 1:rank
+            s0 = "%5i "
+            s1 = r > length(ω) ? "%48s " : "%48.40g "
+            s2 = r > length(τ) ? "%48s " : "%48.40g "
+            s3 = r > length(nF) ? "%16s " : "%16i "
+            s4 = r > length(nB) ? "%16s\n" : "%16i\n"
+            f = Printf.Format(s0 * s1 * s2 * s3 * s4)
+            Printf.format(file, f, r, r > length(ω) ? nan : ω[r],
+                r > length(τ) ? nan : τ[r],
+                r > length(nF) ? nan : nF[r],
+                r > length(nB) ? nan : nB[r])
         end
+        # for r = 1:rank
+        #     @printf(io, "%5i  %32.17g  %32.17g  %16i  %16i\n", r, ω[r], τ[r], nF[r], nB[r])
+        # end
+        close(file)
     end
-    for r = 1:rank
-        push!(dlrGrid.ω, ω[r] / β)
-        push!(dlrGrid.τ, τ[r] * β)
-        n = isFermi ? nF[r] : nB[r]
-        push!(dlrGrid.n, n)
-        push!(dlrGrid.ωn, isFermi ? (2n + 1.0) * π / β : 2n * π / β)
-    end
+    dlrGrid.ω = ω / β
+    dlrGrid.τ = τ * β
+    n = isFermi ? copy(nF) : copy(nB)
+    dlrGrid.n = n
+    dlrGrid.ωn = isFermi ? (2n .+ 1.0) * π / β : 2n * π / β
+    # for r = 1:rank
+    #     push!(dlrGrid.ω, ω[r] / β)
+    #     push!(dlrGrid.τ, τ[r] * β)
+    #     n = isFermi ? nF[r] : nB[r]
+    #     push!(dlrGrid.n, n)
+    #     push!(dlrGrid.ωn, isFermi ? (2n + 1.0) * π / β : 2n * π / β)
+    # end
     # println(rank)
 end
 

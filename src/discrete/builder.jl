@@ -5,7 +5,7 @@ using ..Spectral
 using ..Interp
 include("kernel.jl")
 
-function ωQR(kernel, rtol, print::Bool = true)
+function ωQR(kernel, rtol, print::Bool=true)
     # print && println(τ.grid[end], ", ", τ.panel[end])
     # print && println(ω.grid[end], ", ", ω.panel[end])
     ################# find the rank ##############################
@@ -56,15 +56,21 @@ function ωQR(kernel, rtol, print::Bool = true)
     return p[1:rank]
 end
 
-function τnQR(kernel, rank, print::Bool = true)
+function τnQR(kernel, rank, print::Bool=true)
     ###########  dlr grid for τ  ###################
     print && println("Calculating τ and ωn grid ...")
+    println("$(size(kernel))\n")
     @assert rank == size(kernel)[2] #the ω dimension of the τkernel should be the effective rank
+
     τnqr = qr(transpose(kernel), Val(true)) # julia qr has a strange, Val(true) will do a pivot QR
-    return τnqr.p[1:rank]
+    if rank > length(τnqr.p)
+        return τnqr.p
+    else
+        return τnqr.p[1:rank]
+    end
 end
 
-function buildωn(dlrGrid, print::Bool = true)
+function buildωn(dlrGrid, print::Bool=true)
     ###########  dlr grid for ωn  ###################
     print && println("Calculating ωn grid ...")
     symmetry = dlrGrid.symmetry
@@ -102,12 +108,13 @@ function build(dlrGrid, print::Bool = true)
    Λ: the dimensionless scale β*Euv, rtol: the required relative accuracy, isFermi: fermionic or bosonic, symmetry: particle-hole symmetry/antisymmetry or none
 - `print`: print the internal information or not
 """
-function build(dlrGrid, print::Bool = true)
+function build(dlrGrid, print::Bool=true)
     degree = 24 # number of Chebyshev nodes in each panel
     Λ = dlrGrid.Λ
     rtol = dlrGrid.rtol
     τ = τChebyGrid(dlrGrid, degree, print)
     ω = ωChebyGrid(dlrGrid, degree, print)
+
     print && println("minimal τ = $(minimum([(τ.grid[i]-τ.grid[i-1]) for i in 2:τ.ngrid]))")
     print && println("minimal ω = $(minimum([(ω.grid[i]-ω.grid[i-1]) for i in 2:ω.ngrid]))")
 
@@ -115,7 +122,7 @@ function build(dlrGrid, print::Bool = true)
     print && println("ω grid size = $(ω.ngrid)")
 
     kernel = preciseKernelT(dlrGrid, τ, ω, print)
-    if dlrGrid.symmetry!=:sym
+    if dlrGrid.symmetry != :sym
         testInterpolation(dlrGrid, τ, ω, kernel, print)
     end
     ωIndex = ωQR(kernel, rtol, print)
