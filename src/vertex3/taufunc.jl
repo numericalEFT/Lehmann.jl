@@ -5,8 +5,8 @@ using LinearAlgebra
 using DelimitedFiles
 #const Float = BigFloat  #FQR.Float
 #const Double =BigFloat  #FQR.Double
-#const DotF = BigFloat
-#const Tiny = DotF(1e-5)
+const Dottau = BigFloat
+const Tinytau = Dottau(1e-6)
 
 struct TauGrid{Float} <: FQR.Grid
     tau::Float             # actual location of the grid point   
@@ -21,10 +21,13 @@ struct TauFineMesh{Float} <: FQR.FineMesh
     candidates::Vector{TauGrid{Float}}       # vector of grid points
     selected::Vector{Bool}
     residual::Vector{Float}
-
+    L2grids::Vector{TauGrid{Float}}  
+    residual_L2::Vector{Float}
+    Lambda::Float
+    simplegrid::Bool
     ## for frequency mesh only ###
     fineGrid::CompositeG.Composite        # fine grid for each dimension
-    function TauFineMesh{Float}(Λ, FreqMesh; sym=1, degree = 12, ratio = 2.0) where {Float}
+    function TauFineMesh{Float}(Λ, FreqMesh; sym=1, degree = 12, ratio = 2.0, simplegrid=false) where {Float}
         # initialize the residual on fineGrid with <g, g>
 
         #_finegrid = Float.(fineGrid(Λ, 24, rtol))
@@ -33,9 +36,15 @@ struct TauFineMesh{Float} <: FQR.FineMesh
         println(_finegrid.bound)
         #_finegrid = Float.(τChebyGrid(Λ))
         # separationTest(_finegrid)
-        mesh = new{Float}(sym, [], [], [], _finegrid)
+        mesh = new{Float}(sym, [], [], [],[],[], Λ, simplegrid,_finegrid)
 
-        for (xi, x) in enumerate(_finegrid)
+        if simplegrid
+            #candidate_grid = log_tauGrid(Float(2.0e-04), Float(1.2^2))
+            candidate_grid = loguni_tauGrid(Float(5.0e-05), Float(1.5))
+        else 
+            candidate_grid = _finegrid
+        end
+        for (xi, x) in enumerate(candidate_grid)
             coord = xi
             #if irreducible(coord, sym, Nfine)  # if grid point is in the reducible zone, then skip residual initalization
             vec = [Spectral.kernelSymT(x, ω, Float.(1.0)) for ω in FreqMesh]
@@ -45,12 +54,62 @@ struct TauFineMesh{Float} <: FQR.FineMesh
             push!(mesh.selected, false)
             #end
         end
-       
+  
+        for (xi, x) in enumerate(_finegrid)
+            coord = xi
+            #if irreducible(coord, sym, Nfine)  # if grid point is in the reducible zone, then skip residual initalization
+            vec = [Spectral.kernelSymT(x, ω, Float.(1.0)) for ω in FreqMesh]
+            g = TauGrid(x, coord, vec)
+            push!(mesh.L2grids, g)
+            push!(mesh.residual_L2, FQR.dot(mesh, g, g))
+            #end
+        end
+    
+
+
         println("fine mesh initialized.")
         return mesh
     end
 end
 
+
+function log_tauGrid(g1::Float, ratio::Float) where {Float}
+    grid = Float[]
+    #grid = Float[]
+    grid_point = g1
+    # while grid_point<0.5
+    #     append!(grid, grid_point)
+    #     grid_point *= ratio
+    # end
+
+    while grid_point<0.25
+        append!(grid, grid_point)
+        grid_point *= ratio
+    end
+    grid = vcat(grid, reverse(Float(0.5) .- grid))
+    return vcat(grid, reverse(Float(1.0) .- grid))
+end
+
+function loguni_tauGrid(step::Float, ratio::Float) where {Float}
+    grid = Float[0.0]
+    #grid = Float[]
+    grid_point = step
+    # while grid_point<0.5
+    #     append!(grid, grid_point)
+    #     grid_point *= ratio
+    # end
+    i = 1
+    N = 3
+    while grid_point<0.5
+        append!(grid, grid_point)
+        grid_point += step
+        if i%N == 0
+            step *= ratio
+        end
+        i += 1
+    end
+    return vcat(grid, reverse(Float(1.0) .- grid))
+end
 # function τChebyGrid(Λ, degree=24, print = true)
 #     npt = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
 
@@ -155,15 +214,32 @@ function FQR.mirror(mesh::TauFineMesh{Float}, idx) where {Float}
 end
 
 
-"""
-basis dot
-"""
-function FQR.dot(mesh, g1::TauGrid, g2::TauGrid)
-    # println("dot: ", g1, ", ", g2)
-        return dot(g1.vec, g2.vec)
+@inline function F(a::T) where {T}
+    if abs(a) > Tinytau
+        return (1 - exp(-a)) / a
+    else
+        return T(1-a/2 + a^2/6 - a^3/24)
+    end
 end
 
+function FQR.dot(mesh, g1::TauGrid, g2::TauGrid)
+    if mesh.simplegrid
+        var = (g1.tau + g2.tau)*mesh.Lambda
+        var2 = (2.0 - g1.tau - g2.tau)*mesh.Lambda
+        return mesh.Lambda * (F(var) + F(var2))
+    else
+        return dot(g1.vec, g2.vec)
+    end    
+    #return dot(g1.vec, g2.vec)
+end
 
+# """
+# basis dot
+# """
+# function FQR.dot(mesh, g1::TauGrid, g2::TauGrid)
+#     # println("dot: ", g1, ", ", g2)
+#         return dot(g1.vec, g2.vec)
+# end
 
 if abspath(PROGRAM_FILE) == @__FILE__
 

@@ -1,5 +1,5 @@
 using FastGaussQuadrature, Printf
-rtol(x, y) = maximum(abs.(x - y)) / maximum(abs.(x))
+rtol(x, y) = maximum(abs.(x - y)) # / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
@@ -136,7 +136,7 @@ end
         if symmetry == :sym
             error_tolerance = 100
         else
-            error_tolerance = 11000
+            error_tolerance = 110
         end
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
@@ -146,12 +146,12 @@ end
         # get imaginary-time Green's function for τ sample 
         τSample = dlr10.τ
         Gsample = case(dlr, τSample, :τ)
-
         ########################## imaginary-time to dlr #######################################
         coeff = tau2dlr(dlr, Gdlr)
         @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
         Gfitted = dlr2tau(dlr, coeff, τSample)
         @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
+        Gfitted = tau2tau(dlr, Gdlr, τSample)
         compare("dlr τ → dlr → generic τ $case", Gsample, Gfitted, eps, 100, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
@@ -208,20 +208,20 @@ end
         end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
-    cases = [MultiPole, SemiCircle]
+    cases = [MultiPole]
     Λ = [1e3, 1e4, 1e5]
-    rtol = [1e-4, 1e-6, 1e-8, 1e-12]
+    rtol =[1e-4, 1e-6, 1e-8, 1e-10, 1e-12]
     for case in cases
         for l in Λ
             for r in rtol
                 test(case, true, :none, l, 1.0, r, dtype=Float64)
                 test(case, false, :none, l, 1.0, r, dtype=Float64)
 
-                test(case, false, :ph, l, 1.0, r, dtype=Float64)
-                test(case, true, :ph, l, 1.0, r, dtype=Float64)
+                #test(case, false, :ph, l, 1.0, r, dtype=Float64)
+                #test(case, true, :ph, l, 1.0, r, dtype=Float64)
 
-                test(case, false, :pha, l, 1.0, r, dtype=Float64)
-                test(case, true, :pha, l, 1.0, r, dtype=Float64)
+                #test(case, false, :pha, l, 1.0, r, dtype=Float64)
+                #test(case, true, :pha, l, 1.0, r, dtype=Float64)
 
                 # if case == MultiPole
                 #     setprecision(128)

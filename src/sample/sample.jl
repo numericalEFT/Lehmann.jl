@@ -210,7 +210,7 @@ Return the function on Grid and the systematic error.
 - `poles`: a list of frequencies for the delta functions
 - `regularized`: use regularized bosonic kernel if symmetry = :none
 """
-function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbol=:none; regularized::Bool=true)
+function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbol=:none, weight = nothing; regularized::Bool=true)
     # poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
     # poles=[0.8Euv, 1.0Euv]
     # poles = [0.0]
@@ -223,7 +223,7 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
     end
     g = IsMatFreq ? zeros(Complex{typeof(β)}, length(Grid)) : zeros(typeof(β), length(Grid))
     for (τi, τ) in enumerate(Grid)
-        for ω in poles
+        for (ωi, ω )   in enumerate(poles)
 
             if (symmetry == :ph || symmetry == :pha) && ω < 0.0
                 #spectral density is not defined for negative frequency
@@ -231,16 +231,26 @@ function MultiPole(β, isFermi::Bool, Grid, type::Symbol, poles, symmetry::Symbo
             end
 
             if IsMatFreq == false
-                g[τi] += Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                if isnothing(weight)
+                    g[τi] += Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                else
+                    g[τi] += weight[ωi]*Spectral.kernelT(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                end
             else
-                g[τi] += Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                if isnothing(weight)
+                    g[τi] += Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                else
+                    g[τi] +=weight[ωi]*Spectral.kernelΩ(Val(isFermi), Val(symmetry), τ, ω, β, regularized)
+                end
+                
             end
         end
     end
     return g
 end
-function MultiPole(dlr, type::Symbol, poles, Grid=dlrGrid(dlr, type); regularized::Bool=true)
-    return MultiPole(dlr.β, dlr.isFermi, Grid, type, poles, dlr.symmetry; regularized=regularized)
+function MultiPole(dlr, type::Symbol, poles, Grid=dlrGrid(dlr, type), weight = nothing; regularized::Bool=true)
+    #return MultiPole(dlr.β, dlr.isFermi, Grid, type, poles, dlr.symmetry, weight; regularized=regularized)
+    return MultiPole(dlr.β, dlr.isFermi, Grid, type, poles, :none, weight; regularized=regularized)
 end
 
 end
