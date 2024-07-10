@@ -1,5 +1,5 @@
 using Lehmann
-using StaticArrays, Printf
+using Printf
 using CompositeGrids
 using LinearAlgebra
 using GenericLinearAlgebra
