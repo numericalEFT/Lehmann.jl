@@ -213,7 +213,7 @@ function IR(grid, U, idx, name, Lambda=100, ifplot = false)
     print(name*" Full cond:$(cond(Un))\n")
     # print(name*" IR cond UUT:$(cond(abs.(Hnew)))\n")
     # print(name*" Full cond UUT:$(cond(abs.(Hfull)))\n")
-    return ir_grid
+    return Un[sort(qr_nidx[1:idx]) , :], ir_grid
 end
 
 # function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular = false,

@@ -76,12 +76,13 @@ function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular
     
     print("rank: $(idx)\n")
     if space == :n
-        n_grid = IR(ngrid, eig.U, idx, "omega_n")
+        Un_IR, n_grid = IR(ngrid, eig.U, idx, "omega_n")
         #print("tail selected: left $(ngrid[left] in n_grid) right $(ngrid[right] in n_grid)\n")
     elseif space == :τ
-        tau_grid = IR(tgrid, eig.U, idx, "tau", Lambda, true)
+        Utau_IR, tau_grid = IR(tgrid, eig.U, idx, "tau", Lambda, true)
+        Utau_full = eig.U[:, 1:idx]
     elseif space==:ex
-        expan_grid = IR(expangrid, eig.U, idx, "expan")
+        Uex_IR , expan_grid = IR(expangrid, eig.U, idx, "expan")
     end
  
     omega_grid = IR(wgrid, eig.V, idx, "omega")
@@ -126,13 +127,16 @@ function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular
     #print("U diff: $(maximum(abs.(U - U_compare)))\n") 
 
     if space == :n
-        tau_grid = IR(tgrid, U, idx, "tau")
+        Utau_IR, tau_grid = IR(tgrid, U, idx, "tau")
+        Utau_full = U
     elseif space == :τ
-        n_grid = IR(ngrid, U, idx, "omega_n", Lambda, true)
+        Un_IR, n_grid = IR(ngrid, U, idx, "omega_n", Lambda, true)
     end
     dlr = DLRGrid(Lambda, beta, eps, true, :none, dtype=T)
     
-    test_err(dlr, tau_grid, tgrid, t_grid, omega_grid,  :τ, regular, omega0)
+   # test_err(dlr, tau_grid, tgrid, t_grid, omega_grid,  :τ, regular, omega0)
+    #test_err(dlr, Int.(n_grid), tgrid, t_grid, omega_grid,  :n, regular, omega0)
+    test_err_U(dlr, Int.(n_grid), tgrid, t_grid, omega_grid,  :n, Un_IR, Utau_full)
     return omega_grid, tau_grid, n_grid
 end
 
@@ -141,7 +145,7 @@ function test_err(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  spa
     #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))
     Gsample =  SemiCircle(dlr,  ir_grid, space)
     if space == :n
-        K = Kfunc_freq(ir_omega_grid , ir_grid, regular, omega0) 
+        K = Kfunc_freq(ir_omega_grid , (ir_grid), regular, omega0) 
     elseif space == :τ
         K = Kfunc(ir_omega_grid, ir_grid, regular, omega0) 
     end
@@ -150,10 +154,24 @@ function test_err(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  spa
     G = Ktau * rho
     G_analy =  SemiCircle(dlr,  target_fine_grid, :τ)
     interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
+    print("condition KIR: $(cond(K))\n")
     print("Exact Green err: $(interp_err)\n")
 
     
 end    
+
+function test_err_U(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  space, U_IR, U_full)
+   
+    #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))
+    Gsample =  SemiCircle(dlr,  ir_grid, space) 
+    rho = U_IR \ Gsample
+    G = U_full * rho
+    G_analy =  SemiCircle(dlr,  target_fine_grid, :τ)
+    interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
+    print("condition UIR: $(cond(U_IR))\n")
+    print("Exact Green err: $(interp_err)\n")
+end    
+
 if abspath(PROGRAM_FILE) == @__FILE__
     # dlr = DLRGrid(Euv=lambda, β=beta, isFermi=true, rtol=1e-12, symmetry=:sym)
    
@@ -163,7 +181,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     isFermi = true
     symmetry = :none
     beta = datatype(1.0)
-    Lambda = datatype(1000)
+    Lambda = datatype(3200)
     eps = datatype(1e-10)
     n_trunc = datatype(10) #omega_n is truncated at n_trunc * Lambda
     expan_trunc = 1000
