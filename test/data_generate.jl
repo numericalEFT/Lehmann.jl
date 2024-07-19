@@ -320,7 +320,7 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
     eta2 = 0.0
     block = zeros(dtype, 10)
     print(dtype)
-    omega_grid, tau_grid, n_grid= generate_grid(dlr10.rtol, dlr10.Euv)
+    omega_grid, tau_grid, n_grid= generate_grid(dlr10.rtol, dlr10.Euv, dtype(10.0), :t, false, dlr10.Euv)
     #e3 e-8 3 1.9   / e5 e-8 5 2.3 110 86/ e5 -12 7 2.3 140 118/ 
     degree = 3
     ratio = dtype(2.5^(log(1e-4) / log(eps)))
@@ -442,7 +442,7 @@ end
 
 #cases = [MultiPole]
 cases = [SemiCircle]
-Λ = [1e2] #, 1e4, 1e5, 1e6, 1e7]
+Λ = [1.6e3] #, 1e4, 1e5, 1e6, 1e7]
 
 rtol = [1e-6,]# 1e-12]
 #rtol = [1e-4, 1e-6, 1e-8, 1e-10, 1e-12]# 1e-6 , 1e-8, 1e-10, 1e-12]
