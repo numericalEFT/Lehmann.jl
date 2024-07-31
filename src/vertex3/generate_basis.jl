@@ -260,12 +260,12 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
 
     D = 1
-    Err = [-10, ]
+    Err = [-6, ]
     #Λ = [1e4, ]
     #Err = [-6, -8, -10, -12, -14]
     #Err = [-5, -7, -9, -11, -13]
-    Λ = [1e4]  # [1e3, 1e4, 1e5, 1e6,1e7]
-    setprecision(512)
+    Λ = [1e2]  # [1e3, 1e4, 1e5, 1e6,1e7]
+    setprecision(128)
     Float = BigFloat
     Double = BigFloat
     #Float = Float64
@@ -284,7 +284,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     #     end
     # end
     # exit()
-    sym = 1
+    sym = 0
     for lambda in Λ
         for err in Err
             rtol = 10.0^err
@@ -299,7 +299,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
             # for rat in ratio_scan
             #     for init in init_scan
                     #mesh = FreqFineMesh{D,Float, Double}(lambda, rtol, sym=sym, degree = degree1, ratio = ratio1, simplegrid=true)
-            mesh = FreqFineMesh{D,Float, Double}(lambda, rtol, sym=sym, degree = degree1, ratio = rat, factor = 1000, init=init, simplegrid=true)
+            mesh = FreqFineMesh{D,Float, Double}(lambda, rtol, sym=sym, degree = degree1, ratio = ratio1, factor = 1000, init=init, simplegrid=false)
             basis = FQR.Basis{FreqGrid, Float ,Double}(lambda, rtol, mesh)
     
             L2Res = L2Residual(basis.mesh)

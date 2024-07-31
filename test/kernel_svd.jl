@@ -77,11 +77,13 @@ function Kfunc(omega::Vector{T}, tau::Vector{T}, weight_omega::Vector{T}, weight
             #result[i, j] = sqrt(weight_tau[i] * weight_omega[j]) * Spectral.kernelFermiT(tau[i], omega[j], T(1.0))
             if ifregular
                 #result[i, j] =  Spectral.kernelFermiT(tau[i], omega[j], T(1.0)) - 1/2.0 #  - IntFermiT(omega[j])
-                result[i, j] =Spectral.kernelFermiT(tau[i], omega[j], T(1.0)) - 1.0/2.0 - (1- 2*tau[i])*omega[j]/4.0 -  (tau[i]-1)*tau[i]*omega[j]^2/4.0
+                result[i, j] =sqrt(weight_tau[i])*(Spectral.kernelFermiT(tau[i], omega[j], T(1.0)) - 1.0/2.0 - (1- 2*tau[i])*omega[j]/4.0 -  (tau[i]-1)*tau[i]*omega[j]^2/4.0)
+                
                 #(Spectral.kernelFermiT(tau[i], omega0, T(1.0))
                 #+ Spectral.kernelFermiT(1.0 - tau[i], omega0, T(1.0)))/2.0 
             else
-                result[i, j] = Spectral.kernelFermiT(tau[i], omega[j], T(1.0))
+                #result[i, j] = Spectral.kernelFermiT(tau[i], omega[j], T(1.0))
+                result[i, j] = sqrt(weight_tau[i])*Spectral.kernelFermiT(tau[i], omega[j], T(1.0))
                 #result[i, j] =  Spectral.kernelFermiT(tau[i], omega[j], T(1.0))
             end
             #result[i, j] =  Spectral.kernelFermiT_PH(tau[i], omega[j], T(1.0))
@@ -147,7 +149,19 @@ function Kfunc_freq(omega::Vector{T}, n::Vector{Int},   regular::Bool=false ,ome
     return result
 end
 
-
+function Kfunc_freq!(result::Matrix{Complex{T}}, omega::Vector{T}, n::Vector{Int},   regular::Bool=false ,omega0::T=1e-4 ) where {T}
+    omega0 = T(omega0)
+    for i in eachindex(n)
+        omega_n = (2*n[i]+1)* π 
+        for j in eachindex(omega)
+            if regular
+                result[i, j] =(Spectral.kernelFermiΩ(n[i], omega[j], T(1.0))  + 1/(im*omega_n) + omega[j]/(im*omega_n)^2 + omega[j]^2/(im*omega_n)^3)
+            else
+                result[i, j] =Spectral.kernelFermiΩ(n[i], omega[j], T(1.0))
+            end
+        end
+    end
+end
 
 function Kfunc_expan(omega::Vector{T}, n::Vector{Int},  weight_omega::Vector{T}, Lambda::T) where {T}
     result = zeros(T, (length(n), length(omega)))
@@ -166,7 +180,7 @@ function IR(grid, U, idx, name, Lambda=100, ifplot = false)
     qr_nidx = qr_Un.p
     left = searchsortedfirst(grid, -Lambda)
     right = searchsortedfirst(grid, Lambda)
-    print("selected: $(length(qr_nidx)) $(minimum(qr_nidx[1:idx])) $(maximum(qr_nidx[1:idx]))\n" )
+    #print("selected: $(length(qr_nidx)) $(minimum(qr_nidx[1:idx])) $(maximum(qr_nidx[1:idx]))\n" )
     if name == "omega_n"
         shift = 0#20 - idx
     else
@@ -198,22 +212,22 @@ function IR(grid, U, idx, name, Lambda=100, ifplot = false)
             pl = heatmap(abs.(Un), title=L"U_{full}", xlabel=L"s", ylabel=L"\tau", color=:viridis)
         end
         diag_full = diag(abs.(Hfull))
-        print("max Ufull:$(maximum(diag_full))\n")
-        print("max Ufull:$(minimum(diag_full))\n")
+        # print("max Ufull:$(maximum(diag_full))\n")
+        # print("max Ufull:$(minimum(diag_full))\n")
         diag_IR = diag(abs.(Hnew))
-        print("max UIR:$(maximum(diag_IR))\n")
-        print("max UIR:$(minimum(diag_IR))\n")
+        # print("max UIR:$(maximum(diag_IR))\n")
+        # print("max UIR:$(minimum(diag_IR))\n")
         savefig(pl, name*"Ufull.pdf")
     end 
     #print(name*" R cond :$(cond(qr_Un.R[:, qr_nidx[1:idx]]))\n")
     #print(name*" Q cond :$(cond(qr_Un.Q))\n")
     #print(name*" IR cond :$(cond(Un[qr_nidx[1:idx] , 1:idx]))\n")
     #print(name*" Full cond:$(cond(Un[:, 1:idx]))\n")
-    print(name*" IR cond :$(cond(Unew))\n")
-    print(name*" Full cond:$(cond(Un))\n")
+    #print(name*" IR cond :$(cond(Unew))\n")
+    #print(name*" Full cond:$(cond(Un))\n")
     # print(name*" IR cond UUT:$(cond(abs.(Hnew)))\n")
     # print(name*" Full cond UUT:$(cond(abs.(Hfull)))\n")
-    return Un[sort(qr_nidx[1:idx]) , :], ir_grid
+    return qr_nidx, ir_grid
 end
 
 # function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular = false,
@@ -464,6 +478,48 @@ function MultiPole(dlr, grid, type, coeff, weight=nothing)
     end
 end
 
+function test_err_dlr(dlr, ir_grid, target_fine_grid, ir_omega_grid,  space, target_space, regular, omega0, hasweight=false, weight=nothing)
+   
+  
+    #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))
+    Gsample =  SemiCircle(dlr,  ir_grid, space)
+    T = typeof(Gsample[1])
+    if space == :n
+        K = Kfunc_freq(ir_omega_grid , (ir_grid), regular, omega0) 
+        noise = (rand(T, length(Gsample)))
+        noise = 1e-6 * noise ./ norm(noise)
+        Gsample +=  noise
+    elseif space == :τ
+        K = Kfunc(ir_omega_grid, ir_grid, regular, omega0) 
+        noise = (rand(T, length(Gsample)))
+        noise = 1e-6 * noise ./ norm(noise)
+        Gsample += noise
+    end
+    if target_space==:τ
+        Kfull = Kfunc( ir_omega_grid , target_fine_grid.grid, regular, omega0) 
+        G_analy =  SemiCircle(dlr,  target_fine_grid.grid, target_space)
+    else
+        Kfull = Kfunc_freq( ir_omega_grid , target_fine_grid, regular, omega0) 
+        G_analy =  SemiCircle(dlr,  target_fine_grid, target_space)
+    end
+    # if hasweight
+    #     if space == :n
+    #         Gsample = Gsample .* weight[]
+    # end
+    rho = K \ Gsample
+    G = Kfull * rho
+    
+    #interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
+    if target_space==:n
+        interp_err  = norm(G - G_analy)
+    else
+        interp_err  = sqrt(Interp.integrate1D( (abs.(G - G_analy)).^2, target_fine_grid ))
+    end
+    #print("condition KIR: $(cond(K))\n")
+    print("Exact Green err: $(interp_err)\n")
+
+    
+end    
 # function test_err(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  space, regular, omega0)
    
 #     #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))

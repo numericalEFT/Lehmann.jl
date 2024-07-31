@@ -1,7 +1,7 @@
 include("kernel_svd.jl")
 
 function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular = false,
-    omega0::T = Lambda,) where {T}
+    omega0::T = Lambda, hasweight =false) where {T}
     # generate frequency finegrid
     w_grid = fine_ωGrid_test(T(Lambda), 24, T(1.5))
     weight_w = zeros(T,length(w_grid))
@@ -32,145 +32,190 @@ function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular
     #ngrid = nGrid_test(true, T(Lambda), 12, T(1.5))
     ngrid = uni_ngrid(true, T(n_trunc*Lambda))
     omega = (2*ngrid.+1)* π 
-
-     #ngrid = vcat(ngrid, dlr.n)
-     #unique!(ngrid)
-     #ngrid = sort(ngrid)
-
-     #regular controls if we add 1/(iwn - Lambda) term to compensate the tail    
-    expangrid = collect(1:10000)
+    dlr = DLRGrid(Lambda, beta, eps, true, :none, dtype=T)
     
-    F = Fourier(ngrid, tgrid, weight_t)
-    Kn = Kfunc_freq(wgrid, Int.(ngrid), weight_w, regular, omega0) 
-    Ktau = Kfunc(wgrid, tgrid, weight_w, weight_t, regular, omega0)
-    Kexpan = Kfunc_expan(wgrid, expangrid, weight_w, Lambda)
-    # Kn_fourier = F*Ktau
-    # print("fourier error: $(maximum(abs.(Kn- Kn_fourier)))\n")
+    Kn = Kfunc_freq(wgrid, Int.(ngrid), weight_w, regular, omega0)
+    if hasweight 
+        Ktau = Kfunc(wgrid, tgrid, weight_w, weight_t, regular, omega0)
+    else 
+        Ktau =  Kfunc(wgrid, tgrid,  regular, omega0)
+    end
+
     left = searchsortedfirst(omega, -n_trunc*Lambda/10)
     right = searchsortedfirst(omega, n_trunc*Lambda/10)
-    # print("$(left) $(right)\n")
-    # Kn_new = copy(Kn[left:right, :])
-    # Kn_new[1, :] = sum(Kn[1:left, :], dims=1)
-    # Kn_new[end, :] = sum(Kn[right:end, :], dims=1)
-
-    # #print("$(maximum(abs.(Kn), dims=1))\n $(abs.(Kn[1,:]))\n $(abs.(Kn[end,:])) \n")
- 
-    # Kn = Kn_new
 
     if space == :n
         eig = svd(Kn, full = true)
     elseif space == :τ
         eig = svd(Ktau, full = true)
-    elseif space == :ex
-        eig = svd(Kexpan, full = true)
-        print("eig highfreq expansion: $(eig.S[1:10])\n")
-        pl = plot( collect(1:70),  eig.S[1:70], linewidth = 1,label = L"max(\left|K_n\right|)", yaxis=:log)
-        # plot!(pl,wgrid , abs.(Kn_new[1,:]), label=L"\left|\sum_{\omega_n > \Lambda} K_n \right|" )
-        xlabel!(L"s")
-        #legend()
-        #pl = plot(wgrid , abs.(Kn[1,:]) )
-         savefig(pl, "expan_eig.pdf")
     end
-
-    idx = searchsortedfirst(eig.S./eig.S[1], eps, rev=true)
     
+    idx = searchsortedfirst(eig.S./eig.S[1], eps, rev=true)
+ 
     print("rank: $(idx)\n")
     if space == :n
-        Un_IR, n_grid = IR(ngrid, eig.U, idx, "omega_n")
+        pivoted_idx, n_grid = IR(ngrid, eig.U, idx, "omega_n")
+        Un_full = eig.U
+        n_idx = pivoted_idx
         #print("tail selected: left $(ngrid[left] in n_grid) right $(ngrid[right] in n_grid)\n")
     elseif space == :τ
-        Utau_IR, tau_grid = IR(tgrid, eig.U, idx, "tau", Lambda, true)
-        Utau_full = eig.U[:, 1:idx]
-    elseif space==:ex
-        Uex_IR , expan_grid = IR(expangrid, eig.U, idx, "expan")
+        pivoted_idx, tau_grid = IR(tgrid, eig.U, idx, "tau", Lambda)
+        Utau_full = eig.U
+        tau_idx = pivoted_idx
     end
  
-    omega_grid = IR(wgrid, eig.V, idx, "omega")
+    omega_idx, omega_grid = IR(wgrid, eig.V, idx, "omega")
 
     #Use implicit fourier to get U in the other space
-  
     if space == :n
-        U = (Ktau * eig.V)[:, 1:idx]
+        U = (Ktau * eig.V)
     elseif space == :τ
-        U = (Kn * eig.V)[:, 1:idx]
-        U_compare = F*eig.U[:, 1:idx]
-   
+        U = (Kn * eig.V)
+        #U_compare = F*eig.U
     end
 
     for i in 1:idx
         U[:, i] = U[:, i] ./ eig.S[i]
     end
-    print("fourier error: $(maximum(abs.(U- U_compare)))\n")
-    #Un = U
-    Un = U_compare
-    Un_new = copy(Un[left:right, :])
-    Un_new[1, :] = sum(Un[1:left, :], dims=1)
-    Un_new[end, :] = sum(Un[right:end, :], dims=1)
-    pl1 =  plot(omega , abs.(Un[: , 15]).*omega.^2, linewidth = 1)
-    #plot!(pl1, omega[left:right] , abs.(Un_new[1 , 15])* ones(length(omega)), linewidth = 1)
-    ylabel!(L"\omega_n^2 U")
-    xlabel!(L"\omega")
-    savefig(pl1, "U_omega_n_2.pdf") 
-
-    pl2 =  plot(omega , abs.(Un[: , 15]), linewidth = 1)
-    plot!(pl2, omega , abs.(Un_new[1 , 15])* ones(length(omega)), linewidth = 1, label="sum tail")
-    ylabel!(L"U")
-    xlabel!(L"\omega")
-    savefig(pl2, "U_tail.pdf") 
-
-    pl = plot( collect(1:idx) , maximum(abs.(Un), dims=1)[1,:], linewidth = 1,label = L"max(\left|U_n\right|)")
-    plot!(pl,collect(1:idx), abs.(Un_new[1,:]), label=L"\left|\sum_{\omega_n > \Lambda} U_n \right|" )
-    xlabel!(L"s")
-    #legend()
-    #pl = plot(wgrid , abs.(Kn[1,:]) )
-    savefig(pl, "U.pdf") 
-    #print("U diff: $(maximum(abs.(U - U_compare)))\n") 
 
     if space == :n
-        Utau_IR, tau_grid = IR(tgrid, U, idx, "tau")
+        pivoted_idx, tau_grid = IR(tgrid, U, idx, "tau")
         Utau_full = U
+        tau_idx = pivoted_idx
     elseif space == :τ
-        Un_IR, n_grid = IR(ngrid, U, idx, "omega_n", Lambda, true)
+        pivoted_idx, n_grid = IR(ngrid, U, idx, "omega_n", Lambda)
+        Un_full = U
+        n_idx = pivoted_idx
     end
-    dlr = DLRGrid(Lambda, beta, eps, true, :none, dtype=T)
     
-   # test_err(dlr, tau_grid, tgrid, t_grid, omega_grid,  :τ, regular, omega0)
-    #test_err(dlr, Int.(n_grid), tgrid, t_grid, omega_grid,  :n, regular, omega0)
-    test_err_U(dlr, Int.(n_grid), tgrid, t_grid, omega_grid,  :n, Un_IR, Utau_full)
+    maxidx =  searchsortedfirst(eig.S./eig.S[1], 1e-16, rev=true)
+   
+    # This test with U matrix
+    # n space sparse grid: n_grid
+    # n space fine grid: ngrid
+    # τ space sparse grid:  tau_grid
+     # τ space fine grid:  tgrid
+    
+    test_err(dlr, tau_grid, tgrid, tgrid, :τ, :τ, Un_full[:, 1:maxidx], n_idx, Utau_full[:, 1:maxidx], tau_idx, collect(1:maxidx), idx; 
+    #test_err(dlr, Int.(n_grid), Int.(ngrid), tgrid, :n, :τ, Un_full[:, 1:maxidx], n_idx, Utau_full[:, 1:maxidx], tau_idx, collect(1:maxidx), idx; 
+
+    # This test with K matrix
+    #test_err(dlr, Int.(n_grid), Int.(ngrid), t_grid, :n, :τ, Kn, n_idx, Ktau, tau_idx, omega_idx, idx; 
+    
+        case = "SemiCircle", hasnoise = true, hasweight=hasweight, weight_tau = sqrt.(weight_t))
+ 
+    filename = "newDLReig.txt"
+    folder="./"
+    file = open(joinpath(folder, filename), "a") 
+    #max_res = maximum((res[:]))  
+    for i in 1:idx          
+        @printf(file, "%32.30g\n", eig.S[i])
+    end
+    close(file)
+    
     return omega_grid, tau_grid, n_grid
 end
 
-function test_err(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  space, regular, omega0)
-   
-    #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))
-    Gsample =  SemiCircle(dlr,  ir_grid, space)
+
+
+function test_err(dlr, ir_grid, fine_grid, target_fine_grid,  space, target_space, Un_full, n_idx, Utau_full, tau_idx,  omega_idx, rank; 
+    case = "SemiCircle", hasnoise=false, hasweight=false, weight_tau =nothing)
+    print("size: $(size(Un_full)) $(size(Utau_full))\n")
     if space == :n
-        K = Kfunc_freq(ir_omega_grid , (ir_grid), regular, omega0) 
-    elseif space == :τ
-        K = Kfunc(ir_omega_grid, ir_grid, regular, omega0) 
+        U11 = Un_full[sort(n_idx[1:rank]), sort(omega_idx[1:rank])]
+        U12 = Un_full[sort(n_idx[1:rank]), sort(omega_idx[rank+1:end])]
+        Uinit_full = Un_full 
+    elseif space== :τ
+        U11 = Utau_full[sort(tau_idx[1:rank]), sort(omega_idx[1:rank])]
+        U12 = Utau_full[sort(tau_idx[1:rank]), sort(omega_idx[rank+1:end])]
+        Uinit_full = Utau_full
     end
-    Ktau = Kfunc( ir_omega_grid , target_fine_grid.grid, regular, omega0) 
-    rho = K \ Gsample
-    G = Ktau * rho
-    G_analy =  SemiCircle(dlr,  target_fine_grid, :τ)
-    interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
-    print("condition KIR: $(cond(K))\n")
-    print("Exact Green err: $(interp_err)\n")
-
-    
-end    
-
-function test_err_U(dlr, ir_grid, fine_grid, target_fine_grid, ir_omega_grid,  space, U_IR, U_full)
-   
+    if target_space == :τ
+        U21 = Utau_full[sort(tau_idx[rank+1 : end]),sort(omega_idx[1:rank])]
+        U22 =  Utau_full[sort(tau_idx[rank+1 : end]),sort(omega_idx[rank+1:end])]
+        U_full = Utau_full
+    elseif  target_space== :n
+        U21 = Un_full[sort(n_idx[rank+1 : end]), sort(omega_idx[1:rank])]
+        U22 =  Un_full[sort(n_idx[rank+1 : end]), sort(omega_idx[rank+1:end])]
+        U_full = Un_full
+    end
+    print("noise err bound:  $(opnorm(U21*inv(U11)))\n")
+    print("Un * inv(U11):  $(opnorm(Un_full[:, sort(omega_idx[1:rank])]*inv(U11)))\n")
+    print("Utau * inv(U11):  $(opnorm(Utau_full[:, sort(omega_idx[1:rank])]*inv(U11)))\n")
+    print("epsilon err bound: $(opnorm(U21*inv(U11)*U12 -U22))\n")
     #generate_grid_expan(eps, Lambda, expan_trunc, :ex, false, datatype(Lambda))
-    Gsample =  SemiCircle(dlr,  ir_grid, space) 
-    rho = U_IR \ Gsample
-    G = U_full * rho
-    G_analy =  SemiCircle(dlr,  target_fine_grid, :τ)
-    interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
-    print("condition UIR: $(cond(U_IR))\n")
-    print("Exact Green err: $(interp_err)\n")
-end    
+
+    N = 1
+    if case == "MultiPole"
+        N = 5
+        N_poles = 100
+        dtype = typeof(Utau_full[1,1])
+        poles = zeros(dtype, (N, N_poles))
+        weights = zeros(dtype, (N, N_poles))
+        Random.seed!(8)
+
+        for i in 1:N
+            #poles[i, :] = dlr.ω          
+            poles[i, :] = 2.0 * rand(dtype, N_poles) .- 1.0
+            weights[i, :] = rand(dtype, N_poles)#2.0 * rand(dtype, N_poles) .- 1.0
+            weights[i, :] = weights[i, :] / sum(abs.(weights[i, :]))
+        end
+    end
+
+    for i in 1:N
+        if case == "SemiCircle"
+            Gsample =  SemiCircle(dlr,  ir_grid, space) 
+            Gsample_full =  SemiCircle(dlr,  fine_grid, space)
+            G_analy =  SemiCircle(dlr,  target_fine_grid, target_space)
+        else
+            Gsample =  MultiPole(dlr, ir_grid, space, poles[i], weights[i]) 
+            Gsample_full =  MultiPole(dlr, fine_grid, space, poles[i], weights[i]) 
+            G_analy =  MultiPole(dlr,  target_fine_grid, target_space, poles[i], weights[i])
+        end
+
+        if hasnoise
+            T = typeof(Gsample[1])
+            noise = (rand(T, length(Gsample)))
+            noise = dlr.rtol * noise ./ norm(noise)
+            print("err norm: $(norm(noise))\n")
+            Gsample +=  noise
+        end
+
+        
+        if hasweight
+            if target_space == :τ
+                G_analy .*= weight_tau
+            end
+            if space == :τ
+                Gsample .*= weight_tau[sort(tau_idx[1:rank])]
+                Gsample_full .*= weight_tau
+            end
+        end
+        #Gsample += 1e-11 * (randn(length(Gsample)) + im * randn(length(Gsample)))
+        #print("U21U11^-1: $(norm(Ures/U_IR))\n")
+        rho = U11 \ Gsample
+        G = U_full[:, sort(omega_idx[1:rank])] * rho
+        GIR = U11 *rho
+
+        print("norm C_IR: $(norm(rho))\n")
+        init_rho_full = Uinit_full \ Gsample_full
+        print("norm in $(space): C1: $(norm(init_rho_full[ sort(omega_idx[1:rank])])) C2:$(norm(init_rho_full[ sort(omega_idx[rank+1:end])]))\n")
+        rho_full = U_full \ G_analy
+        print("norm in $(target_space): C1: $(norm(rho_full[ sort(omega_idx[1:rank])])) C2:$(norm(rho_full[ sort(omega_idx[rank+1:end])]))\n")
+        if target_space == :τ
+            interp_err = (norm(G - G_analy))
+            #interp_err = sqrt(Interp.integrate1D((G - G_analy) .^ 2, target_fine_grid ))
+        else
+            interp_err = (norm(G - G_analy))
+        end
+        print("IR err: $(maximum(abs.(GIR - Gsample)))\n")
+        print("full err: $(maximum(abs.(G - G_analy)))\n")
+        
+        print("Exact Green err: $(interp_err/dlr.rtol)\n")
+    end
+
+ end    
+
 
 if abspath(PROGRAM_FILE) == @__FILE__
     # dlr = DLRGrid(Euv=lambda, β=beta, isFermi=true, rtol=1e-12, symmetry=:sym)
@@ -181,11 +226,11 @@ if abspath(PROGRAM_FILE) == @__FILE__
     isFermi = true
     symmetry = :none
     beta = datatype(1.0)
-    Lambda = datatype(3200)
-    eps = datatype(1e-10)
+    Lambda = datatype(3000)
+    eps = datatype(1e-6)
     n_trunc = datatype(10) #omega_n is truncated at n_trunc * Lambda
-    expan_trunc = 1000
-    omega_grid, tau_grid, n_grid = generate_grid(eps, Lambda, n_trunc, :τ, false, datatype(Lambda))
-  
+    expan_trunc = 100
+    omega_grid, tau_grid, n_grid = generate_grid(eps, Lambda, n_trunc, :τ, false, datatype(Lambda), true)
+    #omega_grid, tau_grid, n_grid = generate_grid_expan(eps, Lambda, expan_trunc, :τ, false, datatype(Lambda))
    #generate_grid_resum(eps, Lambda, n_trunc, false, datatype(Lambda)) 
 end
