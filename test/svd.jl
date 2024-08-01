@@ -29,8 +29,9 @@ function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular
 
     # generate fine n grid
 
-    #ngrid = nGrid_test(true, T(Lambda), 12, T(1.5))
-    ngrid = uni_ngrid(true, T(n_trunc*Lambda))
+    ngrid = nGrid_test(true, T(Lambda), 12, T(1.5))
+    #ngrid = uni_ngrid(true, T(n_trunc*Lambda))
+    fine_ngrid = uni_ngrid(true, T(n_trunc*Lambda))
     omega = (2*ngrid.+1)* π 
     dlr = DLRGrid(Lambda, beta, eps, true, :none, dtype=T)
     
@@ -89,19 +90,28 @@ function generate_grid(eps::T, Lambda::T, n_trunc::T, space::Symbol=:τ, regular
     end
     
     maxidx =  searchsortedfirst(eig.S./eig.S[1], 1e-16, rev=true)
-   
+    fine_n_idx = zeros(Int, length(n_grid))
+    fidx = 1
+    for i in eachindex(n_grid)
+        while Int(n_grid[i]) != Int(fine_ngrid[fidx])
+            fidx += 1
+        end
+        fine_n_idx[i] = fidx
+    end
+    print("test idx: $(fine_ngrid[fine_n_idx]) $(n_grid)\n")
+    Kn_fine = Kfunc_freq(wgrid, Int.(fine_ngrid), weight_w, regular, omega0)
     # This test with U matrix
     # n space sparse grid: n_grid
     # n space fine grid: ngrid
     # τ space sparse grid:  tau_grid
      # τ space fine grid:  tgrid
     
-    test_err(dlr, tau_grid, tgrid, tgrid, :τ, :τ, Un_full[:, 1:maxidx], n_idx, Utau_full[:, 1:maxidx], tau_idx, collect(1:maxidx), idx; 
+    #test_err(dlr, tau_grid, tgrid, tgrid, :τ, :τ, Un_full[:, 1:maxidx], n_idx, Utau_full[:, 1:maxidx], tau_idx, collect(1:maxidx), idx; 
     #test_err(dlr, Int.(n_grid), Int.(ngrid), tgrid, :n, :τ, Un_full[:, 1:maxidx], n_idx, Utau_full[:, 1:maxidx], tau_idx, collect(1:maxidx), idx; 
-
+   
     # This test with K matrix
     #test_err(dlr, Int.(n_grid), Int.(ngrid), t_grid, :n, :τ, Kn, n_idx, Ktau, tau_idx, omega_idx, idx; 
-    
+    test_err(dlr, Int.(n_grid), Int.(fine_ngrid), t_grid, :n, :τ, Kn_fine, fine_n_idx, Ktau, tau_idx, omega_idx, idx; 
         case = "SemiCircle", hasnoise = true, hasweight=hasweight, weight_tau = sqrt.(weight_t))
  
     filename = "newDLReig.txt"
@@ -226,7 +236,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     isFermi = true
     symmetry = :none
     beta = datatype(1.0)
-    Lambda = datatype(3000)
+    Lambda = datatype(100000)
     eps = datatype(1e-6)
     n_trunc = datatype(10) #omega_n is truncated at n_trunc * Lambda
     expan_trunc = 100
