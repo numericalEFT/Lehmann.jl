@@ -101,10 +101,10 @@ function addBasisBlock!(basis::Basis, idx, verbose)
     basis.mesh.residual[idx] = 0 # the selected mesh grid has zero residual
     #print("$(mirror(basis.mesh, idx))\n")
     gridmirror , idxmirror = mirror(basis.mesh, idx)
-    print(idxmirror)
+    #print("mirror $(idx) $(idxmirror)\n")
     for (gi,grid) in enumerate(gridmirror)
         addBasis!(basis, grid, verbose)
-        L2Res = L2Residual(basis.mesh)
+        #L2Res = L2Residual(basis.mesh)
         # if typeof(basis.mesh)<:FreqFineMesh
         #     if output && num % 5 == 0 &&  typeof(basis.mesh)<: TauFineMesh#MatsuFineMesh
         #         pic = plot(ylabel = "residual")
@@ -168,24 +168,24 @@ function updateResidual!(basis::Basis{Grid, Mesh, F, D}) where {Grid,Mesh,F,D}
             end
         end
     end
-    if basis.mesh.simplegrid
-        Threads.@threads for idx in 1:length(mesh.L2grids)
-            candidate = mesh.L2grids[idx]
-            pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
-            #pp = q[basis.N] * dot(mesh, candidate, basis.grid[basis.N])
-            _residual = mesh.residual_L2[idx] - abs(pp) * abs(pp)
-            # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
-            # println("working on $candidate : $_residual")
-            if _residual < 0
-                if _residual < -basis.rtol
-                    @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual_L2[idx]) - $(abs(pp)^2) = $_residual")
-                end
-                mesh.residual_L2[idx] = 0
-            else
-                mesh.residual_L2[idx] = _residual
-            end
-        end
-    end
+    # if basis.mesh.simplegrid
+    #     Threads.@threads for idx in 1:length(mesh.L2grids)
+    #         candidate = mesh.L2grids[idx]
+    #         pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
+    #         #pp = q[basis.N] * dot(mesh, candidate, basis.grid[basis.N])
+    #         _residual = mesh.residual_L2[idx] - abs(pp) * abs(pp)
+    #         # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
+    #         # println("working on $candidate : $_residual")
+    #         if _residual < 0
+    #             if _residual < -basis.rtol
+    #                 @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual_L2[idx]) - $(abs(pp)^2) = $_residual")
+    #             end
+    #             mesh.residual_L2[idx] = 0
+    #         else
+    #             mesh.residual_L2[idx] = _residual
+    #         end
+    #     end
+    # end
 end
 
 # function updateResidual!(basis::Basis{Grid, Mesh, F, D}, candidate) where {Grid,Mesh,F,D}
@@ -227,9 +227,9 @@ function GramSchmidt(basis::Basis{G,M,F,D}) where {G,M,F,D}
     newgrid = basis.grid[end]
 
     overlap = [dot(basis.mesh, basis.grid[j], newgrid) for j in 1:basis.N-1]
-    if !isempty(overlap)
-        println( "$(maximum(imag(overlap)))\n" )
-    end
+    # if !isempty(overlap)
+    #     println( "$(maximum(imag(overlap)))\n" )
+    # end
     for qi in 1:basis.N-1
         _R[qi, end] = basis.Q[:, qi]' * overlap
         _Q[:, end] -= _R[qi, end] * _Q[:, qi]  # <q, qnew> q
@@ -238,7 +238,7 @@ function GramSchmidt(basis::Basis{G,M,F,D}) where {G,M,F,D}
     _norm = dot(basis.mesh, newgrid, newgrid) - _R[:, end]' * _R[:, end]
     _norm = sqrt(abs(_norm))
 
-    @assert _norm > eps(F(1)) * 100 "$_norm is too small as a denominator!\nnewgrid = $newgrid\nexisting grid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
+    @assert _norm > eps(F(1)) * 100 "$_norm is too small as a denominator!"#\nnewgrid = $newgrid\nexisting grid = $(basis.grid)\noverlap=$overlap\nR=$_R\nQ=$_Q"
 
     _R[end, end] = _norm
     _Q[:, end] /= _norm

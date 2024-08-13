@@ -67,8 +67,8 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
             # elseif D == 3
         elseif D == 1
             if simplegrid
-                candidate_grid = log_ωGrid(Float(init), Float(factor*Λ), Float(ratio))# Float(1.35^(log(1e-6) / log(rtol))))  
-                #candidate_grid = matsu_ωGrid(50, Float(1.0))
+                #candidate_grid = log_ωGrid(Float(init), Float(factor*Λ), Float(ratio))# Float(1.35^(log(1e-6) / log(rtol))))  
+                candidate_grid = matsu_ωGrid(80, Float(1.0))
                 #fine_ωGrid(Float(10Λ), 1, Float(1.3))
             else
                 candidate_grid = _finegrid

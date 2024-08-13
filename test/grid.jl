@@ -3,7 +3,7 @@ function fine_ωGrid_test(Λ::Float, degree, ratio::Float) where {Float}
     N = Int(floor(log(Λ) / log(ratio) + 1))
 
     grid = CompositeGrid.LogDensedGrid(
-        :cheb,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
+        :gauss,# The top layer grid is :gauss, optimized for integration. For interpolation use :cheb
         [0.0, Λ],# The grid is defined on [0.0, β]
         [0.0,],# and is densed at 0.0 and β, as given by 2nd and 3rd parameter.
         N,# N of log grid

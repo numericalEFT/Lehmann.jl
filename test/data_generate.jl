@@ -135,7 +135,7 @@ function L2normτ(value_dlr, dlr, case, grid, poles=nothing, weight=nothing, spa
 
     # println("fine grid size: $(length(grid)) within [$(grid[1]), $(grid[2])]")
     # return grid
-    fineGrid = fine_τGrid(dlr.Euv, 12, typeof(dlr.Euv)(1.5), :gauss)
+    fineGrid = fine_τGrid(dlr.Euv, 128, typeof(dlr.Euv)(1.5), :gauss)
     if space == :n
         value = real(matfreq2tau(dlr, value_dlr, fineGrid, grid))
     else
@@ -320,7 +320,7 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
     eta2 = 0.0
     block = zeros(dtype, 10)
     print(dtype)
-    omega_grid, tau_grid, n_grid= generate_grid(dlr10.rtol, dlr10.Euv, dtype(10.0), :t, false, dlr10.Euv)
+    omega_grid, tau_grid, n_grid= generate_grid(dlr10.rtol, dlr10.Euv, dtype(10.0), :τ, false, dlr10.Euv)
     #e3 e-8 3 1.9   / e5 e-8 5 2.3 110 86/ e5 -12 7 2.3 140 118/ 
     degree = 3
     ratio = dtype(2.5^(log(1e-4) / log(eps)))
@@ -352,6 +352,8 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
     # println("ngrid: $(length(sample_ngrid))  $(length(dlr.n))")
     # println("taugrid: $(length(sample_taugrid))  $(length(dlr.τ))")
     if case == MultiPole
+        maxerr= []
+        maxerr2 = [ ]
         for i in 1:N
             eff_poles = poles[i, :]
             weight = weights[i, :]
@@ -371,8 +373,9 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
             value2, err2, max_err2 = L2normτ(Gndlr, dlr10, case, dlr10.n, eff_poles, weight, :n)
             #modulus = abs(sum(dlreff))
 
-
-            println("eta: $(err/eps) $(max_err) $(err2/eps) $(max_err2)\n")
+            append!(maxerr, err)
+            append!(maxerr2, err2)
+            #println("eta: $(err/eps) $(max_err) $(err2/eps) $(max_err2)\n")
 
             if output
 
@@ -396,6 +399,7 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
             max_err_sum += max_err
             block[(i-1)÷(N÷10)+1] += err / N * 10
         end
+        println("max: $(maximum(maxerr)/eps) $(maximum(maxerr2)/eps)\n")
     else
 
         Gtaudlr = case(dlr10, dlr10.τ, :τ)
@@ -440,11 +444,11 @@ function test_err_cheby(case, isFermi, symmetry, Euv, β, eps, poles, weights; d
 end
 
 
-#cases = [MultiPole]
-cases = [SemiCircle]
-Λ = [1.6e3] #, 1e4, 1e5, 1e6, 1e7]
+cases = [MultiPole]
+#cases = [SemiCircle]
+Λ = [1e4] #, 1e4, 1e5, 1e6, 1e7]
 
-rtol = [1e-6,]# 1e-12]
+rtol = [1e-8,]# 1e-12]
 #rtol = [1e-4, 1e-6, 1e-8, 1e-10, 1e-12]# 1e-6 , 1e-8, 1e-10, 1e-12]
 
 #Λ = [1e3, 1e5, 1e6, 1e7]
@@ -452,8 +456,8 @@ rtol = [1e-6,]# 1e-12]
 #rtol = [1e-10]
 
 
-N_poles = 100
-N = 100
+N_poles = 2
+N = 10000
 dtype = Float64
 #dtype = BigFloat
 #setprecision(128)
@@ -472,7 +476,8 @@ for i in 1:N
     weights[i, :] = rand(dtype, N_poles)#2.0 * rand(dtype, N_poles) .- 1.0
     weights[i, :] = weights[i, :] / sum(abs.(weights[i, :]))
 end
-
+print("poles $(poles[1:10,1])\n")
+print("weights $(weights[1:10,1])\n")
 for case in cases
     for l in Λ
         for r in rtol

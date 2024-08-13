@@ -23,32 +23,8 @@ struct TauFineMesh{Float} <: FQR.FineMesh
     residual::Vector{Float}
 
     ## for frequency mesh only ###
-    fineGrid::CompositeG.Composite        # fine grid for each dimension
-    function TauFineMesh{Float}(Λ, FreqMesh; sym=1, degree = 12, ratio = 2.0) where {Float}
-        # initialize the residual on fineGrid with <g, g>
+    fineGrid::Vector{Float}        # fine grid for each dimension
 
-        #_finegrid = Float.(fineGrid(Λ, 24, rtol))
-        _finegrid = (fine_τGrid(Float(Λ), degree, Float(ratio) ))
-
-        println(_finegrid.bound)
-        #_finegrid = Float.(τChebyGrid(Λ))
-        # separationTest(_finegrid)
-        mesh = new{Float}(sym, [], [], [], _finegrid)
-
-        for (xi, x) in enumerate(_finegrid)
-            coord = xi
-            #if irreducible(coord, sym, Nfine)  # if grid point is in the reducible zone, then skip residual initalization
-            vec = [Spectral.kernelSymT(x, ω, Float.(1.0)) for ω in FreqMesh]
-            g = TauGrid(x, coord, vec)
-            push!(mesh.candidates, g)
-            push!(mesh.residual, FQR.dot(mesh, g, g))
-            push!(mesh.selected, false)
-            #end
-        end
-       
-        println("fine mesh initialized.")
-        return mesh
-    end
     function TauFineMesh(U::AbstractMatrix{Float}, finegrid; sym=1) where {Float}
         # initialize the residual on fineGrid with <g, g>
         #_finegrid = Float.(τChebyGrid(Λ))

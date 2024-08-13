@@ -29,7 +29,7 @@ struct MatsuFineMesh{Float} <: FQR.FineMesh
         _finegrid = Int.(nGrid(isFermi, Float(Λ), degree, Float(ratio) ))
         #print("ngrid $(_finegrid)\n")
         # separationTest(_finegrid)
-        mesh = new(isFermi, sym, [], [], [], _finegrid)
+        mesh = new{Float}(isFermi, sym, [], [], [], _finegrid)
 
         for (xi, x) in enumerate(_finegrid)
             coord = xi
@@ -46,6 +46,22 @@ struct MatsuFineMesh{Float} <: FQR.FineMesh
             #end
         end
         
+        return mesh
+    end
+
+    function MatsuFineMesh{Float}(U::AbstractMatrix, finegrid, isFermi; sym=1) where {Float}
+        mesh = new{Float}(isFermi, sym, [], [], [], finegrid)
+
+        for (xi, x) in enumerate(finegrid)
+            coord = xi
+            #if irreducible(coord, sym, Nfine)  # if grid point is in the reducible zone, then skip residual initalization
+           vec = U[xi, :]
+            g = MatsuGrid(x, coord, vec)
+            push!(mesh.candidates, g)
+            push!(mesh.residual, real.(FQR.dot(mesh, g, g)) )
+            push!(mesh.selected, false)
+            #end
+        end
         return mesh
     end
 end
