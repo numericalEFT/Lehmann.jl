@@ -2,6 +2,8 @@
 using Lehmann
 using StaticArrays, Printf
 using CompositeGrids
+using DelimitedFiles
+
 # const Float = BigFloat
 # const Double = BigFloat
 const DotF = BigFloat
@@ -19,6 +21,7 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
     color::Int                            # D+1 sectors
     symmetry::Int                         # symmetrize colors and (omega1, omega2) <-> (omega2, omega1)
     candidates::Vector{FreqGrid{D,Float}}       # vector of grid points
+    sortindex::Vector{Int}
     #candidates_simple::Vector{FreqGrid{D,Float}}       # vector of grid points
     selected::Vector{Bool}
     residual::Vector{Double}
@@ -32,8 +35,11 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
 
     function FreqFineMesh{D,Float,Double}(Λ, rtol; sym=1, degree=12, ratio=2.0, factor = 1000, init=1.0, simplegrid=false) where {D,Float,Double}
         # initialize the residual on fineGrid with <g, g>
-       # _finegrid = fine_ωGrid(Float(Λ), degree, Float(ratio))
-       _finegrid = fine_ωGrid(Float(Λ), 12, Float(1.5))
+        # _finegrid = fine_ωGrid(Float(Λ), degree, Float(ratio))
+        _finegrid = fine_ωGrid(Float(Λ), 12, Float(1.5))
+        # grid = readdlm("./omegagrid.txt", Float)
+        # grid = abs.(reverse(candidate_grid))
+        # _finegrid = vcat(grid, _finegrid)
         #separationTest(D, _finegrid)
         Nfine = length(_finegrid)
 
@@ -48,7 +54,7 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
 
         color = D + 1
         # color = 1
-        mesh = new{D,Float,Double}(color, sym, [], [], [], [],[], _finegrid, _cache1, _cache2, simplegrid)
+        mesh = new{D,Float,Double}(color, sym, [],[], [], [], [],[], _finegrid, _cache1, _cache2, simplegrid)
 
         if D == 2
             for (xi, x) in enumerate(_finegrid)
@@ -68,7 +74,10 @@ struct FreqFineMesh{D,Float,Double} <: FQR.FineMesh
         elseif D == 1
             if simplegrid
                 #candidate_grid = log_ωGrid(Float(init), Float(factor*Λ), Float(ratio))# Float(1.35^(log(1e-6) / log(rtol))))  
-                candidate_grid = matsu_ωGrid(80, Float(1.0))
+                #candidate_grid = matsu_ωGrid(80, Float(1.0))
+                
+                candidate_grid = readdlm("./omegagrid.txt", Float)
+                candidate_grid= abs.(reverse(candidate_grid[1:2:end]))
                 #fine_ωGrid(Float(10Λ), 1, Float(1.3))
             else
                 candidate_grid = _finegrid

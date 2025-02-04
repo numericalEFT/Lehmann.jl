@@ -168,24 +168,24 @@ function updateResidual!(basis::Basis{Grid, Mesh, F, D}) where {Grid,Mesh,F,D}
             end
         end
     end
-    # if basis.mesh.simplegrid
-    #     Threads.@threads for idx in 1:length(mesh.L2grids)
-    #         candidate = mesh.L2grids[idx]
-    #         pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
-    #         #pp = q[basis.N] * dot(mesh, candidate, basis.grid[basis.N])
-    #         _residual = mesh.residual_L2[idx] - abs(pp) * abs(pp)
-    #         # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
-    #         # println("working on $candidate : $_residual")
-    #         if _residual < 0
-    #             if _residual < -basis.rtol
-    #                 @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual_L2[idx]) - $(abs(pp)^2) = $_residual")
-    #             end
-    #             mesh.residual_L2[idx] = 0
-    #         else
-    #             mesh.residual_L2[idx] = _residual
-    #         end
-    #     end
-    # end
+    if hasfield(typeof(basis.mesh), :simplegrid) && basis.mesh.simplegrid
+        Threads.@threads for idx in 1:length(mesh.L2grids)
+            candidate = mesh.L2grids[idx]
+            pp = sum(q[j] * dot(mesh, candidate, basis.grid[j]) for j in 1:basis.N)
+            #pp = q[basis.N] * dot(mesh, candidate, basis.grid[basis.N])
+            _residual = mesh.residual_L2[idx] - abs(pp) * abs(pp)
+            # @assert isnan(_residual) == false "$pp and $([q[j] for j in 1:basis.N]) => $([dot(mesh, basis.grid[j], candidate) for j in 1:basis.N])"
+            # println("working on $candidate : $_residual")
+            if _residual < 0
+                if _residual < -basis.rtol
+                    @warn("warning: residual smaller than 0 at $candidate got $(mesh.residual_L2[idx]) - $(abs(pp)^2) = $_residual")
+                end
+                mesh.residual_L2[idx] = 0
+            else
+                mesh.residual_L2[idx] = _residual
+            end
+        end
+    end
 end
 
 # function updateResidual!(basis::Basis{Grid, Mesh, F, D}, candidate) where {Grid,Mesh,F,D}

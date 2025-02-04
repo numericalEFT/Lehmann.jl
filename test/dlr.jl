@@ -1,21 +1,36 @@
 using FastGaussQuadrature, Printf
+using CompositeGrids
+using LinearAlgebra
+using GenericLinearAlgebra
+using Random
+include("../src/SDLR/grid.jl")
 rtol(x, y) = maximum(abs.(x - y)) # / maximum(abs.(x))
 
 # SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr.Euv, dlr.β, dlr.isFermi, grid, type, dlr.symmetry, rtol = dlr.rtol, degree = 24, regularized = true)
 SemiCircle(dlr, grid, type) = Sample.SemiCircle(dlr, type, grid, degree=24, regularized=true)
-function MultiPole(dlr, grid, type)
-    Euv = dlr.Euv
-    poles = [-Euv, -0.2 * Euv, 0.0, 0.8 * Euv, Euv]
+function MultiPole(dlr, grid, type, poles, weight)  
     # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
-    return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+    return Sample.MultiPole(dlr, type, poles, grid, weight; regularized=true)
 end
+# function MultiPole(dlr, grid, type)
+#     Euv = dlr.Euv
+#     # dtype = typeof(Euv)
+#     # poles = 2.0 * rand(dtype,1) .- 1.0
+#     # print(poles)
+#     # poles *= Euv
 
-function MultiPole(dlr, grid, type, coeff)
-    Euv = dlr.Euv
-    poles = coeff * Euv
-    # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
-    return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
-end
+#     poles = [-0.626881264308736*Euv] #, -0.3 * Euv, 0.0, 0.125 * Euv, 0.224Euv]
+#     print(poles)
+#      # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+#     return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+# end
+
+# function MultiPole(dlr, grid, type, coeff)
+#     Euv = dlr.Euv
+#     poles = coeff * Euv
+#     # return Sample.MultiPole(dlr.β, dlr.isFermi, grid, type, poles, dlr.symmetry; regularized = true)
+#     return Sample.MultiPole(dlr, type, poles, grid; regularized=true)
+# end
 
 
 function bare_G(dlr, grid, type)
@@ -60,14 +75,23 @@ function bare_G_τ(dlr, grid)
     return G
 end
 
-function compare(case, a, b, eps, requiredratio, para="")
+function compare_L2(case, err,  eps, requiredratio, para="")
+    ratio = isfinite(err) ? Int(round(err / eps)) : 0
+    if ratio > requiredratio
+        printstyled("$case, $para err: ", color=:white)
+        printstyled("$(round(err, sigdigits=3)) = $ratio x rtol\n", color=:green)
+    end
+    @test err .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
+end
+
+function compare(case, a, b,  eps, requiredratio, para="")
     err = rtol(a, b)
     ratio = isfinite(err) ? Int(round(err / eps)) : 0
     if ratio > 50
         printstyled("$case, $para err: ", color=:white)
         printstyled("$(round(err, sigdigits=3)) = $ratio x rtol\n", color=:green)
     end
-    @test rtol(a, b) .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
+    @test err .< requiredratio * eps # dlr should represent the Green's function up to accuracy of the order eps
 end
 
 function compare_atol(case, a, b, atol, para="")
@@ -129,42 +153,78 @@ end
 
     function test(case, isFermi, symmetry, Euv, β, eps; dtype=Float64)
         # println("Test $case with isFermi=$isFermi, Symmetry = $symmetry, Euv=$Euv, β=$β, rtol=$eps")
+        Random.seed!(8)
         para = "fermi=$isFermi, sym=$symmetry, Euv=$Euv, β=$β, rtol=$eps"
         dlr = DLRGrid(Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct dlr basis
-        #dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry) #construct denser dlr basis for benchmark purpose
-        dlr10 = DLRGrid(10Euv, β, eps, isFermi, symmetry, dtype=dtype) #construct denser dlr basis for benchmark purpose
-        if symmetry == :sym
-            error_tolerance = 100
-        else
-            error_tolerance = 110
-        end
+        fine_tau =  fine_τGrid_test(dtype(Euv),64, dtype(1.5))
+        fine_n = Int.(uni_ngrid(true, dtype(10*Euv)))
+        
+      
+        error_tolerance = 25
+        # if symmetry == :sym
+        #     error_tolerance = 3
+        # else
+        #     error_tolerance = 10
+        # end
         #=========================================================================================#
         #                              Imaginary-time Test                                        #
         #=========================================================================================#
         # get imaginary-time Green's function 
-        Gdlr = case(dlr, dlr.τ, :τ)
+        τSample = fine_tau
+        nSample = dlr.n
+        # else
+        # if Euv > 1e5
+        #     nSample = dlr.n
+        # else
+        #     nSample = fine_n
+        # end
+        if case == MultiPole
+            dtype = typeof(dlr.Euv)
+            N_poles = 5
+            poles = zeros(dtype, (N_poles))
+            weight = zeros(dtype, (N_poles))  
+            poles[:] = 2.0 * rand(dtype, N_poles) .- 1.0
+            weight[:] = rand(dtype, N_poles)
+            weight[:] = weight[:] / sum(abs.(weight[:]))
+            Euv = dlr.Euv
+            #print(poles, weight)
+            poles *= Euv
+            Gdlr = case(dlr, dlr.τ, :τ, poles, weight)
+            Gsample = case(dlr, τSample, :τ, poles, weight)
+            Gndlr = case(dlr, dlr.n, :n, poles, weight)
+            Gnsample = case(dlr, nSample, :n, poles, weight)
+        else
+            Gdlr = case(dlr, dlr.τ, :τ)
+            Gsample = case(dlr, τSample, :τ)
+            Gndlr = case(dlr, dlr.n, :n)
+            Gnsample = case(dlr, nSample, :n)
+        end
+
+        
         # get imaginary-time Green's function for τ sample 
-        τSample = dlr10.τ
-        Gsample = case(dlr, τSample, :τ)
+       
+      
         ########################## imaginary-time to dlr #######################################
         coeff = tau2dlr(dlr, Gdlr)
-        @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
+     
         Gfitted = dlr2tau(dlr, coeff, τSample)
-        @test size(dlr.kernel_τ) == (length(dlr.τ), length(dlr.ω))
-        Gfitted = tau2tau(dlr, Gdlr, τSample)
-        compare("dlr τ → dlr → generic τ $case", Gsample, Gfitted, eps, 100, para)
+        err = sqrt(Interp.integrate1D( (abs.(Gsample -Gfitted)).^2,  τSample))
+        #err = maximum(abs.(Gsample-Gfitted))
+        #Gfitted = tau2tau(dlr, Gdlr, τSample)
+        compare_L2("dlr τ → dlr → generic τ $case", err, eps, error_tolerance, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[1, ti],  Gfitted[1, ti], Gsample[1, ti] - Gfitted[1, ti])
         # end
         
-        compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, error_tolerance, para)
+        #compare("generic τ → dlr → τ $case", tau2tau(dlr, Gsample, dlr.τ, τSample), Gdlr, eps, error_tolerance, para)
         #=========================================================================================#
         #                            Matsubara-frequency Test                                     #
         #=========================================================================================#
         # get Matsubara-frequency Green's function
-        Gndlr = case(dlr, dlr.n, :n)
-        nSample = dlr10.n
-        Gnsample = case(dlr, nSample, :n)
+        
+       
+       
+       
 
         # Matsubara frequency to dlr
         coeffn = matfreq2dlr(dlr, Gndlr)
@@ -172,21 +232,24 @@ end
         #     for (ni, n) in enumerate(nSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", n, real(Gnsample[1, ni]),  real(Gnfitted[1, ni]), abs(Gnsample[1, ni] - Gnfitted[1, ni]))
         # end
-
-        compare("dlr iω → dlr → generic iω $case ", Gnsample, Gnfitted, eps, 100, para)
-        compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, error_tolerance, para)
+        err = norm(Gnsample - Gnfitted)
+        #err = maximum(abs.(Gnsample-Gnfitted))
+        compare_L2("dlr iω → dlr → generic iω $case ", err, eps, error_tolerance, para)
+        #compare("generic iω → dlr → iω $case", matfreq2matfreq(dlr, Gnsample, dlr.n, nSample), Gndlr, eps, error_tolerance, para)
 
         #=========================================================================================#
         #                            Fourier Transform Test                                     #
         #=========================================================================================#
         Gnfourier = tau2matfreq(dlr, Gdlr, nSample)
-        compare("fourier τ→dlr→iω $case", Gnsample, Gnfourier, eps, 1000, para)
-        # for (ti, t) in enumerate(nSample)
-        #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, imag(Gnsample[2, ti]), imag(Gnfourier[2, ti]), abs(Gnsample[2, ti] - Gnfourier[2, ti]))
-        # end
+        err = norm(Gnsample - Gnfourier)
+        #err = maximum(abs.(Gnsample-Gnfourier))
+        compare_L2("fourier τ→dlr→iω $case", err, eps, error_tolerance, para)
+       
 
         Gfourier = matfreq2tau(dlr, Gndlr, τSample)
-        compare("fourier iω→dlr→τ $case", Gsample, Gfourier, eps, 1000, para)
+        err = sqrt(Interp.integrate1D( (abs.(Gsample -Gfourier)).^2,  τSample))
+        #err = maximum(abs.(Gsample-Gfourier))
+        compare_L2("fourier iω→dlr→τ $case", err, eps, error_tolerance, para)
         # for (ti, t) in enumerate(τSample)
         #     @printf("%32.19g    %32.19g   %32.19g   %32.19g\n", t / β, Gsample[2, ti],  real(Gfourier[2, ti]), abs(Gsample[2, ti] - Gfourier[2, ti]))
         # end
@@ -208,8 +271,9 @@ end
         end
     end
     # the accuracy greatly drops beyond Λ >= 1e8 and rtol<=1e-6
-    cases = [MultiPole]
-    Λ = [1e3, 1e4, 1e5]
+    cases = [SemiCircle, MultiPole]
+    #cases = [MultiPole]
+    Λ = [1e3, 1e4, 1e5, 1e6]
     rtol =[1e-4, 1e-6, 1e-8, 1e-10, 1e-12]
     for case in cases
         for l in Λ
@@ -343,7 +407,7 @@ end
     end
     tensorGτ_copy = tensorGτ
     tensorGn_copy = tensorGn
-
+    err = 
     compare("τ ↔ iω tensor", tau2matfreq(dlr, Gτ_copy), Gn, eps, 1000.0, para)
     @inferred tau2matfreq(dlr, Gτ_copy)
     @test Gτ ≈ Gτ_copy #make sure there is no side effect on G
