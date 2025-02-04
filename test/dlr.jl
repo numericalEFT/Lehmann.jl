@@ -1,7 +1,6 @@
 using FastGaussQuadrature, Printf
 using CompositeGrids
 using LinearAlgebra
-using GenericLinearAlgebra
 using Random
 include("../src/SDLR/grid.jl")
 rtol(x, y) = maximum(abs.(x - y)) # / maximum(abs.(x))
