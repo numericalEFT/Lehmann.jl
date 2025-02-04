@@ -84,6 +84,14 @@ end
         a = Spectral.kernelFermiT_dω3(tau, w, beta)
         b = central_fdm(5, 1)(w -> Spectral.kernelFermiT_dω2(tau, w, beta), w)
         @test abs(a - b) < atol
+
+        a = Spectral.kernelFermiT_dω4(tau, w, beta)
+        b = central_fdm(5, 1)(w -> Spectral.kernelFermiT_dω3(tau, w, beta), w)
+        @test abs(a - b) < atol
+
+        a = Spectral.kernelFermiT_dω5(tau, w, beta)
+        b = central_fdm(5, 1)(w -> Spectral.kernelFermiT_dω4(tau, w, beta), w)
+        @test abs(a - b) < atol
     end
 
     test_dω(1.0, 1.0, 1.0)
