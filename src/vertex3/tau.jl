@@ -49,7 +49,29 @@ struct TauFineMesh{Float} <: FQR.FineMesh
         println("fine mesh initialized.")
         return mesh
     end
+    function TauFineMesh(U::AbstractMatrix{Float}, finegrid; sym=1) where {Float}
+        # initialize the residual on fineGrid with <g, g>
+        #_finegrid = Float.(τChebyGrid(Λ))
+        # separationTest(_finegrid)
+        mesh = new{Float}(sym, [], [], [], finegrid)
+    
+        for (xi, x) in enumerate(finegrid)
+            coord = xi
+            #if irreducible(coord, sym, Nfine)  # if grid point is in the reducible zone, then skip residual initalization
+            vec = U[xi,:]
+            g = TauGrid(x, coord, vec)
+            push!(mesh.candidates, g)
+            push!(mesh.residual, FQR.dot(mesh, g, g))
+            push!(mesh.selected, false)
+            #end
+        end
+       
+        println("fine mesh initialized.")
+        return mesh
+    end
 end
+
+
 
 # function τChebyGrid(Λ, degree=24, print = true)
 #     npt = Int(ceil(log(Λ) / log(2.0))) - 2 # subintervals on [0,1/2] in tau space (# subintervals on [0,1] is 2*npt)
@@ -162,6 +184,8 @@ function FQR.dot(mesh, g1::TauGrid, g2::TauGrid)
     # println("dot: ", g1, ", ", g2)
         return dot(g1.vec, g2.vec)
 end
+
+
 
 if abspath(PROGRAM_FILE) == @__FILE__
 

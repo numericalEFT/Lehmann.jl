@@ -118,6 +118,7 @@ function DLRGrid(Euv, β, rtol, isFermi::Bool, symmetry::Symbol=:none;
         for dir in folder
             if length(searchdir(dir, filename)) > 0
                 #dlr file found
+                #println("Using the DLR file $filename in the folders $folder.")
                 return joinpath(dir, filename)
             end
         end

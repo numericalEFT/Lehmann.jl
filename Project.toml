@@ -5,12 +5,13 @@ version = "0.2.7"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
+CompositeGrids = "b5136c89-beeb-4521-9139-60d2cac8be56"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
-DoubleFloats = "497a8b3b-efae-58df-a0af-a86822472b78"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Quadmath = "be4d8f0f-7fa4-5f49-b795-2f01399ab2dd"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
@@ -19,7 +20,6 @@ FastGaussQuadrature = "0.4"
 Quadmath = "0.5"
 StaticArrays = "1"
 julia = "1.6"
-DoubleFloats = "1.2"
 
 [extras]
 CodecZlib = "944b1d66-785c-5afd-91f1-9de20f533193"
