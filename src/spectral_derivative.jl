@@ -177,6 +177,50 @@ function kernelFermiT_dω5(τ::T, ω::T, β::T) where {T<:AbstractFloat}
     )
 end
 
+"""
+    kernelFermiT_dω6(τ, ω, β)
+
+Compute the sixth derivative of the imaginary-time fermionic kernel with respect to ω.
+
+# Arguments
+- `τ`: the imaginary time, must be (-β, β]
+- `ω`: frequency
+- `β`: the inverse temperature 
+"""
+
+function kernelFermiT_dω6(τ::T, ω::T, β::T) where {T<:AbstractFloat}
+    (-β < τ <= β) || error("τ=$τ must be (-β, β] where β=$β")
+    if τ >= T(0.0)
+        sign = T(1)
+        if ω > T(0.0)
+            a, b = -τ, -β
+        else
+            a, b = β - τ, β
+        end
+    else
+        sign = -T(1)
+        if ω > T(0.0)
+            a, b = -(β + τ), -β
+        else
+            a, b = -τ, β
+        end
+    end
+    expa = exp(ω * a)
+    expb = exp(ω * b)
+    expmb = expm1(ω * b) # exp(ω*b) -1
+    exppb = 1 + expb
+    
+    return sign * expa / exppb * (
+        (expb^5 - 57expb^4 + 302expb^3 - 302expb^2 + 57expb - 1) * b^6 * expb / exppb^6 -
+        (expb^4 - 26expb^3 + 66expb^2 - 26expb + 1) * 6a * b^5 * expb / exppb^5 +
+        (expb^3 - 11expb^2 + 11expb - 1) * 15a^2 * b^4 * expb / exppb^4 -
+        (expb^2 - 4expb + 1) * 20a^3 * b^3 * expb / exppb^3 +
+        15a^4 * b^2 * expb * expmb / exppb^2 -
+        6a^5 * b * expb / exppb + 
+        a^6
+    )
+end
+
 # function ChainRulesCore.frule((_, Δτ, Δω, Δβ), ::typeof(kernelFermiT), τ::T, ω::T, β::T) where {T<:AbstractFloat}
 #     return kernelFermiT(τ, ω, β), (ZeroTangent(), kernelFermiT_dω(τ, ω, β) * Δω, ZeroTangent())
 # end
