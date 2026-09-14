@@ -330,7 +330,7 @@ function matfreq2dlr(dlrGrid::DLRGrid{T,S}, green::AbstractArray{TC,N}, nGrid=dl
         end
     else
         if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
-            if length(dlrGrid.kernel_n) == 1
+            if length(dlrGrid.kernel_nc) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
             kernel = dlrGrid.kernel_nc
@@ -409,7 +409,7 @@ function dlr2matfreq(dlrGrid::DLRGrid{T,S}, dlrcoeff::AbstractArray{TC,N}, nGrid
         end
     else
         if length(nGrid) == length(dlrGrid.n) && isapprox(nGrid, dlrGrid.n; rtol=10 * eps(T))
-            if length(dlrGrid.kernel_n) == 1
+            if length(dlrGrid.kernel_nc) == 1
                 dlrGrid.kernel_nc = Spectral.kernelΩ(T, Val(dlrGrid.isFermi), Val(S), nGrid, ωGrid, dlrGrid.β, true)
             end
             kernel = dlrGrid.kernel_nc
